@@ -211,6 +211,7 @@ app.listen(PORT, async () => {
 });
 
 // Catch-all: serve frontend for client-side routing (must be after API routes)
-app.get('*', (req, res) => {
+// Express 5 uses {*path} syntax instead of just *
+app.get('/{*path}', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
