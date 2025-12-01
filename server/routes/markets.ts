@@ -17,12 +17,26 @@ import { createOnChainMarket, syncAllMarketPools, getMarketProbabilities } from 
 import { getIntradayData } from '../services/stockApi';
 import { syncStockMarkets } from '../services/stockSync';
 import { Position, MarketStatus } from '../types/market';
+import { testDiscordWebhook } from '../services/discordBot';
 
 const router = express.Router();
 
 // Chart data cache to reduce API calls (cache for 5 minutes)
 const chartCache: Map<string, { data: any; timestamp: number }> = new Map();
 const CHART_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * GET /api/markets/test-discord
+ * Test the Discord webhook integration
+ */
+router.get('/test-discord', async (req, res) => {
+  try {
+    const success = await testDiscordWebhook();
+    res.json({ success, message: success ? 'Test tweet sent to Discord!' : 'Failed - check DISCORD_WEBHOOK_URL' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 /**
  * GET /api/markets/chart/:symbol

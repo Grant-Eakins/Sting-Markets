@@ -3,6 +3,7 @@ import { createOnChainMarket } from './blockchainSync';
 import { getBatchQuotes, POPULAR_STOCKS } from './stockApi';
 import { MarketStatus } from '../types/market';
 import { updateBlockchainMarketId } from './database';
+import { sendOpeningTweets } from './marketSettlement';
 
 /**
  * Get current time info in ET timezone
@@ -199,6 +200,20 @@ export async function syncStockMarkets(): Promise<void> {
     }
 
     console.log(`✅ Stock sync completed: ${created} new markets created (1 API call used)\n`);
+    
+    // Send opening price tweets to Discord for newly created markets
+    if (created > 0) {
+      const newMarkets = stocksToProcess
+        .filter(s => quotes[s.symbol])
+        .map(s => ({
+          stockSymbol: s.symbol,
+          stockName: s.name,
+          openingPrice: Math.round(quotes[s.symbol].price * 100),
+        }));
+      
+      console.log('📢 Sending opening price tweets to Discord...');
+      await sendOpeningTweets(newMarkets);
+    }
   } catch (error: any) {
     console.error('❌ Error during stock sync:', error.message);
     console.log('ℹ️  Sync will retry on next scheduled run\n');

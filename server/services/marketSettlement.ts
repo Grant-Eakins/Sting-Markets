@@ -1,9 +1,15 @@
 import { getMarketsReadyToSettle, settleMarket, lockExpiredMarkets, getActiveMarkets, updateMarketPrice } from './marketService';
 import { getStockQuote, getBatchQuotes } from './stockApi';
+import { sendPriceUpdateTweets, sendClosingPriceTweets, sendOpeningPriceTweets } from './discordBot';
+
+// Track last Discord update time to send every 3 hours
+let lastDiscordUpdateTime: number = 0;
+const THREE_HOURS_MS = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
 
 /**
  * Updates current stock prices for all active markets using batch API
  * Uses 1 API call for all symbols instead of 1 per symbol
+ * Sends Discord tweets every 3 hours
  */
 export async function updateActiveMarketPrices(): Promise<void> {
   const activeMarkets = getActiveMarkets();
@@ -22,18 +28,54 @@ export async function updateActiveMarketPrices(): Promise<void> {
     const quotes = await getBatchQuotes(symbols);
     
     // Update each market with its quote
+    const updatedMarkets = [];
     for (const market of activeMarkets) {
       const quote = quotes[market.stockSymbol];
       if (quote) {
         const currentPriceInCents = Math.round(quote.price * 100);
         updateMarketPrice(market.id, currentPriceInCents);
+        
+        // Collect data for Discord tweet
+        const priceChange = currentPriceInCents - market.openingPrice;
+        const priceChangePercent = (priceChange / market.openingPrice) * 100;
+        updatedMarkets.push({
+          stockSymbol: market.stockSymbol,
+          stockName: market.stockName,
+          currentPrice: currentPriceInCents,
+          openingPrice: market.openingPrice,
+          priceChangePercent,
+        });
       }
+    }
+    
+    // Send Discord tweets every 3 hours
+    const now = Date.now();
+    if (updatedMarkets.length > 0 && (now - lastDiscordUpdateTime) >= THREE_HOURS_MS) {
+      console.log('📢 Sending 3-hour price update tweets to Discord...');
+      await sendPriceUpdateTweets(updatedMarkets);
+      lastDiscordUpdateTime = now;
     }
     
     console.log(`✅ Updated ${activeMarkets.length} markets with 1 API call`);
   } catch (error: any) {
     console.error(`Error updating market prices:`, error.message);
   }
+}
+
+/**
+ * Send opening price tweets when new markets are created
+ */
+export async function sendOpeningTweets(markets: Array<{ stockSymbol: string; stockName?: string; openingPrice: number }>) {
+  const marketData = markets.map(m => ({
+    stockSymbol: m.stockSymbol,
+    stockName: m.stockName,
+    currentPrice: m.openingPrice,
+    openingPrice: m.openingPrice,
+    priceChangePercent: 0,
+  }));
+  
+  await sendOpeningPriceTweets(marketData);
+  lastDiscordUpdateTime = Date.now(); // Reset timer after opening tweets
 }
 
 /**
@@ -60,9 +102,21 @@ export async function checkAndSettleMarkets(): Promise<void> {
     
     console.log(`📊 Found ${marketsToSettle.length} markets ready to settle`);
     
+    // Collect settled market data for Discord
+    const settledMarkets = [];
+    
     // Settle each market
     for (const market of marketsToSettle) {
-      await settleMarketWithData(market.id, market.stockSymbol);
+      const result = await settleMarketWithData(market.id, market.stockSymbol, market.openingPrice);
+      if (result) {
+        settledMarkets.push(result);
+      }
+    }
+    
+    // Send closing price tweets to Discord
+    if (settledMarkets.length > 0) {
+      console.log('📢 Sending closing price tweets to Discord...');
+      await sendClosingPriceTweets(settledMarkets);
     }
     
     console.log('✅ Market settlement check completed\n');
@@ -73,8 +127,9 @@ export async function checkAndSettleMarkets(): Promise<void> {
 
 /**
  * Settles a market by fetching latest stock price
+ * Returns market data for Discord tweet
  */
-async function settleMarketWithData(marketId: string, stockSymbol: string): Promise<void> {
+async function settleMarketWithData(marketId: string, stockSymbol: string, openingPrice: number): Promise<{ stockSymbol: string; currentPrice: number; openingPrice: number; priceChangePercent: number } | null> {
   try {
     console.log(`\n🏁 Settling market: ${stockSymbol}`);
     
@@ -84,7 +139,7 @@ async function settleMarketWithData(marketId: string, stockSymbol: string): Prom
     
     if (!closingPrice) {
       console.error(`❌ Could not fetch price for "${stockSymbol}"`);
-      return;
+      return null;
     }
     
     console.log(`📈 Closing price: $${(closingPrice / 100).toFixed(2)}`);
@@ -97,8 +152,16 @@ async function settleMarketWithData(marketId: string, stockSymbol: string): Prom
     console.log(`   Price change: ${result.priceChange >= 0 ? '+' : ''}$${(result.priceChange / 100).toFixed(2)} (${result.priceChangePercent.toFixed(2)}%)`);
     console.log(`   Total payout: ${result.totalPayout.toFixed(4)} ETH`);
     
+    return {
+      stockSymbol,
+      currentPrice: closingPrice,
+      openingPrice,
+      priceChangePercent: result.priceChangePercent,
+    };
+    
   } catch (error: any) {
     console.error(`❌ Error settling market ${marketId}:`, error.message);
+    return null;
   }
 }
 
@@ -111,5 +174,5 @@ export async function manuallySettleMarket(marketId: string): Promise<void> {
     throw new Error('Market not found');
   }
   
-  await settleMarketWithData(marketId, market.stockSymbol);
+  await settleMarketWithData(marketId, market.stockSymbol, market.openingPrice);
 }
