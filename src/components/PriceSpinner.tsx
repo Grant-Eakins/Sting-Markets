@@ -264,8 +264,12 @@ export function PriceSpinner({
         const container = listRef.current;
         const middleElement = container.children[middleLevelIndex] as HTMLElement;
         if (middleElement) {
-          // Use scrollIntoView for more reliable centering
-          middleElement.scrollIntoView({ block: 'center', behavior: 'instant' });
+          // Use scrollTop to scroll within the container only (not the whole page)
+          const containerHeight = container.clientHeight;
+          const elementTop = middleElement.offsetTop;
+          const elementHeight = middleElement.offsetHeight;
+          const scrollPosition = elementTop - (containerHeight / 2) + (elementHeight / 2);
+          container.scrollTop = Math.max(0, scrollPosition);
           hasScrolled.current = true;
           console.log(`📍 Scrolled to middle bucket (index ${middleLevelIndex})`);
         }
@@ -359,11 +363,16 @@ export function PriceSpinner({
                   }
                 });
                 setSelectedLevel(closestIdx);
-                // Scroll to the found bucket
+                // Scroll within the container only (not the whole page)
                 if (listRef.current) {
-                  const element = listRef.current.children[closestIdx] as HTMLElement;
+                  const container = listRef.current;
+                  const element = container.children[closestIdx] as HTMLElement;
                   if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const containerHeight = container.clientHeight;
+                    const elementTop = element.offsetTop;
+                    const elementHeight = element.offsetHeight;
+                    const scrollPosition = elementTop - (containerHeight / 2) + (elementHeight / 2);
+                    container.scrollTo({ top: Math.max(0, scrollPosition), behavior: 'smooth' });
                   }
                 }
               }
