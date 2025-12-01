@@ -17,10 +17,35 @@ export async function initializeMarketsFromDb(): Promise<void> {
 
   try {
     const dbMarkets = await loadAllMarkets();
+    const now = new Date();
+    
     for (const market of dbMarkets) {
+      // Fix stale market statuses on startup
+      // If lock time passed but still ACTIVE, mark as LOCKED
+      if (market.status === MarketStatus.ACTIVE && now >= new Date(market.lockTime)) {
+        market.status = MarketStatus.LOCKED;
+        console.log(`🔒 Auto-locked stale market: ${market.stockSymbol}`);
+        updateMarketStatus(market.id, MarketStatus.LOCKED).catch(() => {});
+      }
+      
+      // If settle time passed but still LOCKED (or ACTIVE), mark as SETTLED
+      // This allows new markets to be created for the same symbol
+      if ((market.status === MarketStatus.ACTIVE || market.status === MarketStatus.LOCKED) 
+          && now >= new Date(market.settleTime)) {
+        market.status = MarketStatus.SETTLED;
+        console.log(`🏁 Auto-settled stale market: ${market.stockSymbol}`);
+        updateMarketStatus(market.id, MarketStatus.SETTLED).catch(() => {});
+      }
+      
       markets.set(market.id, market);
     }
+    
+    const activeCount = dbMarkets.filter(m => m.status === MarketStatus.ACTIVE).length;
+    const lockedCount = dbMarkets.filter(m => m.status === MarketStatus.LOCKED).length;
+    const settledCount = dbMarkets.filter(m => m.status === MarketStatus.SETTLED).length;
+    
     console.log(`✅ Loaded ${dbMarkets.length} markets from database`);
+    console.log(`   Active: ${activeCount}, Locked: ${lockedCount}, Settled: ${settledCount}`);
   } catch (error: any) {
     console.error('❌ Failed to load markets from database:', error.message);
   }
