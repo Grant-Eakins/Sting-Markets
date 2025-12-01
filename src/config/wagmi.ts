@@ -1,13 +1,13 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { base, baseSepolia } from 'wagmi/chains';
 
-// Get WalletConnect project ID or use a default for development
-const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'c3ab2e3e3b3e3e3e3e3e3e3e3e3e3e3e';
+// WalletConnect Project ID from https://cloud.walletconnect.com/
+const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'eb33070102c31c71949eeac977f28689';
 
 export const config = getDefaultConfig({
-  appName: 'Mindshare Token',
+  appName: 'Sting Markets',
   projectId,
-  chains: [base, baseSepolia],
+  chains: [baseSepolia, base], // Sepolia first since that's our active network
   ssr: false,
 });
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +53,7 @@ export function PriceSpinner({
   // Reset scroll flag when market changes so it re-centers
   useEffect(() => {
     hasScrolled.current = false;
-  }, [blockchainMarketId]);
+  }, [blockchainMarketId, openingPrice]);
 
   // Click outside handler to deselect bucket
   useEffect(() => {
@@ -114,7 +114,11 @@ export function PriceSpinner({
   }, [isConfirmed, onBetPlaced]);
 
   const currentPriceUSD = currentPrice / 100;
+  const openingPriceUSD = openingPrice / 100;
   const totalPool = upPool + downPool;
+  
+  // Price levels should be centered on opening price (base price for percent changes)
+  const basePriceUSD = openingPriceUSD;
   
   // Contract bucket ordering (from ProportionalMarket.sol):
   // INTRADAY (23 buckets): 0 = >+10%, 10 = +0% to +1%, 11 = 0% to -1%, 21 = <-10%
@@ -139,67 +143,52 @@ export function PriceSpinner({
   
   const priceLevels: PriceLevel[] = [];
   
-  // Build price levels to match contract bucket ordering
-  // Contract: bucket 0 = highest positive change, bucket N = lowest negative change
+  // Build price levels - simplified view with one bucket per percentage
+  // For intraday: +10%, +9%, +8%, ..., +1%, 0%, -1%, ..., -9%, -10%
+  // That's 21 display buckets (but contract has 23 - we combine extreme buckets)
   
-  // First: extreme positive (>+10%) - bucket 0
-  priceLevels.push({
-    price: currentPriceUSD * 1.10,
-    percentChange: 10,
-    liquidity: 0,
-    probability: probabilities?.[0] ?? uniformProbability,
-    bucketIndex: 0,
-  });
+  // All percent changes are relative to OPENING PRICE (basePriceUSD)
   
-  // Positive buckets (from +10% down to +0.5%/+1%)
-  for (let i = 1; i <= numLevelsPerSide; i++) {
-    const percentChange = (numLevelsPerSide - i + 1) * increment; // 10%, 9.5%, 9%, ... 0.5%
-    const price = currentPriceUSD * (1 + percentChange / 100);
-    const bucketIndex = i; // Buckets 1 to numLevelsPerSide
+  // Positive buckets: +10% down to +1%
+  for (let i = 0; i <= numLevelsPerSide; i++) {
+    const percentChange = (numLevelsPerSide - i) * increment; // 10, 9, 8, ..., 0
+    const price = basePriceUSD * (1 + percentChange / 100);
+    // Map to contract bucket index
+    // For display bucket +10%, use contract bucket 0 (>+10%) + bucket 1 (+10% range) combined probability
+    const bucketIndex = i === 0 ? 0 : i; // First display bucket maps to contract bucket 0
     
     priceLevels.push({
       price,
       percentChange,
       liquidity: 0,
-      probability: probabilities?.[bucketIndex] ?? uniformProbability,
-      bucketIndex,
+      // For the +10% bucket, combine probabilities from bucket 0 (>+10%) and bucket 1 (+9-10%)
+      probability: i === 0 
+        ? (probabilities?.[0] ?? uniformProbability) + (probabilities?.[1] ?? uniformProbability)
+        : (probabilities?.[bucketIndex + 1] ?? uniformProbability),
+      bucketIndex: i === 0 ? 0 : bucketIndex + 1, // Bet on bucket 0 for +10%, otherwise offset by 1
     });
   }
   
-  // Middle bucket (0% change) - buckets numLevelsPerSide+1 (index 10 or 20)
-  const middleBucketIndex = numLevelsPerSide;
-  priceLevels.push({
-    price: currentPriceUSD,
-    percentChange: 0,
-    liquidity: 0,
-    probability: probabilities?.[middleBucketIndex] ?? uniformProbability,
-    bucketIndex: middleBucketIndex,
-  });
-  
-  // Negative buckets (from -0.5%/-1% down to -10%)
+  // Negative buckets: -1% down to -10%
   for (let i = 1; i <= numLevelsPerSide; i++) {
-    const percentChange = -i * increment; // -0.5%, -1%, ... -10%
-    const price = currentPriceUSD * (1 + percentChange / 100);
-    const bucketIndex = numLevelsPerSide + i; // Buckets numLevelsPerSide+1 to 2*numLevelsPerSide
+    const percentChange = -i * increment; // -1, -2, ..., -10
+    const price = basePriceUSD * (1 + percentChange / 100);
+    const bucketIndex = numLevelsPerSide + 1 + i; // Offset past 0% bucket
+    
+    // For -10%, combine with <-10% bucket
+    const isExtreme = i === numLevelsPerSide;
+    const lastBucketIndex = totalBuckets - 1;
     
     priceLevels.push({
       price,
       percentChange,
       liquidity: 0,
-      probability: probabilities?.[bucketIndex] ?? uniformProbability,
-      bucketIndex,
+      probability: isExtreme
+        ? (probabilities?.[bucketIndex] ?? uniformProbability) + (probabilities?.[lastBucketIndex] ?? uniformProbability)
+        : (probabilities?.[bucketIndex] ?? uniformProbability),
+      bucketIndex: isExtreme ? lastBucketIndex : bucketIndex, // Bet on last bucket for -10%
     });
   }
-  
-  // Last: extreme negative (<-10%) - last bucket
-  const lastBucketIndex = totalBuckets - 1;
-  priceLevels.push({
-    price: currentPriceUSD * 0.90,
-    percentChange: -10,
-    liquidity: 0,
-    probability: probabilities?.[lastBucketIndex] ?? uniformProbability,
-    bucketIndex: lastBucketIndex,
-  });
   
   // Calculate liquidity for each level based on probability and total pool
   // Filter out dust amounts (< 0.0001 ETH) from display
@@ -257,31 +246,51 @@ export function PriceSpinner({
 
   // Find the index of the 0% change bucket for scrolling
   const middleLevelIndex = priceLevels.findIndex(l => l.percentChange === 0);
+  
+  // Debug: log the bucket structure
+  useEffect(() => {
+    console.log(`📊 PriceSpinner bucket structure:`, {
+      totalBuckets,
+      numLevelsPerSide,
+      priceLevelsCount: priceLevels.length,
+      middleLevelIndex,
+      buckets: priceLevels.map(l => `${l.percentChange}%`).join(', ')
+    });
+  }, [priceLevels.length, middleLevelIndex]);
 
   // Scroll to center (0% bucket) on mount and when market changes
-  useEffect(() => {
-    // Use setTimeout to ensure DOM is fully ready
+  // Use useLayoutEffect to scroll before browser paint
+  useLayoutEffect(() => {
     const scrollToMiddle = () => {
-      if (listRef.current && !hasScrolled.current && middleLevelIndex !== -1) {
+      if (listRef.current && middleLevelIndex !== -1) {
         const container = listRef.current;
         const middleElement = container.children[middleLevelIndex] as HTMLElement;
         if (middleElement) {
-          // Use scrollTop to scroll within the container only (not the whole page)
           const containerHeight = container.clientHeight;
           const elementTop = middleElement.offsetTop;
           const elementHeight = middleElement.offsetHeight;
           const scrollPosition = elementTop - (containerHeight / 2) + (elementHeight / 2);
           container.scrollTop = Math.max(0, scrollPosition);
-          hasScrolled.current = true;
-          console.log(`📍 Scrolled to middle bucket (index ${middleLevelIndex})`);
+          console.log(`📍 Centered on 0% bucket (array index ${middleLevelIndex}), scrollTop=${Math.round(scrollPosition)}, containerHeight=${containerHeight}`);
         }
       }
     };
     
-    // Try after DOM is ready
-    const timer = setTimeout(scrollToMiddle, 50);
-    return () => clearTimeout(timer);
-  }, [middleLevelIndex, priceLevels.length]);
+    // Reset and scroll immediately
+    hasScrolled.current = false;
+    scrollToMiddle();
+    
+    // Also scroll after delays to handle async rendering
+    const timer1 = setTimeout(scrollToMiddle, 50);
+    const timer2 = setTimeout(scrollToMiddle, 150);
+    const timer3 = setTimeout(scrollToMiddle, 300);
+    
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+    };
+  }, [middleLevelIndex, blockchainMarketId, openingPrice]);
 
   // Find the bucket with highest probability (market prediction)
   const highestProbBucket = priceLevels.reduce((max, level) => 
@@ -425,8 +434,9 @@ export function PriceSpinner({
                     !isUp && !isCurrent && 'text-red-500',
                     isCurrent && 'text-muted-foreground'
                   )}>
-                    {level.percentChange > 0 && '+'}
-                    {level.percentChange.toFixed(1)}%
+                    {level.percentChange > 0 ? `+${level.percentChange.toFixed(0)}%` :
+                     level.percentChange === 0 ? '0%' :
+                     `${level.percentChange.toFixed(0)}%`}
                   </span>
                 </div>
 
@@ -469,7 +479,10 @@ export function PriceSpinner({
                 priceLevels[selectedLevel].percentChange < 0 && 'text-red-500',
                 priceLevels[selectedLevel].percentChange === 0 && 'text-primary'
               )}>
-                ${priceLevels[selectedLevel].price.toFixed(2)} ({priceLevels[selectedLevel].percentChange > 0 ? '+' : ''}{priceLevels[selectedLevel].percentChange.toFixed(1)}%)
+                ${priceLevels[selectedLevel].price.toFixed(2)} (
+                {priceLevels[selectedLevel].percentChange > 0 ? `+${priceLevels[selectedLevel].percentChange.toFixed(0)}%` :
+                 priceLevels[selectedLevel].percentChange === 0 ? '0%' :
+                 `${priceLevels[selectedLevel].percentChange.toFixed(0)}%`})
               </span>
             </div>
             {(() => {
