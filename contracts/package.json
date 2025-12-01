@@ -1,0 +1,11 @@
+{
+  "name": "prediction-market-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for Mindshare Prediction Market",
+  "scripts": {
+    "compile": "forge build",
+    "deploy:sepolia": "forge create --rpc-url https://sepolia.base.org --private-key $PRIVATE_KEY src/PredictionMarket.sol:PredictionMarket",
+    "deploy:mainnet": "forge create --rpc-url https://mainnet.base.org --private-key $PRIVATE_KEY src/PredictionMarket.sol:PredictionMarket",
+    "verify": "forge verify-contract --chain-id 84532 $CONTRACT_ADDRESS src/PredictionMarket.sol:PredictionMarket --etherscan-api-key $BASESCAN_API_KEY"
+  }
+}

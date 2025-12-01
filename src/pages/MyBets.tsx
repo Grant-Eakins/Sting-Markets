@@ -1,0 +1,880 @@
+import { useQuery } from '@tanstack/react-query';
+import { fetchMarkets, type Market } from '@/lib/marketApi';
+import { useAccount, useWriteContract, useReadContracts } from 'wagmi';
+import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { TrendingUp, TrendingDown, Trophy, DollarSign, Activity, Wallet, AlertCircle, ArrowRightLeft, Menu, X } from 'lucide-react';
+
+// Authorized admin wallet addresses (lowercase for comparison)
+const ADMIN_WALLETS = [
+  '0x6b1b7e7b207ec756b8d9edc59db4b32184160b22',
+  '0xb0687ef6ea5906089ec3586f9997764650bf1934',
+];
+import { useState, useMemo, useEffect } from 'react';
+import { WalletConnect } from '@/components/WalletConnect';
+import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI } from '@/config/contract';
+import { toast } from 'sonner';
+import { useBlockchainBets, type BlockchainBet } from '@/hooks/useBlockchainBets';
+import { useSellShares } from '@/hooks/useContract';
+import { useEthPrice, formatEthToUsd } from '@/hooks/useEthPrice';
+import { BetCardSkeleton, StatCardSkeleton } from '@/components/ui/skeleton';
+import { Footer } from '@/components/Footer';
+
+// Enriched bet type for display
+interface EnrichedBet extends BlockchainBet {
+  marketName: string;
+  bucketLabel: string;
+  amountEth: number;
+  sharesNum: number;
+  potentialPayout: number;
+  probability: string;
+  isSettled: boolean;
+  won: boolean;
+  currentValue: number;
+  pnl: number;
+  pnlPercent: number;
+  isUpBet: boolean;
+}
+
+export default function MyBets() {
+  const { address, isConnected } = useAccount();
+  const [claimingBetId, setClaimingBetId] = useState<bigint | null>(null);
+  const [sellingBetId, setSellingBetId] = useState<bigint | null>(null);
+  const [sellDialogBet, setSellDialogBet] = useState<EnrichedBet | null>(null);
+  const [sellPercentage, setSellPercentage] = useState(100);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Get ETH price for USD display
+  const { ethPrice } = useEthPrice();
+  
+  // Check if connected wallet is admin
+  const isAdmin = isConnected && address && ADMIN_WALLETS.includes(address.toLowerCase());
+  
+  const { writeContractAsync } = useWriteContract();
+  const { bets, isLoading: isLoadingBets, error: betsError, refetch: refetchBets } = useBlockchainBets();
+  const { sellShares, isPending: isSellPending, isConfirming: isSellConfirming, isConfirmed: isSellConfirmed, error: sellError, hash: sellHash } = useSellShares();
+
+  // Debug logging
+  console.log('📊 MyBets render:', { 
+    address, 
+    isConnected, 
+    betsCount: bets.length, 
+    isLoadingBets, 
+    betsError: betsError?.message 
+  });
+
+  // Fetch markets to get market details
+  const { data: markets = [], isLoading: isLoadingMarkets } = useQuery({
+    queryKey: ['markets'],
+    queryFn: () => fetchMarkets('all'),
+    refetchInterval: 30000,
+  });
+
+  // Fetch market details from blockchain for all markets in bets
+  const marketIds = useMemo(() => {
+    return [...new Set(bets.map(bet => bet.marketId))];
+  }, [bets]);
+
+  const { data: marketsData } = useReadContracts({
+    contracts: marketIds.map((marketId) => ({
+      address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'getMarket',
+      args: [marketId],
+    })) as any,
+    query: {
+      enabled: marketIds.length > 0,
+      refetchInterval: 15000,
+    },
+  } as any);
+
+  // Fetch probabilities for each market to calculate estimated payouts
+  const { data: probabilitiesData } = useReadContracts({
+    contracts: marketIds.map((marketId) => ({
+      address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'getProbabilities',
+      args: [marketId],
+    })) as any,
+    query: {
+      enabled: marketIds.length > 0,
+      refetchInterval: 15000,
+    },
+  } as any);
+
+  const isLoading = isLoadingBets || isLoadingMarkets;
+
+  // ProportionalMarket uses claimPayout(marketId) instead of claimWinnings(betId)
+  const handleClaim = async (marketId: bigint) => {
+    if (!address) return;
+    
+    setClaimingBetId(marketId);
+    try {
+      const hash = await writeContractAsync({
+        address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: 'claimPayout',
+        args: [marketId],
+        chain: undefined,
+        account: address,
+      });
+      
+      toast.success(`Claim transaction submitted! Hash: ${hash.slice(0, 10)}...`);
+      
+      setTimeout(async () => {
+        await refetchBets();
+        toast.success('Winnings claimed successfully!');
+      }, 5000);
+      
+    } catch (error: any) {
+      // Check if user rejected the transaction
+      if (error.message?.includes('User rejected') || error.message?.includes('User denied')) {
+        toast.info('Transaction canceled');
+      } else {
+        console.error('Claim error:', error);
+        toast.error(error.shortMessage || error.message || 'Failed to claim winnings');
+      }
+    } finally {
+      setClaimingBetId(null);
+    }
+  };
+
+  // Open sell dialog for partial selling
+  const openSellDialog = (bet: EnrichedBet) => {
+    setSellDialogBet(bet);
+    setSellPercentage(100); // Default to selling all
+  };
+
+  // Execute the partial sell
+  const handlePartialSell = async () => {
+    if (!address || !sellDialogBet) return;
+    
+    const sharesToSell = (sellDialogBet.shares * BigInt(sellPercentage)) / 100n;
+    if (sharesToSell === 0n) {
+      toast.error('Amount too small to sell');
+      return;
+    }
+    
+    setSellingBetId(sellDialogBet.betId);
+    setSellDialogBet(null);
+    
+    try {
+      // minPayout = 0 for now (no slippage protection)
+      sellShares(Number(sellDialogBet.marketId), sellDialogBet.outcomeIndex, sharesToSell, 0n);
+      toast.info(`Selling ${sellPercentage}% of position...`);
+    } catch (error: any) {
+      if (error.message?.includes('User rejected') || error.message?.includes('User denied')) {
+        toast.info('Transaction canceled');
+      } else {
+        console.error('Sell error:', error);
+        toast.error(error.shortMessage || error.message || 'Failed to sell position');
+      }
+      setSellingBetId(null);
+    }
+  };
+
+  // Legacy full sell (keeping for backward compatibility)
+  const handleSell = async (bet: EnrichedBet) => {
+    if (!address) return;
+    
+    setSellingBetId(bet.betId);
+    try {
+      // Sell all shares in this position
+      // minPayout = 0 for now (no slippage protection) - can add UI for this later
+      sellShares(Number(bet.marketId), bet.outcomeIndex, bet.shares, 0n);
+      
+      toast.info('Sell transaction submitted...');
+      
+    } catch (error: any) {
+      if (error.message?.includes('User rejected') || error.message?.includes('User denied')) {
+        toast.info('Transaction canceled');
+      } else {
+        console.error('Sell error:', error);
+        toast.error(error.shortMessage || error.message || 'Failed to sell position');
+      }
+      setSellingBetId(null);
+    }
+  };
+
+  // Handle sell confirmation with useEffect to properly trigger refetch
+  useEffect(() => {
+    if (isSellConfirmed && sellingBetId) {
+      toast.success('Position sold successfully! Updating...');
+      setSellingBetId(null);
+      // Wait for blockchain to index the transaction, then refetch multiple times
+      // to ensure we get the updated data
+      setTimeout(() => {
+        refetchBets();
+        toast.info('Refreshing positions...');
+      }, 3000);
+      // Second refetch after 6 seconds in case first one was too early
+      setTimeout(() => {
+        refetchBets();
+      }, 6000);
+    }
+  }, [isSellConfirmed, sellingBetId, refetchBets]);
+
+  // Handle sell errors
+  useEffect(() => {
+    if (sellError && sellingBetId) {
+      const errorMsg = (sellError as any)?.shortMessage || sellError.message || 'Failed to sell';
+      if (!errorMsg.includes('User rejected') && !errorMsg.includes('User denied')) {
+        toast.error(errorMsg);
+      }
+      setSellingBetId(null);
+    }
+  }, [sellError, sellingBetId]);
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+        {/* Navigation Bar */}
+        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4 lg:gap-6">
+              <Link to="/" className="flex items-center gap-2 shrink-0">
+                <img src="/Copilot_20251128_175824-removebg-preview.png" alt="Sting Markets" className="h-8 sm:h-10" />
+                <span className="text-lg sm:text-xl font-bold italic tracking-tight hidden sm:inline">Sting Markets</span>
+              </Link>
+              <nav className="hidden md:flex gap-4">
+                <Link to="/">
+                  <Button variant="ghost" size="sm">Markets</Button>
+                </Link>
+                <Link to="/my-bets">
+                  <Button variant="ghost" size="sm">My Bets</Button>
+                </Link>
+              </nav>
+            </div>
+            <WalletConnect />
+          </div>
+        </div>
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-8">My Bets</h1>
+          
+          <Card className="p-8 sm:p-12 text-center">
+            <Wallet className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-muted-foreground" />
+            <CardTitle className="mb-2">Connect Your Wallet</CardTitle>
+            <CardDescription className="mb-6">
+              Connect your wallet to view your betting history and claim winnings
+            </CardDescription>
+            <WalletConnect />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate stats from blockchain bets
+  // ProportionalMarket.getMarket returns:
+  // [stockSymbol, sessionType, status, numOutcomes, referencePrice, finalPrice, lockTime, settleTime, settled, winningOutcome, totalLiquidity]
+  const getBetMarketData = (marketId: bigint) => {
+    const index = marketIds.indexOf(marketId);
+    if (index === -1 || !marketsData?.[index]) return null;
+    const marketResult: any = marketsData[index];
+    if (marketResult.status !== 'success' || !marketResult.result) return null;
+    const result: any = marketResult.result;
+    
+    // Get probabilities for this market
+    let probabilities: number[] = [];
+    if (probabilitiesData?.[index]) {
+      const probResult: any = probabilitiesData[index];
+      if (probResult.status === 'success' && probResult.result) {
+        probabilities = (probResult.result as bigint[]).map(p => Number(p) / 10000); // Convert from bps to decimal
+      }
+    }
+    
+    // Access by tuple index for ProportionalMarket
+    return {
+      stockSymbol: result[0] || 'Unknown Market',
+      sessionType: result[1],
+      status: result[2], // 0=ACTIVE, 1=LOCKED, 2=SETTLED, 3=CANCELLED
+      numOutcomes: Number(result[3]),
+      referencePrice: result[4],
+      finalPrice: result[5],
+      settled: result[8] === true,
+      winningOutcome: Number(result[9]), // The winning bucket index
+      totalLiquidity: Number(result[10]) / 1e18,
+      probabilities,
+    };
+  };
+
+  // Enrich bets with market data and categorize
+  const enrichedBets = bets.map(bet => {
+    const marketData = getBetMarketData(bet.marketId);
+    const marketsList = Array.isArray(markets) ? markets : [];
+    const market = marketsList.find((m: Market) => m.blockchainMarketId === Number(bet.marketId));
+    const amountEth = Number(bet.cost) / 1e18;  // Remaining cost basis after sells
+    const sharesNum = Number(bet.shares) / 1e18; // Remaining shares after sells
+    
+    const isSettled = marketData?.settled || false;
+    // Win if the user's bet bucket matches the winning outcome
+    const won = isSettled && marketData?.winningOutcome === bet.outcomeIndex;
+    
+    // Calculate estimated payout and sell value based on current shares and market state
+    let potentialPayout = amountEth * 2; // Default fallback
+    let currentValue = amountEth; // Default to cost basis
+    let probability = 0;
+    
+    if (marketData && marketData.probabilities && marketData.probabilities.length > bet.outcomeIndex) {
+      probability = marketData.probabilities[bet.outcomeIndex];
+      
+      if (probability > 0 && marketData.totalLiquidity > 0) {
+        // In proportional markets:
+        // If your bucket wins, you split the total pool with others in your bucket
+        // Estimated payout = totalPool * (yourShares / totalSharesInYourBucket)
+        potentialPayout = amountEth / probability;
+        
+        // Cap at reasonable max (can't win more than total pool)
+        potentialPayout = Math.min(potentialPayout, marketData.totalLiquidity);
+        
+        // Current sell value estimation:
+        // In a bonding curve market, sell value ≈ shares * pricePerShare
+        // Since probability represents the bucket's share of the pool:
+        // bucketLiquidity ≈ totalLiquidity * probability
+        // Your value ≈ (yourShares / totalSharesInBucket) * bucketLiquidity
+        // Simplified: currentValue ≈ amountEth (your proportional cost basis)
+        currentValue = amountEth;
+      }
+    }
+    
+    // Format the bucket as a price range based on contract's getBucketIndex logic
+    // Contract mapping: bucket 0 = >+10%, lower buckets = higher positive %, higher buckets = negative %
+    const getBucketLabel = (outcomeIndex: number, numOutcomes: number = 42) => {
+      const isIntraday = numOutcomes === 23;
+      const increment = isIntraday ? 1 : 0.5;
+      const maxBucket = numOutcomes - 1;
+      
+      // For intraday (23 buckets): 0=>+10%, 10=0-1%, 11=-1-0%, 21=<-10%
+      // For overnight (42 buckets): 0=>+10%, 20=0-0.5%, 21=-0.5-0%, 41=<-10%
+      
+      if (outcomeIndex === 0) return '>+10%';
+      if (outcomeIndex === maxBucket) return '<-10%';
+      
+      // Calculate percentage range for this bucket
+      // Bucket 1 = +9% to +10%, Bucket 2 = +8% to +9%, etc.
+      const pctHigh = 10 - (outcomeIndex - 1) * increment;
+      const pctLow = pctHigh - increment;
+      
+      if (pctLow >= 0) {
+        return `+${pctLow}% to +${pctHigh}%`;
+      } else if (pctHigh > 0) {
+        return `${pctLow}% to +${pctHigh}%`;
+      } else {
+        return `${pctLow}% to ${pctHigh}%`;
+      }
+    };
+    
+    // Determine if this is an UP or DOWN bet based on bucket index
+    // UP = positive price change buckets (lower indices)
+    // DOWN = negative price change buckets (higher indices)
+    const getIsUpBet = (outcomeIndex: number, numOutcomes: number = 42) => {
+      const isIntraday = numOutcomes === 23;
+      // Middle bucket (0% change): index 10 for intraday, index 20 for overnight
+      const zeroChangeBucket = isIntraday ? 10 : 20;
+      // Buckets 0 to zeroChangeBucket are UP (positive or zero change)
+      return outcomeIndex <= zeroChangeBucket;
+    };
+    
+    // Override the position from useBlockchainBets with correct calculation
+    const isUpBet = getIsUpBet(bet.outcomeIndex, marketData?.numOutcomes);
+    
+    return {
+      ...bet,
+      marketName: marketData?.stockSymbol || market?.stockSymbol || market?.stockName || `Market #${bet.marketId}`,
+      bucketLabel: getBucketLabel(bet.outcomeIndex, marketData?.numOutcomes),
+      amountEth,
+      sharesNum,
+      potentialPayout,
+      probability: (probability * 100).toFixed(1), // As percentage string
+      isSettled,
+      won,
+      currentValue,
+      pnl: 0,
+      pnlPercent: 0,
+      isUpBet, // Correctly determined UP or DOWN
+    };
+  });
+
+  const activeBets = enrichedBets.filter(b => !b.isSettled);
+  const settledBets = enrichedBets.filter(b => b.isSettled);
+  const claimableBets = settledBets.filter(b => b.won && !b.claimed);
+
+  const stats = {
+    totalBets: enrichedBets.length, // Use enrichedBets to reflect actual positions
+    totalStaked: enrichedBets.reduce((sum, b) => sum + b.amountEth, 0),
+    settledBets: settledBets.length,
+    wonBets: settledBets.filter(b => b.won).length,
+    totalWon: settledBets.filter(b => b.won).reduce((sum, b) => sum + b.potentialPayout, 0),
+    claimable: claimableBets.reduce((sum, b) => sum + b.potentialPayout, 0),
+    winRate: settledBets.length > 0 ? (settledBets.filter(b => b.won).length / settledBets.length) * 100 : 0,
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      {/* Navigation Bar */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4 lg:gap-6">
+            <Link to="/" className="flex items-center gap-2 shrink-0">
+              <img src="/Copilot_20251128_175824-removebg-preview.png" alt="Sting Markets" className="h-8 sm:h-10" />
+              <span className="text-lg sm:text-xl font-bold italic tracking-tight hidden sm:inline">Sting Markets</span>
+            </Link>
+            {/* Desktop nav */}
+            <nav className="hidden md:flex gap-4">
+              <Link to="/">
+                <Button variant="ghost" size="sm">Markets</Button>
+              </Link>
+              <Link to="/my-bets">
+                <Button variant="ghost" size="sm">My Bets</Button>
+              </Link>
+              {isAdmin && (
+                <Link to="/admin-167">
+                  <Button variant="ghost" size="sm">Admin</Button>
+                </Link>
+              )}
+            </nav>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <WalletConnect />
+            {/* Mobile menu button */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+        
+        {/* Mobile nav menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
+            <Link to="/" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" size="sm" className="w-full justify-start">Markets</Button>
+            </Link>
+            <Link to="/my-bets" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" size="sm" className="w-full justify-start">My Bets</Button>
+            </Link>
+            {isAdmin && (
+              <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>
+                <Button variant="ghost" size="sm" className="w-full justify-start">Admin</Button>
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="container mx-auto px-4 py-6 sm:py-8">
+        {/* Header */}
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold mb-2">My Bets</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Track your positions, view your history, and claim your winnings
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetchBets()}
+            disabled={isLoadingBets}
+            className="self-start"
+          >
+            {isLoadingBets ? 'Refreshing...' : '🔄 Refresh'}
+          </Button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Card>
+            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Activity className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Total Bets</span>
+                <span className="sm:hidden">Bets</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalBets}</div>
+              <p className="text-xs text-muted-foreground mt-1 hidden sm:block">
+                {activeBets.length} active, {settledBets.length} settled
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <DollarSign className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Total Staked</span>
+                <span className="sm:hidden">Staked</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalStaked.toFixed(4)} <span className="text-sm font-normal text-muted-foreground">ETH</span></div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Win Rate</span>
+                <span className="sm:hidden">Wins</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{stats.winRate.toFixed(1)}%</div>
+              <p className="text-xs text-muted-foreground mt-1 hidden sm:block">
+                {stats.wonBets} / {stats.settledBets} bets won
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
+                Claimable
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-green-500">{stats.claimable.toFixed(4)} <span className="text-sm font-normal">ETH</span></div>
+              <p className="text-xs text-muted-foreground mt-1 hidden sm:block">
+                {claimableBets.length} bet{claimableBets.length !== 1 ? 's' : ''} ready
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Claimable Winnings */}
+        {claimableBets.length > 0 && (
+          <Alert className="mb-6 border-green-500 bg-green-500/10">
+            <Trophy className="h-4 w-4 text-green-500" />
+            <AlertDescription>
+              <strong>You have {claimableBets.length} winning bet{claimableBets.length !== 1 ? 's' : ''} ready to claim!</strong> Total: {stats.claimable.toFixed(4)} ETH
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Bets List */}
+        <div className="space-y-6">
+          {/* Active Bets */}
+          {activeBets.length > 0 && (
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Active Bets</h2>
+              <div className="space-y-3">
+                {activeBets.map((bet) => (
+                  <Card key={bet.betId.toString()}>
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            {bet.isUpBet ? (
+                              <TrendingUp className="w-5 h-5 text-green-500" />
+                            ) : (
+                              <TrendingDown className="w-5 h-5 text-red-500" />
+                            )}
+                            <Badge variant="secondary" className="font-mono">
+                              {bet.bucketLabel}
+                            </Badge>
+                            <span className="font-semibold">{bet.marketName}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Staked:</span>
+                              <span className="ml-2 font-bold">{bet.amountEth.toFixed(4)} ETH</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Shares:</span>
+                              <span className="ml-2 font-bold">{bet.sharesNum < 0.01 ? bet.sharesNum.toFixed(6) : bet.sharesNum.toFixed(4)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Win Chance:</span>
+                              <span className="ml-2 font-bold">{bet.probability}%</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">If Win:</span>
+                              <span className="ml-2 font-bold text-green-500">~{bet.potentialPayout.toFixed(4)} ETH</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Est. Sell Value:</span>
+                              <span className="ml-2 font-bold text-orange-500">~{(bet.currentValue * 0.99).toFixed(4)} ETH</span>
+                              <span className="text-xs text-muted-foreground ml-1">(1% fee)</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="ml-4 flex flex-col items-end gap-2">
+                          <Badge variant="outline">Active</Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openSellDialog(bet)}
+                            disabled={sellingBetId === bet.betId || isSellPending || isSellConfirming}
+                            className="border-orange-500 text-orange-500 hover:bg-orange-500/10"
+                          >
+                            <ArrowRightLeft className="w-3 h-3 mr-1" />
+                            {sellingBetId === bet.betId ? (isSellConfirming ? 'Confirming...' : 'Selling...') : 'Sell'}
+                          </Button>
+                          <a href={`https://sepolia.basescan.org/tx/${bet.txHash}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline">
+                            View Tx
+                          </a>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Settled Bets */}
+          {settledBets.length > 0 && (
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Settled Bets</h2>
+              <div className="space-y-3">
+                {settledBets.map((bet) => (
+                  <Card key={bet.betId.toString()} className={bet.won ? 'border-green-500' : 'border-red-500/30'}>
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            {bet.won ? (
+                              <Trophy className="w-5 h-5 text-green-500" />
+                            ) : (
+                              <AlertCircle className="w-5 h-5 text-red-500" />
+                            )}
+                            <Badge variant="secondary" className="font-mono">
+                              {bet.bucketLabel}
+                            </Badge>
+                            <span className="font-semibold">{bet.marketName}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Staked:</span>
+                              <span className="ml-2 font-bold">{bet.amountEth.toFixed(4)} ETH</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Result:</span>
+                              <span className={`ml-2 font-bold ${bet.won ? 'text-green-500' : 'text-red-500'}`}>
+                                {bet.won ? `Won ~${bet.potentialPayout.toFixed(4)} ETH` : 'Lost'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="ml-4 flex flex-col items-end gap-2">
+                          {bet.won ? (
+                            <Badge variant="outline" className="border-green-500 text-green-500">Won</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-red-500 text-red-500">Lost</Badge>
+                          )}
+                          {bet.won && !bet.claimed && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleClaim(bet.marketId)}
+                              disabled={claimingBetId === bet.marketId}
+                              className="bg-green-500 hover:bg-green-600"
+                            >
+                              {claimingBetId === bet.marketId ? 'Claiming...' : 'Claim'}
+                            </Button>
+                          )}
+                          {bet.claimed && (
+                            <Badge variant="secondary">Claimed</Badge>
+                          )}
+                          <a href={`https://sepolia.basescan.org/tx/${bet.txHash}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline">
+                            View Tx
+                          </a>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {isLoadingBets && (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <BetCardSkeleton key={i} />
+              ))}
+            </div>
+          )}
+
+          {/* Error State */}
+          {betsError && !isLoadingBets && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Error loading bets:</strong> {betsError.message}
+                <br />
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchBets()}>
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Empty State */}
+          {enrichedBets.length === 0 && !isLoadingBets && !betsError && (
+            <Card className="p-12 text-center">
+              <Activity className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <CardTitle className="mb-2">No Bets Yet</CardTitle>
+              <CardDescription className="mb-4">
+                Start betting on prediction markets to see your positions here
+              </CardDescription>
+              <CardDescription className="mb-6 text-xs">
+                Connected: {address?.slice(0, 6)}...{address?.slice(-4)}
+                <br />
+                Contract: {CONTRACT_ADDRESSES[84532].slice(0, 10)}...
+              </CardDescription>
+              <Button asChild>
+                <a href="/">Browse Markets</a>
+              </Button>
+            </Card>
+          )}
+        </div>
+
+        {/* Blockchain Notice */}
+        <Alert className="mt-8">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-xs">
+            <strong>On-Chain Betting:</strong> All bets are recorded on Base Sepolia testnet. Claims transfer funds directly from the smart contract to your wallet.
+            <br />
+            <strong>Sell Positions:</strong> Exit active bets early at current odds before market locks. Value based on pool distribution (like Polymarket).
+          </AlertDescription>
+        </Alert>
+      </div>
+
+      {/* Partial Sell Dialog */}
+      <Dialog open={sellDialogBet !== null} onOpenChange={(open) => !open && setSellDialogBet(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5 text-orange-500" />
+              Sell Position
+            </DialogTitle>
+            <DialogDescription>
+              Choose how much of your position to sell
+            </DialogDescription>
+          </DialogHeader>
+          
+          {sellDialogBet && (
+            <div className="space-y-6 py-4">
+              {/* Position Info */}
+              <div className="p-4 bg-muted rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Market:</span>
+                  <span className="font-bold">{sellDialogBet.marketName}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Position:</span>
+                  <Badge variant="secondary" className="font-mono">{sellDialogBet.bucketLabel}</Badge>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Shares:</span>
+                  <span className="font-bold">{sellDialogBet.sharesNum.toFixed(6)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Est. Full Value:</span>
+                  <span className="font-bold text-orange-500">
+                    ~{(sellDialogBet.currentValue * 0.99).toFixed(4)} ETH
+                    {ethPrice && (
+                      <span className="text-muted-foreground ml-1">
+                        ({formatEthToUsd(sellDialogBet.currentValue * 0.99, ethPrice)})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Percentage Slider */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label>Amount to Sell</Label>
+                  <span className="text-2xl font-bold text-orange-500">{sellPercentage}%</span>
+                </div>
+                <Slider
+                  value={[sellPercentage]}
+                  onValueChange={(value) => setSellPercentage(value[0])}
+                  min={10}
+                  max={100}
+                  step={10}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>10%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+
+              {/* Quick Select Buttons */}
+              <div className="flex gap-2">
+                {[25, 50, 75, 100].map((pct) => (
+                  <Button
+                    key={pct}
+                    variant={sellPercentage === pct ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setSellPercentage(pct)}
+                  >
+                    {pct}%
+                  </Button>
+                ))}
+              </div>
+
+              {/* Sell Summary */}
+              <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Shares to Sell:</span>
+                  <span className="font-bold">{(sellDialogBet.sharesNum * sellPercentage / 100).toFixed(6)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Est. Payout:</span>
+                  <span className="font-bold text-orange-500">
+                    ~{(sellDialogBet.currentValue * 0.99 * sellPercentage / 100).toFixed(4)} ETH
+                    {ethPrice && (
+                      <span className="text-muted-foreground ml-1">
+                        ({formatEthToUsd(sellDialogBet.currentValue * 0.99 * sellPercentage / 100, ethPrice)})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Remaining:</span>
+                  <span className="font-bold">{(100 - sellPercentage)}% of position</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setSellDialogBet(null)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handlePartialSell}
+              className="bg-orange-500 hover:bg-orange-600"
+              disabled={isSellPending || isSellConfirming}
+            >
+              {isSellPending || isSellConfirming ? 'Selling...' : `Sell ${sellPercentage}%`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Footer />
+    </div>
+  );
+}

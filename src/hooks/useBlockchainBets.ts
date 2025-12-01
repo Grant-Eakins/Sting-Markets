@@ -1,0 +1,250 @@
+import { useAccount } from 'wagmi';
+import { CONTRACT_ADDRESSES } from '@/config/contract';
+import { useState, useEffect } from 'react';
+import { createPublicClient, http, parseAbiItem } from 'viem';
+import { baseSepolia } from 'viem/chains';
+
+// Create a public client for reading events with a proper RPC
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http('https://sepolia.base.org'),
+});
+
+export interface BlockchainBet {
+  betId: bigint;           // Synthetic ID based on event log index
+  marketId: bigint;
+  outcomeIndex: number;    // Bucket index (0-22 for intraday, 0-41 for overnight)
+  shares: bigint;          // Number of shares remaining (after sells)
+  cost: bigint;            // ETH paid (in wei)
+  timestamp: number;       // Block timestamp
+  txHash: string;          // Transaction hash
+  // Legacy compatibility fields
+  bettor: string;
+  position: number;        // 0 if bucket < middle (UP-ish), 1 if bucket > middle (DOWN-ish)
+  amount: bigint;          // Same as cost
+  odds: bigint;            // Placeholder - parimutuel doesn't have fixed odds
+  claimed: boolean;        // Will be determined from market settlement status
+}
+
+interface PositionKey {
+  marketId: string;
+  outcomeIndex: number;
+}
+
+export function useBlockchainBets() {
+  const { address } = useAccount();
+  const [bets, setBets] = useState<BlockchainBet[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const contractAddress = CONTRACT_ADDRESSES[84532];
+
+  const fetchBets = async () => {
+    if (!address || !contractAddress) {
+      console.log('📊 useBlockchainBets: No address or contract', { address, contractAddress });
+      setBets([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    console.log(`📊 Fetching bets for ${address} from contract ${contractAddress}`);
+
+    try {
+      // Get current block number
+      console.log('📊 Getting current block number...');
+      const currentBlock = await publicClient.getBlockNumber();
+      console.log(`📊 Current block: ${currentBlock}`);
+      
+      // Query in chunks of 50,000 blocks (well under the 100k limit)
+      const CHUNK_SIZE = 50000n;
+      const LOOKBACK_BLOCKS = 200000n; // ~5 days on Base Sepolia
+      const startBlock = currentBlock > LOOKBACK_BLOCKS ? currentBlock - LOOKBACK_BLOCKS : 0n;
+      
+      console.log(`📊 Querying blocks ${startBlock} to ${currentBlock} in chunks of ${CHUNK_SIZE}`);
+
+      const purchaseLogs: any[] = [];
+      const sellLogs: any[] = [];
+      
+      // Query in chunks for both purchase and sell events
+      for (let fromBlock = startBlock; fromBlock < currentBlock; fromBlock += CHUNK_SIZE) {
+        const toBlock = fromBlock + CHUNK_SIZE - 1n > currentBlock ? currentBlock : fromBlock + CHUNK_SIZE - 1n;
+        
+        console.log(`📊 Querying chunk: ${fromBlock} to ${toBlock}`);
+        
+        // Fetch SharesPurchased events
+        const purchases = await publicClient.getLogs({
+          address: contractAddress as `0x${string}`,
+          event: parseAbiItem('event SharesPurchased(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 cost)'),
+          args: {
+            user: address,
+          },
+          fromBlock: fromBlock,
+          toBlock: toBlock,
+        });
+        
+        // Fetch SharesSold events
+        const sells = await publicClient.getLogs({
+          address: contractAddress as `0x${string}`,
+          event: parseAbiItem('event SharesSold(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 payout)'),
+          args: {
+            user: address,
+          },
+          fromBlock: fromBlock,
+          toBlock: toBlock,
+        });
+        
+        purchaseLogs.push(...purchases);
+        sellLogs.push(...sells);
+        console.log(`📊 Found ${purchases.length} purchases, ${sells.length} sells in chunk`);
+      }
+
+      console.log(`📊 Total: ${purchaseLogs.length} purchases, ${sellLogs.length} sells for ${address}`);
+
+      // Aggregate positions by market + outcomeIndex
+      // Track net shares per position (buys - sells)
+      const positionMap = new Map<string, {
+        marketId: bigint;
+        outcomeIndex: number;
+        totalShares: bigint;
+        totalCost: bigint;
+        firstTimestamp: number;
+        firstTxHash: string;
+        firstBetId: bigint;
+      }>();
+
+      // Process all purchases
+      for (const log of purchaseLogs) {
+        const marketId = log.args.marketId!;
+        const outcomeIndex = log.args.outcomeIndex!;
+        const shares = log.args.shares!;
+        const cost = log.args.cost!;
+        
+        const key = `${marketId.toString()}-${outcomeIndex}`;
+        
+        let timestamp = Date.now() / 1000;
+        try {
+          const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
+          timestamp = Number(block.timestamp);
+        } catch (e) {
+          console.warn('Could not fetch block timestamp:', e);
+        }
+        
+        const existing = positionMap.get(key);
+        if (existing) {
+          existing.totalShares += shares;
+          existing.totalCost += cost;
+        } else {
+          positionMap.set(key, {
+            marketId,
+            outcomeIndex,
+            totalShares: shares,
+            totalCost: cost,
+            firstTimestamp: timestamp,
+            firstTxHash: log.transactionHash,
+            firstBetId: BigInt(log.blockNumber) * BigInt(1000) + BigInt(log.logIndex ?? 0),
+          });
+        }
+      }
+
+      // Process all sells (subtract from positions)
+      for (const log of sellLogs) {
+        const marketId = log.args.marketId!;
+        const outcomeIndex = log.args.outcomeIndex!;
+        const shares = log.args.shares!;
+        
+        const key = `${marketId.toString()}-${outcomeIndex}`;
+        
+        const existing = positionMap.get(key);
+        if (existing && existing.totalShares > 0n) {
+          // Calculate what percentage of shares are being sold
+          const sharesBefore = existing.totalShares;
+          const percentageSold = Number(shares) / Number(sharesBefore);
+          
+          // Reduce shares
+          existing.totalShares -= shares;
+          
+          // Proportionally reduce cost basis
+          if (existing.totalShares > 0n) {
+            // Reduce cost by the same proportion as shares sold
+            const costReduction = BigInt(Math.floor(Number(existing.totalCost) * percentageSold));
+            existing.totalCost -= costReduction;
+          } else {
+            existing.totalCost = 0n;
+          }
+          
+          console.log(`📊 Sell processed: ${key} - sold ${Number(shares)/1e18} shares (${(percentageSold*100).toFixed(1)}%), remaining: ${Number(existing.totalShares)/1e18}`);
+        }
+      }
+
+      // Convert to bets array, filtering out fully sold positions
+      const activeBets: BlockchainBet[] = [];
+      
+      // Dust threshold: positions with less than 0.000001 shares are considered fully sold
+      const DUST_THRESHOLD = BigInt(1e12); // 0.000001 * 1e18
+      
+      console.log(`📊 Processing ${positionMap.size} positions...`);
+      
+      for (const [key, position] of positionMap) {
+        // Skip positions where all shares have been sold (or only dust remains)
+        if (position.totalShares <= DUST_THRESHOLD) {
+          console.log(`📊 Position ${key} fully sold (shares: ${Number(position.totalShares)/1e18}), skipping`);
+          continue;
+        }
+        
+        console.log(`📊 Position ${key} active with ${Number(position.totalShares)/1e18} shares`);
+        
+        // Determine if this is an UP or DOWN position
+        // For intraday (23 buckets): bucket 0-10 = UP (positive change), 11-22 = DOWN
+        // For overnight (42 buckets): bucket 0-20 = UP, 21-41 = DOWN
+        // We assume overnight (42) unless we can determine otherwise
+        // UP = 0, DOWN = 1
+        const isUpPosition = position.outcomeIndex <= 20; // Safe for both 23 and 42 buckets
+        const positionType = isUpPosition ? 0 : 1;
+        
+        activeBets.push({
+          betId: position.firstBetId,
+          marketId: position.marketId,
+          outcomeIndex: position.outcomeIndex,
+          shares: position.totalShares,
+          cost: position.totalCost,
+          timestamp: position.firstTimestamp,
+          txHash: position.firstTxHash,
+          bettor: address,
+          position: positionType,
+          amount: position.totalCost,
+          odds: BigInt(200),
+          claimed: false,
+        });
+      }
+
+      // Sort by timestamp descending (newest first)
+      activeBets.sort((a, b) => b.timestamp - a.timestamp);
+
+      setBets(activeBets);
+      console.log(`📊 Processed ${activeBets.length} active positions (${purchaseLogs.length} buys, ${sellLogs.length} sells)`);
+    } catch (err) {
+      console.error('❌ Error fetching bets:', err);
+      setError(err as Error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBets();
+    
+    // Refresh every 15 seconds
+    const interval = setInterval(fetchBets, 15000);
+    return () => clearInterval(interval);
+  }, [address, contractAddress]);
+
+  return {
+    bets,
+    isLoading,
+    error,
+    refetch: fetchBets,
+  };
+}
