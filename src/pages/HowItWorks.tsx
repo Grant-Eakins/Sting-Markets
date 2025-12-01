@@ -43,15 +43,15 @@ export default function HowItWorks() {
         <div className="max-w-4xl mx-auto text-center mb-20">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-primary/20 text-sm mb-6">
             <Zap className="w-4 h-4 text-primary" />
-            <span className="text-foreground">Decentralized Stock Prediction Markets</span>
+            <span className="text-foreground">Decentralized Crypto Prediction Markets</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold mb-6">
             <span className="text-foreground">How</span>{" "}
-            <span className="bg-gradient-primary bg-clip-text text-transparent">Mindshare</span>{" "}
+            <span className="bg-gradient-primary bg-clip-text text-transparent">Sting</span>{" "}
             <span className="text-foreground">Works</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            A fully automated platform for betting on stock price movements using blockchain-based prediction markets on Base chain.
+            A fully automated platform for betting on crypto price movements using bonding curve markets on Base chain.
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export default function HowItWorks() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">1. Market Creation</h3>
                 <p className="text-muted-foreground">
-                  Our system monitors popular stocks (AAPL, TSLA, NVDA, etc.) and automatically creates prediction markets based on trading hours and after-hours periods.
+                  Our system tracks the top 6 cryptos (BTC, ETH, SOL, XRP, DOGE, LINK) and creates 12-hour prediction markets running 24/7.
                 </p>
               </Card>
               <ArrowRight className="hidden md:block absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 text-primary" />
@@ -79,9 +79,9 @@ export default function HowItWorks() {
                 <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center mb-4">
                   <BarChart3 className="w-6 h-6 text-secondary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">2. Place Predictions</h3>
+                <h3 className="text-xl font-semibold mb-2">2. Pick Your Bucket</h3>
                 <p className="text-muted-foreground">
-                  Browse active markets, view price charts and liquidity distribution, then bet UP or DOWN on whether the stock will rise or fall by settlement time.
+                  Browse active markets, view price charts and liquidity distribution, then pick which price bucket you think the crypto will land in.
                 </p>
               </Card>
               <ArrowRight className="hidden md:block absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-8 text-primary" />
@@ -95,7 +95,7 @@ export default function HowItWorks() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">3. Collect Winnings</h3>
                 <p className="text-muted-foreground">
-                  Markets settle automatically based on real stock prices. Winners share the losing side's pool proportionally to their bets.
+                  Markets settle every 12 hours based on real crypto prices. Winners share the pool proportionally based on their bucket stake.
                 </p>
               </Card>
             </div>
@@ -108,23 +108,23 @@ export default function HowItWorks() {
           <div className="grid md:grid-cols-2 gap-8">
             <Card className="p-8 bg-card border-border">
               <Globe className="w-10 h-10 text-primary mb-4" />
-              <h3 className="text-2xl font-semibold mb-4">Stock Price API</h3>
+              <h3 className="text-2xl font-semibold mb-4">Crypto Price API</h3>
               <ul className="space-y-3 text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-                  <span>Real-time Alpha Vantage API integration</span>
+                  <span>Real-time CoinGecko API integration</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-                  <span>Automatic price updates every 5 minutes</span>
+                  <span>Automatic price updates every 2 minutes</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-                  <span>Popular stocks (AAPL, TSLA, NVDA, MSFT, etc.)</span>
+                  <span>Top 6 cryptos (BTC, ETH, SOL, XRP, DOGE, LINK)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-                  <span>Trading hours detection (9:30 AM - 4:00 PM ET)</span>
+                  <span>24/7 operation - crypto never sleeps!</span>
                 </li>
               </ul>
             </Card>
@@ -158,19 +158,19 @@ export default function HowItWorks() {
               <ul className="space-y-3 text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-success mt-2" />
-                  <span>Trading Hours: 2h lock, 3h settlement (2% increments)</span>
+                  <span>12-hour market cycles running 24/7</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-success mt-2" />
-                  <span>After Hours: 8h lock, 16h settlement (0.5% increments)</span>
+                  <span>Settlement at 00:00 UTC and 12:00 UTC</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-success mt-2" />
-                  <span>Automatic market creation every 30 minutes</span>
+                  <span>21 price buckets (±10% in 1% increments)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-success mt-2" />
-                  <span>Real-time price tracking and settlement</span>
+                  <span>Automatic new market creation after settlement</span>
                 </li>
               </ul>
             </Card>
@@ -185,11 +185,11 @@ export default function HowItWorks() {
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-warning mt-2" />
-                  <span>Automated settlement based on real stock prices</span>
+                  <span>Automated settlement based on real crypto prices</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-warning mt-2" />
-                  <span>Transparent liquidity pool distribution</span>
+                  <span>Bonding curve pricing - exit anytime (1% fee)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-warning mt-2" />
@@ -221,9 +221,9 @@ export default function HowItWorks() {
                 <TrendingUp className="w-5 h-5 text-secondary" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold mb-2">2. Browse Stock Markets</h3>
+                <h3 className="text-lg font-semibold mb-2">2. Browse Crypto Markets</h3>
                 <p className="text-muted-foreground">
-                  View active prediction markets for popular stocks with real-time price charts and liquidity distribution across price levels.
+                  View active prediction markets for top cryptos with real-time price charts and liquidity distribution across price buckets.
                 </p>
               </div>
             </Card>
@@ -257,9 +257,9 @@ export default function HowItWorks() {
         {/* CTA */}
         <div className="max-w-4xl mx-auto text-center">
           <Card className="p-12 bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20">
-            <h2 className="text-3xl font-bold mb-4">Ready to Predict Stock Movements?</h2>
+            <h2 className="text-3xl font-bold mb-4">Ready to Predict Crypto Movements?</h2>
             <p className="text-lg text-muted-foreground mb-8">
-              Start betting on stock price predictions with transparent on-chain markets.
+              Start betting on crypto price predictions with transparent on-chain markets.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/">

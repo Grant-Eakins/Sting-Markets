@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import marketsRouter from './routes/markets';
-import { syncStockMarkets } from './services/stockSync';
+import { syncCryptoMarkets } from './services/cryptoSync';
 import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/marketSettlement';
 import { initializeBlockchain, syncAllMarketPools } from './services/blockchainSync';
 import { getAllMarkets, updateMarketPools, initializeMarketsFromDb } from './services/marketService';
@@ -29,38 +29,31 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 /**
- * API BUDGET CALCULATION (Twelve Data: 800 calls/day)
- * ================================================
+ * CRYPTO MARKET SCHEDULE
+ * ======================
  * 
- * Reserved calls:
- * - Market open settlement: 1 batch call
- * - Market close settlement: 1 batch call  
- * - New market creation: 6 individual calls (once per session)
- * - Chart data on demand: ~50 calls/day estimated
+ * Markets run 24/7 with 12-hour cycles:
+ * - Session 1: 00:00 UTC - 12:00 UTC
+ * - Session 2: 12:00 UTC - 00:00 UTC
  * 
- * Remaining for price updates: 800 - 2 - 6 - 50 = ~742 calls
- * 
- * With batch quotes (1 call for all 6 symbols):
- * - 742 updates available
- * - Every 2 minutes = 720 calls/day (30 per hour × 24 hours)
- * 
- * SCHEDULE: Update prices every 2 minutes using batch endpoint
+ * Price updates: Every 2 minutes (CoinGecko is free, no rate limits)
+ * Settlement: At 00:00 UTC and 12:00 UTC
  */
 
-// Track API usage for the day
-let apiCallsToday = 0;
+// Track price updates for logging
+let priceUpdatesCount = 0;
 let lastResetDate = new Date().toDateString();
 
-function trackApiCall(count: number = 1) {
+function trackPriceUpdate() {
   const today = new Date().toDateString();
   if (today !== lastResetDate) {
-    console.log(`📊 API Usage Reset: ${apiCallsToday} calls yesterday`);
-    apiCallsToday = 0;
+    console.log(`📊 Yesterday's price updates: ${priceUpdatesCount}`);
+    priceUpdatesCount = 0;
     lastResetDate = today;
   }
-  apiCallsToday += count;
-  if (apiCallsToday % 50 === 0) {
-    console.log(`📊 API Usage: ${apiCallsToday}/800 calls today`);
+  priceUpdatesCount++;
+  if (priceUpdatesCount % 100 === 0) {
+    console.log(`📊 Price updates today: ${priceUpdatesCount}`);
   }
 }
 
@@ -104,13 +97,13 @@ app.use(express.static(distPath));
 // Routes
 app.use('/api/markets', marketsRouter);
 
-// Health check with API usage stats
+// Health check
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    apiCallsToday,
-    apiCallsRemaining: 800 - apiCallsToday
+    priceUpdatesToday: priceUpdatesCount,
+    mode: 'crypto-24/7'
   });
 });
 
@@ -124,75 +117,38 @@ cron.schedule('*/15 * * * *', async () => {
   }
 });
 
-// Helper to check if we're in market hours (9:30 AM - 4 PM ET, Mon-Fri)
-function isMarketHours(): boolean {
-  const now = new Date();
-  const etTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = etTime.getDay(); // 0 = Sunday, 6 = Saturday
-  const hour = etTime.getHours();
-  const minute = etTime.getMinutes();
-  
-  // Weekends - no updates needed
-  if (day === 0 || day === 6) return false;
-  
-  // Before 9:30 AM or after 4 PM - no updates needed
-  if (hour < 9 || (hour === 9 && minute < 30)) return false;
-  if (hour >= 16) return false;
-  
-  return true;
-}
-
-// Update stock prices every 2 minutes ONLY during market hours
-// This saves ~500+ API calls/day by not updating nights/weekends
+// Update crypto prices every 2 minutes (CoinGecko free tier has rate limits)
 cron.schedule('*/2 * * * *', async () => {
-  if (!isMarketHours()) {
-    return; // Skip updates outside market hours
-  }
-  
   try {
     await updateActiveMarketPrices();
-    trackApiCall(1); // Batch call counts as 1
+    trackPriceUpdate();
   } catch (error) {
     console.error('Error updating market prices:', error);
   }
 });
 
-// Get settlement prices and create new markets at market close (4:00 PM ET)
-// On Friday, this creates weekend markets that resolve Monday 9:30 AM
-cron.schedule('0 16 * * 1-5', async () => {
-  const day = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' });
-  console.log(`📊 Market close (${day}) - fetching settlement prices and creating new markets...`);
+// Settlement and new market creation at 00:00 UTC
+cron.schedule('0 0 * * *', async () => {
+  console.log(`📊 00:00 UTC - Settling markets and creating new session...`);
   try {
     await updateActiveMarketPrices();
-    trackApiCall(1);
     await checkAndSettleMarkets();
-    // Create new markets (overnight on Mon-Thu, weekend on Friday)
-    await syncStockMarkets();
-    trackApiCall(1); // Batch call for new market creation
+    await syncCryptoMarkets();
   } catch (error) {
-    console.error('Error at market close:', error);
+    console.error('Error at 00:00 UTC settlement:', error);
   }
-}, {
-  timezone: 'America/New_York'
 });
 
-// Get settlement prices and create new markets at market open (9:30 AM ET)
-// On Monday, this settles weekend markets and creates new trading session markets
-cron.schedule('30 9 * * 1-5', async () => {
-  const day = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long' });
-  console.log(`📊 Market open (${day}) - fetching settlement prices and creating new markets...`);
+// Settlement and new market creation at 12:00 UTC
+cron.schedule('0 12 * * *', async () => {
+  console.log(`📊 12:00 UTC - Settling markets and creating new session...`);
   try {
     await updateActiveMarketPrices();
-    trackApiCall(1);
     await checkAndSettleMarkets();
-    // Create new markets for the trading session
-    await syncStockMarkets();
-    trackApiCall(1); // Batch call for new market creation
+    await syncCryptoMarkets();
   } catch (error) {
-    console.error('Error at market open:', error);
+    console.error('Error at 12:00 UTC settlement:', error);
   }
-}, {
-  timezone: 'America/New_York'
 });
 
 // Clean up old settled markets once per day at midnight ET
@@ -214,32 +170,29 @@ cron.schedule('0 0 * * *', async () => {
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Markets endpoint: http://localhost:${PORT}/api/markets`);
-  console.log(`💰 Betting on stock prices: UP or DOWN`);
-  console.log(`\n📈 API BUDGET (Twelve Data: 800/day)`);
-  console.log(`   • Price updates: Every 2 min (batch) = ~720 calls`);
-  console.log(`   • Settlement: 2 batch calls (open + close)`);
-  console.log(`   • New markets: 2 batch calls (open + close)`);
-  console.log(`   • Charts: ~50 calls reserved (cached 5min)`);
-  console.log(`   • Buffer: ~26 calls\n`);
+  console.log(`💰 Betting on crypto prices: Pick your bucket!`);
+  console.log(`\n🪙 CRYPTO MARKETS (24/7)`);
+  console.log(`   • Price updates: Every 2 min (CoinGecko - free)`);
+  console.log(`   • Settlement: 00:00 UTC and 12:00 UTC (12-hour cycles)`);
+  console.log(`   • Cryptos: BTC, ETH, SOL, XRP, DOGE, LINK`);
   console.log(`✅ Manual market creation: POST /api/markets/create`);
   console.log(`🔗 Each market creates its own on-chain liquidity pool`);
-  console.log(`📊 Showing top 6 stocks only\n`);
+  console.log(`📊 Top 6 cryptos with bonding curve pricing\n`);
   
   // Load existing markets from database
   console.log('📂 Loading markets from database...');
   await initializeMarketsFromDb();
   
   // Force settle any stale markets and create new ones
-  console.log('🌱 Creating markets for top 6 stocks (if needed)...');
+  console.log('🌱 Creating crypto markets (if needed)...');
   try {
     // First, settle any markets that should have been settled
     await checkAndSettleMarkets();
     
     // Then create new markets
-    await syncStockMarkets();
-    trackApiCall(1); // Batch call for initial market creation
+    await syncCryptoMarkets();
   } catch (error) {
-    console.error('Error during initial stock sync:', error);
+    console.error('Error during initial crypto sync:', error);
   }
 });
 

@@ -50,7 +50,7 @@ export default function Terms() {
             <CardContent className="prose prose-sm dark:prose-invert">
               <p>
                 Sting Markets provides a platform for users to participate in prediction markets related to equity price 
-                movements. Users can place bets on predicted price ranges for various stocks and receive payouts based on 
+                movements. Users can place bets on predicted price ranges for various cryptocurrencies and receive payouts based on 
                 market outcomes.
               </p>
               <p>

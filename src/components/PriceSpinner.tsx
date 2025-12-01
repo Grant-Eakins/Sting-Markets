@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TrendingUp, TrendingDown, DollarSign, Loader2, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatCryptoPrice } from '@/lib/utils';
 import { usePlaceBet } from '@/hooks/useContract';
 import { useAccount, useChainId } from 'wagmi';
 import { CONTRACT_ADDRESSES } from '@/config/contract';
@@ -332,7 +332,7 @@ export function PriceSpinner({
           <div className="flex justify-between items-start mb-2">
             <div>
               <div className="text-xs text-muted-foreground">Opening Price</div>
-              <div className="text-xl font-bold">${openingPriceUSD.toFixed(2)}</div>
+              <div className="text-xl font-bold">${formatCryptoPrice(openingPriceUSD)}</div>
             </div>
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Market Prediction</div>
@@ -344,7 +344,7 @@ export function PriceSpinner({
                     highestProbBucket.percentChange < 0 && 'text-red-500',
                     highestProbBucket.percentChange === 0 && 'text-primary'
                   )}>
-                    ${highestProbBucket.price.toFixed(2)}
+                    ${formatCryptoPrice(highestProbBucket.price)}
                   </div>
                   <div className={cn(
                     'text-xs',
@@ -444,7 +444,7 @@ export function PriceSpinner({
                     {isUp && <TrendingUp className="w-3 h-3 text-green-500" />}
                     {!isUp && !isCurrent && <TrendingDown className="w-3 h-3 text-red-500" />}
                     <span className={cn('text-sm', isCurrent && 'text-primary')}>
-                      ${level.price.toFixed(2)}
+                      ${formatCryptoPrice(level.price)}
                     </span>
                   </div>
                   <span className={cn(
@@ -498,7 +498,7 @@ export function PriceSpinner({
                 priceLevels[selectedLevel].percentChange < 0 && 'text-red-500',
                 priceLevels[selectedLevel].percentChange === 0 && 'text-primary'
               )}>
-                ${priceLevels[selectedLevel].price.toFixed(2)} (
+                ${formatCryptoPrice(priceLevels[selectedLevel].price)} (
                 {priceLevels[selectedLevel].percentChange > 0 ? `+${priceLevels[selectedLevel].percentChange.toFixed(isAfterHours ? 1 : 0)}%` :
                  priceLevels[selectedLevel].percentChange === 0 ? '0%' :
                  `${priceLevels[selectedLevel].percentChange.toFixed(isAfterHours ? 1 : 0)}%`})

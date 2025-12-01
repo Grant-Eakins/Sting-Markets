@@ -14,16 +14,43 @@ import {
   clearAllMarkets,
 } from '../services/marketService';
 import { createOnChainMarket, syncAllMarketPools, getMarketProbabilities } from '../services/blockchainSync';
-import { getIntradayData } from '../services/stockApi';
-import { syncStockMarkets } from '../services/stockSync';
+import { getCryptoHistory } from '../services/cryptoApi';
+import { syncCryptoMarkets } from '../services/cryptoSync';
 import { Position, MarketStatus } from '../types/market';
 import { testDiscordWebhook } from '../services/discordBot';
+import { getCryptoQuote } from '../services/cryptoApi';
 
 const router = express.Router();
 
-// Chart data cache to reduce API calls (cache for 5 minutes)
+// Chart data cache to reduce API calls (cache for 2 minutes)
 const chartCache: Map<string, { data: any; timestamp: number }> = new Map();
-const CHART_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CHART_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+// ETH price cache (2 minutes)
+let ethPriceCache: { price: number; timestamp: number } | null = null;
+const ETH_PRICE_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+/**
+ * GET /api/markets/eth-price
+ * Get current ETH price in USD (for USD conversion display)
+ */
+router.get('/eth-price', async (req, res) => {
+  try {
+    // Check cache first
+    if (ethPriceCache && (Date.now() - ethPriceCache.timestamp) < ETH_PRICE_CACHE_TTL) {
+      return res.json({ success: true, price: ethPriceCache.price, cached: true });
+    }
+    
+    const quote = await getCryptoQuote('ETH');
+    ethPriceCache = { price: quote.price, timestamp: Date.now() };
+    
+    res.json({ success: true, price: quote.price, cached: false });
+  } catch (error: any) {
+    // Return cached price if available, otherwise fallback
+    const fallbackPrice = ethPriceCache?.price || 2500;
+    res.json({ success: true, price: fallbackPrice, cached: true, fallback: true });
+  }
+});
 
 /**
  * GET /api/markets/test-discord
@@ -40,14 +67,14 @@ router.get('/test-discord', async (req, res) => {
 
 /**
  * GET /api/markets/chart/:symbol
- * Get intraday chart data for a stock symbol
+ * Get historical price data for a crypto symbol
  * Cached for 5 minutes to reduce API calls
  */
 router.get('/chart/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
-    const { interval = '5min' } = req.query;
-    const cacheKey = `${symbol}-${interval}`;
+    const { days = '1' } = req.query;
+    const cacheKey = `${symbol}-${days}d`;
     
     // Check cache first
     const cached = chartCache.get(cacheKey);
@@ -55,13 +82,13 @@ router.get('/chart/:symbol', async (req, res) => {
       return res.json({
         success: true,
         symbol,
-        interval,
+        days,
         data: cached.data,
         cached: true,
       });
     }
     
-    const data = await getIntradayData(symbol, interval as any);
+    const data = await getCryptoHistory(symbol, parseInt(days as string, 10));
     
     // Store in cache
     chartCache.set(cacheKey, { data, timestamp: Date.now() });
@@ -69,7 +96,7 @@ router.get('/chart/:symbol', async (req, res) => {
     res.json({
       success: true,
       symbol,
-      interval,
+      days,
       data,
       cached: false,
     });
@@ -444,7 +471,7 @@ router.post('/bets/:betId/claim', (req, res) => {
 
 /**
  * POST /api/markets/admin/sync
- * Create new markets for symbols that don't have active/locked markets
+ * Create new markets for cryptos that don't have active/locked markets
  * Useful for manually triggering market creation after settlement
  */
 router.post('/admin/sync', async (req, res) => {
@@ -452,8 +479,8 @@ router.post('/admin/sync', async (req, res) => {
     // Get count of markets before sync
     const beforeMarkets = getAllMarkets().filter(m => m.status === 'ACTIVE' || m.status === 'LOCKED');
     
-    // Sync/create new markets (will skip symbols with existing active/locked markets)
-    await syncStockMarkets();
+    // Sync/create new markets (will skip cryptos with existing active/locked markets)
+    await syncCryptoMarkets();
     
     // Get the newly created markets
     const afterMarkets = getAllMarkets().filter(m => m.status === 'ACTIVE' || m.status === 'LOCKED');
@@ -494,7 +521,7 @@ router.post('/admin/reset', async (req, res) => {
     console.log('🗑️ Cleared chart cache');
     
     // Create fresh markets with current prices
-    await syncStockMarkets();
+    await syncCryptoMarkets();
     
     // Get the newly created markets
     const newMarkets = getAllMarkets();

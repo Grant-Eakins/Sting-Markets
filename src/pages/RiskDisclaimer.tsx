@@ -86,7 +86,7 @@ export default function RiskDisclaimer() {
                   technical issues that affect transaction processing or settlement.
                 </li>
                 <li>
-                  <strong>Oracle Risk:</strong> Market settlements depend on external data sources (stock prices). 
+                  <strong>Oracle Risk:</strong> Market settlements depend on external data sources (crypto prices). 
                   These oracles could provide incorrect data, be manipulated, or fail to update.
                 </li>
                 <li>
@@ -119,7 +119,7 @@ export default function RiskDisclaimer() {
                   worse execution prices than expected.
                 </li>
                 <li>
-                  <strong>Settlement Risk:</strong> Stock prices can gap or move unexpectedly during non-trading 
+                  <strong>Settlement Risk:</strong> Crypto prices can move unexpectedly during volatile 
                   hours, affecting overnight market settlements.
                 </li>
                 <li>

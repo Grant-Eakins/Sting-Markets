@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import axios from 'axios';
+import { formatCryptoPrice } from '@/lib/utils';
 
 interface StockChartProps {
   stockSymbol: string;
@@ -34,18 +35,16 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
         // Use relative URL for production compatibility
         const baseUrl = import.meta.env.PROD ? '' : 'http://localhost:3001';
         const response = await axios.get(`${baseUrl}/api/markets/chart/${stockSymbol}`, {
-          params: { interval: '5min' }
+          params: { days: 1 } // Get last 24 hours of data
         });
         
         if (response.data.success && response.data.data && response.data.data.length > 0) {
-          // Format the data - API returns newest first, we want oldest first for charting
+          // CoinGecko returns {timestamp: Date, price: number} - data is already oldest first
           const formattedData = response.data.data
-            .slice(0, 78) // ~6.5 hours of 5-min data for full trading day
-            .reverse()
             .map((point: any) => ({
-              time: point.time,
+              time: new Date(point.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
               price: point.price,
-              volume: point.volume,
+              volume: 0,
             }));
           setPriceHistory(formattedData);
         } else {
@@ -104,7 +103,7 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
 
     fetchChartData();
     
-    // Refresh chart data every 60 seconds
+    // Refresh chart data every 60 seconds (CoinGecko has rate limits)
     const interval = setInterval(fetchChartData, 60000);
     return () => clearInterval(interval);
   }, [stockSymbol, currentPriceUSD, openingPriceUSD]);
@@ -206,7 +205,7 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="text-lg sm:text-xl font-bold">
-            ${hoveredPoint ? hoveredPoint.price.toFixed(2) : lastPrice.toFixed(2)}
+            ${hoveredPoint ? formatCryptoPrice(hoveredPoint.price) : formatCryptoPrice(lastPrice)}
           </div>
           {hoveredPoint && (
             <div className="text-[10px] text-muted-foreground">{hoveredPoint.time}</div>
@@ -267,7 +266,7 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
                     fill="currentColor"
                     fillOpacity="0.5"
                   >
-                    ${tick.toFixed(2)}
+                    ${formatCryptoPrice(tick)}
                   </text>
                 </g>
               );

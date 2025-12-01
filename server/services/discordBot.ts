@@ -1,3 +1,4 @@
+// @ts-ignore - node-fetch doesn't have types in this context
 import fetch from 'node-fetch';
 
 /**
@@ -16,11 +17,34 @@ const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const SITE_URL = 'https://stingmarkets.com';
 
 interface MarketData {
-  stockSymbol: string;
+  stockSymbol: string;  // Using stockSymbol for compatibility (will be crypto symbol)
   stockName?: string;
   currentPrice: number; // in cents
   openingPrice: number; // in cents
   priceChangePercent: number;
+}
+
+// Format price based on value - more decimals for lower-priced cryptos
+function formatPrice(priceInCents: number, symbol: string): string {
+  const price = priceInCents / 100;
+  
+  // High-value cryptos (BTC, ETH) - show with commas, 2 decimals
+  if (price >= 100) {
+    return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  
+  // Mid-range ($1-$100) - 2 decimals
+  if (price >= 1) {
+    return price.toFixed(2);
+  }
+  
+  // Sub-dollar ($0.01-$0.99) - 4 decimals
+  if (price >= 0.01) {
+    return price.toFixed(4);
+  }
+  
+  // Very low price (memecoins) - 6 decimals
+  return price.toFixed(6);
 }
 
 async function sendDiscordMessage(content: string) {
@@ -64,18 +88,18 @@ export async function sendOpeningPriceTweets(markets: MarketData[]) {
   if (markets.length === 0) return;
 
   for (const market of markets) {
-    const openPrice = (market.openingPrice / 100).toFixed(2);
+    const openPrice = formatPrice(market.openingPrice, market.stockSymbol);
 
     const tweet = `🔔 $${market.stockSymbol} Market Now Open!
 
-Today's Opening Price: $${openPrice}
+Starting Price: $${openPrice}
 
-Predict UP 📈 or DOWN 📉 by market close!
+Predict the price at next settlement 🎯
 
-Place your bet now 👇
+Pick your bucket and bet now 👇
 ${SITE_URL}
 
-#StingMarkets #${market.stockSymbol} #Stocks #PredictionMarket`;
+#StingMarkets #${market.stockSymbol} #Crypto #PredictionMarket`;
 
     const message = `**📋 COPY THIS TWEET:**
 \`\`\`
@@ -100,22 +124,22 @@ export async function sendPriceUpdateTweets(markets: MarketData[]) {
     console.log(`   - openingPrice (cents): ${market.openingPrice}`);
     console.log(`   - priceChangePercent: ${market.priceChangePercent}`);
     
-    const currentPrice = (market.currentPrice / 100).toFixed(2);
-    const openPrice = (market.openingPrice / 100).toFixed(2);
+    const currentPrice = formatPrice(market.currentPrice, market.stockSymbol);
+    const openPrice = formatPrice(market.openingPrice, market.stockSymbol);
     const change = market.priceChangePercent;
     const emoji = change >= 0 ? '📈' : '📉';
     const sign = change >= 0 ? '+' : '';
 
     const tweet = `${emoji} $${market.stockSymbol} Price Update
 
-Open: $${openPrice}
+Session Start: $${openPrice}
 Now: $${currentPrice} (${sign}${change.toFixed(1)}%)
 
-Think you know where it closes? Bet on the closing price! 🎯
+Think you know where it settles? Pick your bucket! 🎯
 
 ${SITE_URL}
 
-#StingMarkets #${market.stockSymbol} #Stocks #Trading`;
+#StingMarkets #${market.stockSymbol} #Crypto #Trading`;
 
     const message = `**📋 COPY THIS TWEET:**
 \`\`\`
@@ -134,25 +158,25 @@ export async function sendClosingPriceTweets(markets: MarketData[]) {
   if (markets.length === 0) return;
 
   for (const market of markets) {
-    const closingPrice = (market.currentPrice / 100).toFixed(2);
-    const openPrice = (market.openingPrice / 100).toFixed(2);
+    const closingPrice = formatPrice(market.currentPrice, market.stockSymbol);
+    const openPrice = formatPrice(market.openingPrice, market.stockSymbol);
     const change = market.priceChangePercent;
     const emoji = change >= 0 ? '🟢' : '🔴';
     const sign = change >= 0 ? '+' : '';
     const direction = change >= 0 ? 'UP' : 'DOWN';
 
-    const tweet = `🏁 $${market.stockSymbol} Market Closed!
+    const tweet = `🏁 $${market.stockSymbol} Session Settled!
 
-Open: $${openPrice}
-Close: $${closingPrice}
+Start: $${openPrice}
+End: $${closingPrice}
 Result: ${emoji} ${direction} ${sign}${change.toFixed(1)}%
 
 Winners have been paid out! 💰
 
-New markets open tomorrow 👇
+New session starting now 👇
 ${SITE_URL}
 
-#StingMarkets #${market.stockSymbol} #Stocks #Crypto`;
+#StingMarkets #${market.stockSymbol} #Crypto #DeFi`;
 
     const message = `**📋 COPY THIS TWEET:**
 \`\`\`
@@ -176,16 +200,16 @@ export async function sendTweetAlert(markets: MarketData[]) {
  * Test the Discord webhook
  */
 export async function testDiscordWebhook() {
-  const testTweet = `🔔 $AAPL Market Now Open!
+  const testTweet = `🔔 $BTC 12-Hour Session Open!
 
-Opening Price: $234.56
+Opening Price: $68,420.00
 
-Will it go UP or DOWN by market close? 🤔
+Will it go UP or DOWN by settlement? 🤔
 
-Place your bet now 👇
+Pick your bucket now 👇
 ${SITE_URL}
 
-#StingMarkets #AAPL #Stocks #PredictionMarket`;
+#StingMarkets #BTC #Crypto #DeFi`;
 
   const message = `**📋 TEST TWEET (copy this):**
 \`\`\`

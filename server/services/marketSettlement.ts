@@ -1,5 +1,5 @@
 import { getMarketsReadyToSettle, settleMarket, lockExpiredMarkets, getActiveMarkets, updateMarketPrice } from './marketService';
-import { getStockQuote, getBatchQuotes } from './stockApi';
+import { getCryptoQuote, getBatchQuotes } from './cryptoApi';
 import { sendPriceUpdateTweets, sendClosingPriceTweets, sendOpeningPriceTweets } from './discordBot';
 
 // Track last Discord update time to send every 3 hours
@@ -126,19 +126,19 @@ export async function checkAndSettleMarkets(): Promise<void> {
 }
 
 /**
- * Settles a market by fetching latest stock price
+ * Settles a market by fetching latest crypto price
  * Returns market data for Discord tweet
  */
-async function settleMarketWithData(marketId: string, stockSymbol: string, openingPrice: number): Promise<{ stockSymbol: string; currentPrice: number; openingPrice: number; priceChangePercent: number } | null> {
+async function settleMarketWithData(marketId: string, symbol: string, openingPrice: number): Promise<{ stockSymbol: string; currentPrice: number; openingPrice: number; priceChangePercent: number } | null> {
   try {
-    console.log(`\n🏁 Settling market: ${stockSymbol}`);
+    console.log(`\n🏁 Settling market: ${symbol}`);
     
-    // Fetch current stock price
-    const quote = await getStockQuote(stockSymbol);
+    // Fetch current crypto price
+    const quote = await getCryptoQuote(symbol);
     const closingPrice = Math.round(quote.price * 100); // Convert to cents
     
     if (!closingPrice) {
-      console.error(`❌ Could not fetch price for "${stockSymbol}"`);
+      console.error(`❌ Could not fetch price for "${symbol}"`);
       return null;
     }
     
@@ -153,7 +153,7 @@ async function settleMarketWithData(marketId: string, stockSymbol: string, openi
     console.log(`   Total payout: ${result.totalPayout.toFixed(4)} ETH`);
     
     return {
-      stockSymbol,
+      stockSymbol: symbol,
       currentPrice: closingPrice,
       openingPrice,
       priceChangePercent: result.priceChangePercent,

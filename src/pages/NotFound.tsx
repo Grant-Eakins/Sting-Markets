@@ -54,7 +54,7 @@ const NotFound = () => {
           {/* Helpful info */}
           <div className="pt-4 border-t">
             <p className="text-sm text-muted-foreground">
-              Looking for something specific? Our prediction markets let you bet on stock price movements.
+              Looking for something specific? Our prediction markets let you bet on crypto price movements.
             </p>
           </div>
         </CardContent>

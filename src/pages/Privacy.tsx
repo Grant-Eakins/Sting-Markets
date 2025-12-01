@@ -130,7 +130,7 @@ export default function Privacy() {
                 <li><strong>WalletConnect / RainbowKit:</strong> For wallet connections</li>
                 <li><strong>Base Network (Coinbase):</strong> Blockchain infrastructure</li>
                 <li><strong>CoinGecko:</strong> For cryptocurrency price data</li>
-                <li><strong>Stock data providers:</strong> For market price information</li>
+                <li><strong>Crypto data providers:</strong> For market price information</li>
               </ul>
               <p>
                 We encourage you to review the privacy policies of these services.

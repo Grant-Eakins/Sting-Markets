@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 
-// Cache ETH price for 5 minutes to avoid excessive API calls
+// Cache ETH price for 2 minutes to avoid excessive API calls
 let cachedPrice: number | null = null;
 let cacheTimestamp: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
 export function useEthPrice() {
   const [ethPrice, setEthPrice] = useState<number | null>(cachedPrice);
@@ -19,16 +19,18 @@ export function useEthPrice() {
       }
 
       try {
-        // Use CoinGecko free API (no key needed)
-        const response = await fetch(
-          'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
-        );
+        // Use our backend API to avoid CORS issues
+        const baseUrl = import.meta.env.PROD ? '' : 'http://localhost:3001';
+        const response = await fetch(`${baseUrl}/api/markets/eth-price`);
         const data = await response.json();
-        const price = data.ethereum.usd;
         
-        cachedPrice = price;
-        cacheTimestamp = Date.now();
-        setEthPrice(price);
+        if (data.success && data.price) {
+          cachedPrice = data.price;
+          cacheTimestamp = Date.now();
+          setEthPrice(data.price);
+        } else {
+          throw new Error('Invalid response');
+        }
       } catch (error) {
         console.error('Failed to fetch ETH price:', error);
         // Fallback to approximate price if API fails
@@ -40,7 +42,7 @@ export function useEthPrice() {
 
     fetchPrice();
     
-    // Refresh price every 5 minutes
+    // Refresh price every minute
     const interval = setInterval(fetchPrice, CACHE_DURATION);
     return () => clearInterval(interval);
   }, []);

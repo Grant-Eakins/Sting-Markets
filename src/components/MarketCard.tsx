@@ -10,6 +10,7 @@ import { StockChart } from '@/components/StockChart';
 import { PriceSpinner } from '@/components/PriceSpinner';
 import { useMarketProbabilities } from '@/hooks/useContract';
 import { useEthPrice, formatEthToUsd } from '@/hooks/useEthPrice';
+import { formatCryptoPrice } from '@/lib/utils';
 
 interface MarketCardProps {
   market: Market;
@@ -71,9 +72,10 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
     downOdds = downProbSum > 0 ? Math.min(100 / downProbSum, 10) : 10;
   }
 
-  const timeUntilLock = new Date(market.lockTime).getTime() - Date.now();
-  const hoursUntilLock = Math.max(0, Math.floor(timeUntilLock / (1000 * 60 * 60)));
-  const minutesUntilLock = Math.max(0, Math.floor((timeUntilLock % (1000 * 60 * 60)) / (1000 * 60)));
+  // Calculate time until settlement (more relevant for crypto markets)
+  const timeUntilSettle = new Date(market.settleTime).getTime() - Date.now();
+  const hoursUntilSettle = Math.max(0, Math.floor(timeUntilSettle / (1000 * 60 * 60)));
+  const minutesUntilSettle = Math.max(0, Math.floor((timeUntilSettle % (1000 * 60 * 60)) / (1000 * 60)));
 
   const [selectedBucket, setSelectedBucket] = useState<{
     bucketIndex: number;
@@ -118,7 +120,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
             {market.status === 'ACTIVE' && (
               <div className="flex items-center text-sm text-muted-foreground">
                 <Clock className="w-4 h-4 mr-1" />
-                {hoursUntilLock}h {minutesUntilLock}m
+                {hoursUntilSettle}h {minutesUntilSettle}m
               </div>
             )}
           </div>
@@ -265,10 +267,10 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
         <CardFooter className="text-xs text-muted-foreground">
           <div className="flex justify-between w-full">
             {market.openingPrice !== undefined && (
-              <span>Opening: ${(market.openingPrice / 100).toFixed(2)}</span>
+              <span>Opening: ${formatCryptoPrice(market.openingPrice / 100)}</span>
             )}
             {market.status === 'ACTIVE' && (
-              <span>Closes in {hoursUntilLock}h {minutesUntilLock}m</span>
+              <span>Settles in {hoursUntilSettle}h {minutesUntilSettle}m</span>
             )}
           </div>
         </CardFooter>
