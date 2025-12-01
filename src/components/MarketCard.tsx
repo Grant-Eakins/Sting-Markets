@@ -83,6 +83,9 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
   } | null>(null);
 
   const handleBet = (bucketIndex: number, percentChange: number, targetPrice: number, amount: number) => {
+    // This is only called in demo/fallback mode from PriceSpinner
+    // For blockchain bets, PriceSpinner handles it directly
+    console.log('📝 MarketCard handleBet (demo mode):', { bucketIndex, percentChange, targetPrice, amount });
     setSelectedBucket({ bucketIndex, percentChange, targetPrice, amount });
     // Determine position based on percentChange for backward compatibility
     setSelectedPosition(percentChange >= 0 ? 'UP' : 'DOWN');

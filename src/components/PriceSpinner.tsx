@@ -230,19 +230,21 @@ export function PriceSpinner({
     
     const level = priceLevels[selectedLevel];
     
-    // Direct blockchain transaction
-    if (isContractDeployed && blockchainMarketId !== undefined) {
-      console.log('🎯 Placing BLOCKCHAIN bet:', {
-        blockchainMarketId,
-        bucketIndex: level.bucketIndex,
-        betAmount,
-        contractAddress,
-        userAddress: address,
-      });
+    console.log('🎯 handleBet called:', {
+      isContractDeployed,
+      blockchainMarketId,
+      contractAddress,
+      bucketIndex: level.bucketIndex,
+      betAmount,
+    });
+    
+    // Direct blockchain transaction - this is the primary path
+    if (isContractDeployed && blockchainMarketId !== undefined && blockchainMarketId !== null) {
+      console.log('✅ Placing BLOCKCHAIN bet directly (no dialog)');
       placeBetOnChain(blockchainMarketId, level.bucketIndex, betAmount);
     } else {
-      // Fallback to callback (demo mode)
-      console.warn('⚠️ Using DEMO mode for bet:', {
+      // Fallback to callback (demo mode) - this opens BetDialog
+      console.warn('⚠️ Using DEMO mode (this will open dialog):', {
         isContractDeployed,
         blockchainMarketId,
         reason: !isContractDeployed ? 'Contract not deployed' : 'No blockchainMarketId',
@@ -557,6 +559,13 @@ export function PriceSpinner({
           </div>
         )}
 
+        {/* Wrong network warning */}
+        {isConnected && chainId !== 84532 && (
+          <div className="text-yellow-500 text-xs text-center py-2 bg-yellow-500/10 rounded border border-yellow-500/20">
+            ⚠️ Switch to Base Sepolia to place bets
+          </div>
+        )}
+
         <Button
           onClick={handleBet}
           className={cn(
@@ -565,7 +574,7 @@ export function PriceSpinner({
             selectedLevel !== null && priceLevels[selectedLevel].percentChange < 0 && 'bg-red-600 hover:bg-red-700',
             (selectedLevel === null || priceLevels[selectedLevel].percentChange === 0) && 'bg-primary hover:bg-primary/90'
           )}
-          disabled={selectedLevel === null || !betAmount || parseFloat(betAmount) < 0.001 || !isConnected || isPending || isConfirming || isConfirmed}
+          disabled={selectedLevel === null || !betAmount || parseFloat(betAmount) < 0.001 || !isConnected || isPending || isConfirming || isConfirmed || chainId !== 84532}
           size="sm"
         >
           {isPending ? (
@@ -585,6 +594,8 @@ export function PriceSpinner({
             </>
           ) : !isConnected ? (
             'Connect Wallet to Bet'
+          ) : chainId !== 84532 ? (
+            'Switch to Base Sepolia'
           ) : selectedLevel === null ? (
             'Select a price bucket'
           ) : (
