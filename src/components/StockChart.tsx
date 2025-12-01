@@ -88,10 +88,10 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
     return () => clearInterval(interval);
   }, [stockSymbol, currentPriceUSD, openingPriceUSD]);
 
-  // Calculate chart dimensions - larger for more detail
+  // Calculate chart dimensions - responsive
   const width = 320;
-  const height = 180;
-  const padding = { top: 15, right: 15, bottom: 30, left: 50 };
+  const height = 160;
+  const padding = { top: 15, right: 10, bottom: 25, left: 45 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -156,35 +156,49 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
   };
 
   return (
-    <Card className="p-4 bg-card/50 backdrop-blur">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <div className="text-sm text-muted-foreground">{stockSymbol}</div>
-          <div className="text-2xl font-bold">
+    <Card className="p-3 sm:p-4 bg-card/50 backdrop-blur">
+      {/* Header with price info - stacks on mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-0 mb-2 sm:mb-3">
+        <div className="flex items-center justify-between sm:block">
+          <div className="text-xs sm:text-sm text-muted-foreground">{stockSymbol}</div>
+          <div className="text-lg sm:text-2xl font-bold">
             ${hoveredPoint ? hoveredPoint.price.toFixed(2) : lastPrice.toFixed(2)}
           </div>
           {hoveredPoint && (
             <div className="text-xs text-muted-foreground">{hoveredPoint.time}</div>
           )}
         </div>
-        <div className={`flex items-center gap-1 text-sm font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-          {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-          {isPositive ? '+' : ''}{priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+        <div className={`flex items-center gap-1 text-xs sm:text-sm font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+          {isPositive ? <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4" />}
+          <span>{isPositive ? '+' : ''}{priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%)</span>
         </div>
       </div>
 
       <div className="relative mb-2">
         {isLoading ? (
-          <div className="flex items-center justify-center h-[180px]">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center h-[140px] sm:h-[160px]">
+            <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <svg 
-            width={width} 
-            height={height} 
+            viewBox={`0 0 ${width} ${height}`}
             className="w-full h-auto"
+            preserveAspectRatio="xMidYMid meet"
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setHoveredPoint(null)}
+            onTouchMove={(e) => {
+              const touch = e.touches[0];
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = touch.clientX - rect.left;
+              const scaleX = width / rect.width;
+              const relativeX = (x * scaleX) - padding.left;
+              const xStep = chartWidth / (priceHistory.length - 1);
+              const index = Math.round(relativeX / xStep);
+              if (index >= 0 && index < priceHistory.length) {
+                setHoveredPoint(getPointPosition(index));
+              }
+            }}
+            onTouchEnd={() => setHoveredPoint(null)}
           >
             {/* Horizontal grid lines */}
             {getYTicks().map((tick, i) => {
@@ -303,7 +317,8 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
         )}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      {/* Bottom stats - wrap on mobile */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
         <span>Open: ${firstPrice.toFixed(2)}</span>
         <span>High: ${maxPrice.toFixed(2)}</span>
         <span>Low: ${minPrice.toFixed(2)}</span>

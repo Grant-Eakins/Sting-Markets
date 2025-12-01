@@ -571,50 +571,58 @@ export default function MyBets() {
           {/* Active Bets */}
           {activeBets.length > 0 && (
             <div>
-              <h2 className="text-2xl font-bold mb-4">Active Bets</h2>
+              <h2 className="text-xl sm:text-2xl font-bold mb-4">Active Bets</h2>
               <div className="space-y-3">
                 {activeBets.map((bet) => (
                   <Card key={bet.betId.toString()}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                    <CardContent className="p-4 sm:p-6">
+                      {/* Mobile: Stack vertically, Desktop: Side by side */}
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          {/* Header row with badge and market name */}
+                          <div className="flex items-center gap-2 mb-3 flex-wrap">
                             {bet.isUpBet ? (
-                              <TrendingUp className="w-5 h-5 text-green-500" />
+                              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 shrink-0" />
                             ) : (
-                              <TrendingDown className="w-5 h-5 text-red-500" />
+                              <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
                             )}
-                            <Badge variant="secondary" className="font-mono">
+                            <Badge variant="secondary" className="font-mono text-xs">
                               {bet.bucketLabel}
                             </Badge>
-                            <span className="font-semibold">{bet.marketName}</span>
+                            <span className="font-semibold text-sm sm:text-base truncate">{bet.marketName}</span>
+                            {/* Mobile: Show Active badge inline */}
+                            <Badge variant="outline" className="sm:hidden ml-auto">Active</Badge>
                           </div>
-                          <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-                            <div>
+                          {/* Stats grid - single column on mobile, 2 cols on desktop */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
+                            <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Staked:</span>
-                              <span className="ml-2 font-bold">{bet.amountEth.toFixed(4)} ETH</span>
+                              <span className="font-bold sm:ml-2">{bet.amountEth.toFixed(4)} ETH</span>
                             </div>
-                            <div>
+                            <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Shares:</span>
-                              <span className="ml-2 font-bold">{bet.sharesNum < 0.01 ? bet.sharesNum.toFixed(6) : bet.sharesNum.toFixed(4)}</span>
+                              <span className="font-bold sm:ml-2">{bet.sharesNum < 0.01 ? bet.sharesNum.toFixed(6) : bet.sharesNum.toFixed(4)}</span>
                             </div>
-                            <div>
+                            <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Win Chance:</span>
-                              <span className="ml-2 font-bold">{bet.probability}%</span>
+                              <span className="font-bold sm:ml-2">{bet.probability}%</span>
                             </div>
-                            <div>
+                            <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">If Win:</span>
-                              <span className="ml-2 font-bold text-green-500">~{bet.potentialPayout.toFixed(4)} ETH</span>
+                              <span className="font-bold text-green-500 sm:ml-2">~{bet.potentialPayout.toFixed(4)} ETH</span>
                             </div>
-                            <div className="col-span-2">
+                            <div className="flex justify-between sm:block sm:col-span-2">
                               <span className="text-muted-foreground">Est. Sell Value:</span>
-                              <span className="ml-2 font-bold text-orange-500">~{(bet.currentValue * 0.99).toFixed(4)} ETH</span>
-                              <span className="text-xs text-muted-foreground ml-1">(1% fee)</span>
+                              <span>
+                                <span className="font-bold text-orange-500 sm:ml-2">~{(bet.currentValue * 0.99).toFixed(4)} ETH</span>
+                                <span className="text-xs text-muted-foreground ml-1">(1% fee)</span>
+                              </span>
                             </div>
                           </div>
                         </div>
-                        <div className="ml-4 flex flex-col items-end gap-2">
-                          <Badge variant="outline">Active</Badge>
+                        {/* Action buttons - full width row on mobile, column on desktop */}
+                        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0">
+                          <Badge variant="outline" className="hidden sm:inline-flex">Active</Badge>
                           <Button
                             size="sm"
                             variant="outline"
@@ -640,42 +648,52 @@ export default function MyBets() {
           {/* Settled Bets */}
           {settledBets.length > 0 && (
             <div>
-              <h2 className="text-2xl font-bold mb-4">Settled Bets</h2>
+              <h2 className="text-xl sm:text-2xl font-bold mb-4">Settled Bets</h2>
               <div className="space-y-3">
                 {settledBets.map((bet) => (
                   <Card key={bet.betId.toString()} className={bet.won ? 'border-green-500' : 'border-red-500/30'}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                    <CardContent className="p-4 sm:p-6">
+                      {/* Mobile: Stack vertically, Desktop: Side by side */}
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          {/* Header row */}
+                          <div className="flex items-center gap-2 mb-3 flex-wrap">
                             {bet.won ? (
-                              <Trophy className="w-5 h-5 text-green-500" />
+                              <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 shrink-0" />
                             ) : (
-                              <AlertCircle className="w-5 h-5 text-red-500" />
+                              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
                             )}
-                            <Badge variant="secondary" className="font-mono">
+                            <Badge variant="secondary" className="font-mono text-xs">
                               {bet.bucketLabel}
                             </Badge>
-                            <span className="font-semibold">{bet.marketName}</span>
+                            <span className="font-semibold text-sm sm:text-base truncate">{bet.marketName}</span>
+                            {/* Mobile: Show Won/Lost badge inline */}
+                            {bet.won ? (
+                              <Badge variant="outline" className="border-green-500 text-green-500 sm:hidden ml-auto">Won</Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-red-500 text-red-500 sm:hidden ml-auto">Lost</Badge>
+                            )}
                           </div>
-                          <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-                            <div>
+                          {/* Stats grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
+                            <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Staked:</span>
-                              <span className="ml-2 font-bold">{bet.amountEth.toFixed(4)} ETH</span>
+                              <span className="font-bold sm:ml-2">{bet.amountEth.toFixed(4)} ETH</span>
                             </div>
-                            <div>
+                            <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Result:</span>
-                              <span className={`ml-2 font-bold ${bet.won ? 'text-green-500' : 'text-red-500'}`}>
+                              <span className={`font-bold sm:ml-2 ${bet.won ? 'text-green-500' : 'text-red-500'}`}>
                                 {bet.won ? `Won ~${bet.potentialPayout.toFixed(4)} ETH` : 'Lost'}
                               </span>
                             </div>
                           </div>
                         </div>
-                        <div className="ml-4 flex flex-col items-end gap-2">
+                        {/* Action buttons */}
+                        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0">
                           {bet.won ? (
-                            <Badge variant="outline" className="border-green-500 text-green-500">Won</Badge>
+                            <Badge variant="outline" className="border-green-500 text-green-500 hidden sm:inline-flex">Won</Badge>
                           ) : (
-                            <Badge variant="outline" className="border-red-500 text-red-500">Lost</Badge>
+                            <Badge variant="outline" className="border-red-500 text-red-500 hidden sm:inline-flex">Lost</Badge>
                           )}
                           {bet.won && !bet.claimed && (
                             <Button
