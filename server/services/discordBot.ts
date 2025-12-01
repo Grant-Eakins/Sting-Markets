@@ -64,13 +64,13 @@ export async function sendOpeningPriceTweets(markets: MarketData[]) {
   if (markets.length === 0) return;
 
   for (const market of markets) {
-    const price = (market.openingPrice / 100).toFixed(2);
+    const openPrice = (market.openingPrice / 100).toFixed(2);
 
     const tweet = `🔔 $${market.stockSymbol} Market Now Open!
 
-Opening Price: $${price}
+Today's Opening Price: $${openPrice}
 
-Will it go UP or DOWN by market close? 🤔
+Predict UP 📈 or DOWN 📉 by market close!
 
 Place your bet now 👇
 ${SITE_URL}
@@ -94,6 +94,12 @@ export async function sendPriceUpdateTweets(markets: MarketData[]) {
   if (markets.length === 0) return;
 
   for (const market of markets) {
+    // Debug logging to verify data
+    console.log(`📊 Discord tweet data for ${market.stockSymbol}:`);
+    console.log(`   - currentPrice (cents): ${market.currentPrice}`);
+    console.log(`   - openingPrice (cents): ${market.openingPrice}`);
+    console.log(`   - priceChangePercent: ${market.priceChangePercent}`);
+    
     const currentPrice = (market.currentPrice / 100).toFixed(2);
     const openPrice = (market.openingPrice / 100).toFixed(2);
     const change = market.priceChangePercent;

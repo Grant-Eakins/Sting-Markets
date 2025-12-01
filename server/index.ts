@@ -124,9 +124,31 @@ cron.schedule('*/15 * * * *', async () => {
   }
 });
 
-// Update stock prices every 2 minutes using batch endpoint (1 API call for all 6 stocks)
-// This uses ~720 calls/day, leaving buffer for settlement and chart calls
+// Helper to check if we're in market hours (9:30 AM - 4 PM ET, Mon-Fri)
+function isMarketHours(): boolean {
+  const now = new Date();
+  const etTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = etTime.getDay(); // 0 = Sunday, 6 = Saturday
+  const hour = etTime.getHours();
+  const minute = etTime.getMinutes();
+  
+  // Weekends - no updates needed
+  if (day === 0 || day === 6) return false;
+  
+  // Before 9:30 AM or after 4 PM - no updates needed
+  if (hour < 9 || (hour === 9 && minute < 30)) return false;
+  if (hour >= 16) return false;
+  
+  return true;
+}
+
+// Update stock prices every 2 minutes ONLY during market hours
+// This saves ~500+ API calls/day by not updating nights/weekends
 cron.schedule('*/2 * * * *', async () => {
+  if (!isMarketHours()) {
+    return; // Skip updates outside market hours
+  }
+  
   try {
     await updateActiveMarketPrices();
     trackApiCall(1); // Batch call counts as 1
@@ -207,13 +229,18 @@ app.listen(PORT, async () => {
   console.log('📂 Loading markets from database...');
   await initializeMarketsFromDb();
   
-  // Create markets for top 6 stocks if they don't exist
+  // Force settle any stale markets and create new ones
   console.log('🌱 Creating markets for top 6 stocks (if needed)...');
-  syncStockMarkets().then(() => {
+  try {
+    // First, settle any markets that should have been settled
+    await checkAndSettleMarkets();
+    
+    // Then create new markets
+    await syncStockMarkets();
     trackApiCall(1); // Batch call for initial market creation
-  }).catch(error => {
+  } catch (error) {
     console.error('Error during initial stock sync:', error);
-  });
+  }
 });
 
 // Catch-all: serve frontend for client-side routing (must be after API routes)

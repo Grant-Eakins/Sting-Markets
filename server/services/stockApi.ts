@@ -9,6 +9,12 @@ import axios from 'axios';
 const TWELVE_DATA_API_KEY = process.env.TWELVE_DATA_API_KEY || 'demo';
 const TWELVE_DATA_BASE_URL = 'https://api.twelvedata.com';
 
+// Log API configuration on startup
+console.log(`📡 Stock API Mode: ${TWELVE_DATA_API_KEY === 'demo' ? '⚠️ DEMO (using mock data)' : '✅ LIVE (using real prices)'}`);
+if (TWELVE_DATA_API_KEY === 'demo') {
+  console.log('   Set TWELVE_DATA_API_KEY in environment for real prices');
+}
+
 export interface StockQuote {
   symbol: string;
   price: number;        // Current price in dollars
@@ -195,12 +201,13 @@ export async function getIntradayData(
 ): Promise<Array<{ time: string; price: number; volume: number }>> {
   try {
     if (TWELVE_DATA_API_KEY === 'demo') {
-      console.log(`🔄 Using mock intraday data for ${symbol}`);
-      // Get the current quote to use real price in mock data
+      console.log(`⚠️ Using MOCK intraday data for ${symbol} (no API key)`);
       const quote = MOCK_QUOTES[symbol] || generateMockQuote(symbol);
       return generateMockIntradayData(quote.price);
     }
 
+    console.log(`📊 Fetching LIVE chart data for ${symbol}...`);
+    
     const response = await axios.get(`${TWELVE_DATA_BASE_URL}/time_series`, {
       params: {
         symbol,
@@ -213,11 +220,11 @@ export async function getIntradayData(
     const data = response.data;
     
     if (data.status === 'error' || !data.values) {
-      console.warn(`⚠️  No intraday data for ${symbol}: ${data.message || 'Unknown error'}`);
+      console.warn(`⚠️ Chart API error for ${symbol}: ${data.message || 'No data'} - using fallback`);
       // Use cached price or fetch fresh quote
       const cachedPrice = latestPriceCache[symbol];
       if (cachedPrice) {
-        console.log(`📊 Using cached price for ${symbol} chart: $${cachedPrice.toFixed(2)}`);
+        console.log(`   Using cached price: $${cachedPrice.toFixed(2)}`);
         return generateMockIntradayData(cachedPrice);
       }
       // Try to get current quote for realistic mock data
@@ -226,13 +233,17 @@ export async function getIntradayData(
       return generateMockIntradayData(quote.price);
     }
 
-    return data.values.map((point: any) => ({
+    const points = data.values.map((point: any) => ({
       time: point.datetime,
       price: parseFloat(point.close),
       volume: parseInt(point.volume) || 0,
     }));
+    
+    console.log(`   ✅ Got ${points.length} data points, latest: $${points[0]?.price?.toFixed(2)}`);
+    
+    return points;
   } catch (error: any) {
-    console.error(`❌ Error fetching intraday data for ${symbol}:`, error.message);
+    console.error(`❌ Chart fetch error for ${symbol}:`, error.message);
     // Use cached price as fallback
     const cachedPrice = latestPriceCache[symbol];
     if (cachedPrice) {
@@ -251,13 +262,17 @@ export async function getBatchQuotes(symbols: string[]): Promise<Record<string, 
   const quotes: Record<string, StockQuote> = {};
   
   if (TWELVE_DATA_API_KEY === 'demo') {
-    console.log('🔄 Using mock batch quotes for development');
+    console.log('⚠️ Using MOCK batch quotes (set TWELVE_DATA_API_KEY for real prices)');
     for (const symbol of symbols) {
-      quotes[symbol] = MOCK_QUOTES[symbol] || generateMockQuote(symbol);
+      const mockQuote = MOCK_QUOTES[symbol] || generateMockQuote(symbol);
+      console.log(`   ${symbol}: $${mockQuote.price.toFixed(2)} (MOCK)`);
+      quotes[symbol] = mockQuote;
     }
     return quotes;
   }
 
+  console.log(`📡 Fetching LIVE quotes for: ${symbols.join(', ')}`);
+  
   try {
     // Twelve Data supports comma-separated symbols in one call
     const response = await axios.get(`${TWELVE_DATA_BASE_URL}/quote`, {
@@ -274,6 +289,7 @@ export async function getBatchQuotes(symbols: string[]): Promise<Record<string, 
       const symbol = symbols[0];
       if (data.close) {
         const price = parseFloat(data.close);
+        console.log(`   ${symbol}: $${price.toFixed(2)} (LIVE)`);
         quotes[symbol] = {
           symbol,
           price,
@@ -294,6 +310,7 @@ export async function getBatchQuotes(symbols: string[]): Promise<Record<string, 
         const quote = data[symbol];
         if (quote && quote.close) {
           const price = parseFloat(quote.close);
+          console.log(`   ${symbol}: $${price.toFixed(2)} (LIVE)`);
           quotes[symbol] = {
             symbol,
             price,
@@ -309,6 +326,7 @@ export async function getBatchQuotes(symbols: string[]): Promise<Record<string, 
           // Update price cache for chart fallbacks
           latestPriceCache[symbol] = price;
         } else {
+          console.log(`   ${symbol}: API error, using mock`);
           quotes[symbol] = MOCK_QUOTES[symbol] || generateMockQuote(symbol);
         }
       }
