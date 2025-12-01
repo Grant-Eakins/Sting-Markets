@@ -287,7 +287,8 @@ export function PriceSpinner({
           const containerHeight = container.clientHeight;
           const elementTop = middleElement.offsetTop;
           const elementHeight = middleElement.offsetHeight;
-          const scrollPosition = elementTop - (containerHeight / 2) + (elementHeight / 2);
+          // Offset by -210px to move the opening price bucket up in the view
+          const scrollPosition = elementTop - (containerHeight / 2) + (elementHeight / 2) - 210;
           container.scrollTop = Math.max(0, scrollPosition);
           console.log(`📍 Centered on 0% bucket (array index ${middleLevelIndex}), scrollTop=${Math.round(scrollPosition)}, containerHeight=${containerHeight}`);
         }
@@ -330,8 +331,8 @@ export function PriceSpinner({
         <div className="mb-4 p-3 bg-muted/50 rounded-lg">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <div className="text-xs text-muted-foreground">Closing Price</div>
-              <div className="text-xl font-bold">${currentPriceUSD.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground">Opening Price</div>
+              <div className="text-xl font-bold">${openingPriceUSD.toFixed(2)}</div>
             </div>
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Market Prediction</div>
