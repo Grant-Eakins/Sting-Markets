@@ -221,6 +221,44 @@ router.post('/:id/settle', async (req, res) => {
 });
 
 /**
+ * POST /api/markets/:id/blockchain-id
+ * Update the blockchainMarketId for a market (used by sync script)
+ */
+router.post('/:id/blockchain-id', async (req, res) => {
+  try {
+    const { blockchainMarketId } = req.body;
+    const market = getMarket(req.params.id);
+    
+    if (!market) {
+      return res.status(404).json({
+        success: false,
+        error: 'Market not found',
+      });
+    }
+    
+    // Update in memory
+    market.blockchainMarketId = blockchainMarketId;
+    
+    // Update in database
+    const { updateBlockchainMarketId } = await import('../services/database.js');
+    await updateBlockchainMarketId(req.params.id, blockchainMarketId);
+    
+    console.log(`✅ Updated ${market.stockSymbol} blockchainMarketId to ${blockchainMarketId}`);
+    
+    res.json({
+      success: true,
+      market,
+    });
+  } catch (error: any) {
+    console.error('Error updating blockchain ID:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/markets/:id
  * Get a specific market with odds
  */
