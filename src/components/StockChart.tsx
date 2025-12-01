@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
@@ -32,14 +31,16 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
     const fetchChartData = async () => {
       setIsLoading(true);
       try {
-        const response = await axios.get(`http://localhost:3001/api/markets/chart/${stockSymbol}`, {
+        // Use relative URL for production compatibility
+        const baseUrl = import.meta.env.PROD ? '' : 'http://localhost:3001';
+        const response = await axios.get(`${baseUrl}/api/markets/chart/${stockSymbol}`, {
           params: { interval: '5min' }
         });
         
         if (response.data.success && response.data.data && response.data.data.length > 0) {
           // Format the data - API returns newest first, we want oldest first for charting
           const formattedData = response.data.data
-            .slice(0, 50) // Last 50 data points for more detail
+            .slice(0, 78) // ~6.5 hours of 5-min data for full trading day
             .reverse()
             .map((point: any) => ({
               time: point.time,
@@ -60,24 +61,44 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
       }
     };
 
-    // Generate mock data as fallback
+    // Generate smooth mock data as fallback
     const generateMockData = () => {
       const data = [];
       const now = new Date();
       const basePrice = openingPriceUSD;
+      const targetPrice = currentPriceUSD;
+      const numPoints = 78; // ~6.5 hours of 5-min intervals
       
-      for (let i = 50; i >= 0; i--) {
-        const time = new Date(now.getTime() - i * 5 * 60 * 1000);
-        const randomWalk = (Math.random() - 0.5) * (basePrice * 0.015);
-        const trend = (currentPriceUSD - basePrice) * ((50 - i) / 50);
-        const price = basePrice + randomWalk + trend;
+      // Create a smooth path from opening to current price with realistic noise
+      let currentVal = basePrice;
+      const overallTrend = (targetPrice - basePrice) / numPoints;
+      
+      for (let i = 0; i < numPoints; i++) {
+        const time = new Date(now.getTime() - (numPoints - 1 - i) * 5 * 60 * 1000);
+        
+        // Smooth random walk with momentum
+        const noise = (Math.random() - 0.5) * basePrice * 0.003; // Small noise
+        const momentum = overallTrend * (1 + (Math.random() - 0.5) * 0.5); // Trend with variation
+        
+        currentVal = currentVal + momentum + noise;
+        
+        // Keep within reasonable bounds
+        const minBound = Math.min(basePrice, targetPrice) * 0.995;
+        const maxBound = Math.max(basePrice, targetPrice) * 1.005;
+        currentVal = Math.max(minBound, Math.min(maxBound, currentVal));
         
         data.push({
           time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          price: Math.max(0, price),
+          price: currentVal,
           volume: Math.floor(Math.random() * 1000000),
         });
       }
+      
+      // Ensure last point matches current price
+      if (data.length > 0) {
+        data[data.length - 1].price = targetPrice;
+      }
+      
       return data;
     };
 
@@ -88,49 +109,73 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
     return () => clearInterval(interval);
   }, [stockSymbol, currentPriceUSD, openingPriceUSD]);
 
-  // Calculate chart dimensions - responsive
+  // Calculate chart dimensions - balanced for readability
   const width = 320;
-  const height = 160;
-  const padding = { top: 15, right: 10, bottom: 25, left: 45 };
+  const height = 140;
+  const padding = { top: 10, right: 10, bottom: 20, left: 40 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
   const prices = priceHistory.map(d => d.price);
-  const minPrice = prices.length > 0 ? Math.min(...prices) * 0.999 : openingPriceUSD * 0.98;
-  const maxPrice = prices.length > 0 ? Math.max(...prices) * 1.001 : openingPriceUSD * 1.02;
+  const minPrice = prices.length > 0 ? Math.min(...prices) * 0.998 : openingPriceUSD * 0.98;
+  const maxPrice = prices.length > 0 ? Math.max(...prices) * 1.002 : openingPriceUSD * 1.02;
   const priceRange = maxPrice - minPrice || 1;
 
-  // Calculate nice tick values for Y axis
+  // Calculate nice tick values for Y axis - fewer ticks for cleaner look
   const getYTicks = () => {
-    const tickCount = 4;
+    const tickCount = 3;
     const step = priceRange / (tickCount - 1);
     return Array.from({ length: tickCount }, (_, i) => minPrice + step * i);
   };
 
-  // Create SVG path for line chart
+  // Create smooth SVG path using cubic bezier curves
   const createPath = () => {
     if (priceHistory.length === 0) return '';
+    if (priceHistory.length === 1) {
+      const x = padding.left;
+      const y = padding.top + chartHeight / 2;
+      return `M ${x} ${y}`;
+    }
     
     const xStep = chartWidth / (priceHistory.length - 1);
+    const points = priceHistory.map((point, i) => ({
+      x: padding.left + i * xStep,
+      y: padding.top + chartHeight - ((point.price - minPrice) / priceRange) * chartHeight
+    }));
     
-    return priceHistory
-      .map((point, i) => {
-        const x = padding.left + i * xStep;
-        const y = padding.top + chartHeight - ((point.price - minPrice) / priceRange) * chartHeight;
-        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
+    // Start with first point
+    let path = `M ${points[0].x} ${points[0].y}`;
+    
+    // Use smooth cubic bezier curves
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const next = points[i + 1] || curr;
+      const prevPrev = points[i - 2] || prev;
+      
+      // Calculate control points for smooth curve
+      const tension = 0.3;
+      const cp1x = prev.x + (curr.x - prevPrev.x) * tension;
+      const cp1y = prev.y + (curr.y - prevPrev.y) * tension;
+      const cp2x = curr.x - (next.x - prev.x) * tension;
+      const cp2y = curr.y - (next.y - prev.y) * tension;
+      
+      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
+    }
+    
+    return path;
   };
 
-  // Create area fill path
+  // Create area fill path using the smooth line
   const createAreaPath = () => {
     if (priceHistory.length === 0) return '';
     
     const linePath = createPath();
     const xStep = chartWidth / (priceHistory.length - 1);
     const lastX = padding.left + (priceHistory.length - 1) * xStep;
+    const bottomY = padding.top + chartHeight;
     
-    return `${linePath} L ${lastX} ${padding.top + chartHeight} L ${padding.left} ${padding.top + chartHeight} Z`;
+    return `${linePath} L ${lastX} ${bottomY} L ${padding.left} ${bottomY} Z`;
   };
 
   // Get point position for hover
@@ -156,28 +201,28 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
   };
 
   return (
-    <Card className="p-3 sm:p-4 bg-card/50 backdrop-blur">
-      {/* Header with price info - stacks on mobile */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-0 mb-2 sm:mb-3">
-        <div className="flex items-center justify-between sm:block">
-          <div className="text-xs sm:text-sm text-muted-foreground">{stockSymbol}</div>
-          <div className="text-lg sm:text-2xl font-bold">
+    <div className="rounded-lg bg-muted/30 p-2 sm:p-3">
+      {/* Header with price info */}
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="text-lg sm:text-xl font-bold">
             ${hoveredPoint ? hoveredPoint.price.toFixed(2) : lastPrice.toFixed(2)}
           </div>
           {hoveredPoint && (
-            <div className="text-xs text-muted-foreground">{hoveredPoint.time}</div>
+            <div className="text-[10px] text-muted-foreground">{hoveredPoint.time}</div>
           )}
         </div>
         <div className={`flex items-center gap-1 text-xs sm:text-sm font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
           {isPositive ? <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4" />}
-          <span>{isPositive ? '+' : ''}{priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%)</span>
+          <span>{isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%</span>
         </div>
       </div>
 
-      <div className="relative mb-2">
+      {/* Chart area */}
+      <div className="relative">
         {isLoading ? (
-          <div className="flex items-center justify-center h-[140px] sm:h-[160px]">
-            <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center h-[120px]">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <svg 
@@ -317,15 +362,15 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
         )}
       </div>
 
-      {/* Bottom stats - wrap on mobile */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
-        <span>Open: ${firstPrice.toFixed(2)}</span>
-        <span>High: ${maxPrice.toFixed(2)}</span>
-        <span>Low: ${minPrice.toFixed(2)}</span>
+      {/* Bottom stats row */}
+      <div className="flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
+        <span>O: ${firstPrice.toFixed(2)}</span>
+        <span>H: ${maxPrice.toFixed(2)}</span>
+        <span>L: ${minPrice.toFixed(2)}</span>
         <span className={isAfterHours ? 'text-orange-500' : 'text-green-500'}>
           {isAfterHours ? '🌙 AH' : '📈 Live'}
         </span>
       </div>
-    </Card>
+    </div>
   );
 }
