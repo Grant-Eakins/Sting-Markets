@@ -143,50 +143,68 @@ export function PriceSpinner({
   
   const priceLevels: PriceLevel[] = [];
   
-  // Build price levels - simplified view with one bucket per percentage
-  // For intraday: +10%, +9%, +8%, ..., +1%, 0%, -1%, ..., -9%, -10%
-  // That's 21 display buckets (but contract has 23 - we combine extreme buckets)
+  // Build simplified price levels: +10%, +9%, ..., +1%, 0%, -1%, ..., -9%, -10%
+  // That's 21 display buckets for intraday (41 for overnight)
+  // Contract has 23/42 buckets - we combine the extreme >+10% with +10% and <-10% with -10%
   
   // All percent changes are relative to OPENING PRICE (basePriceUSD)
   
   // Positive buckets: +10% down to +1%
-  for (let i = 0; i <= numLevelsPerSide; i++) {
-    const percentChange = (numLevelsPerSide - i) * increment; // 10, 9, 8, ..., 0
+  for (let pct = numLevelsPerSide; pct >= 1; pct--) {
+    const percentChange = pct * increment; // 10%, 9%, 8%, ..., 1%
     const price = basePriceUSD * (1 + percentChange / 100);
-    // Map to contract bucket index
-    // For display bucket +10%, use contract bucket 0 (>+10%) + bucket 1 (+10% range) combined probability
-    const bucketIndex = i === 0 ? 0 : i; // First display bucket maps to contract bucket 0
+    
+    // Map to contract bucket index:
+    // +10% (pct=10) -> combine buckets 0 and 1
+    // +9% (pct=9) -> bucket 2
+    // +8% (pct=8) -> bucket 3
+    // etc.
+    const isTop = pct === numLevelsPerSide;
+    const contractBucket = isTop ? 0 : (numLevelsPerSide - pct + 2);
     
     priceLevels.push({
       price,
       percentChange,
       liquidity: 0,
-      // For the +10% bucket, combine probabilities from bucket 0 (>+10%) and bucket 1 (+9-10%)
-      probability: i === 0 
+      probability: isTop 
         ? (probabilities?.[0] ?? uniformProbability) + (probabilities?.[1] ?? uniformProbability)
-        : (probabilities?.[bucketIndex + 1] ?? uniformProbability),
-      bucketIndex: i === 0 ? 0 : bucketIndex + 1, // Bet on bucket 0 for +10%, otherwise offset by 1
+        : (probabilities?.[contractBucket] ?? uniformProbability),
+      bucketIndex: contractBucket,
     });
   }
   
+  // Middle bucket: 0%
+  const middleContractBucket = numLevelsPerSide + 1; // bucket 11 for intraday
+  priceLevels.push({
+    price: basePriceUSD,
+    percentChange: 0,
+    liquidity: 0,
+    probability: probabilities?.[middleContractBucket] ?? uniformProbability,
+    bucketIndex: middleContractBucket,
+  });
+  
   // Negative buckets: -1% down to -10%
-  for (let i = 1; i <= numLevelsPerSide; i++) {
-    const percentChange = -i * increment; // -1, -2, ..., -10
+  for (let pct = 1; pct <= numLevelsPerSide; pct++) {
+    const percentChange = -pct * increment; // -1%, -2%, ..., -10%
     const price = basePriceUSD * (1 + percentChange / 100);
-    const bucketIndex = numLevelsPerSide + 1 + i; // Offset past 0% bucket
     
-    // For -10%, combine with <-10% bucket
-    const isExtreme = i === numLevelsPerSide;
-    const lastBucketIndex = totalBuckets - 1;
+    // Map to contract bucket index:
+    // -1% (pct=1) -> bucket 12
+    // -2% (pct=2) -> bucket 13
+    // ...
+    // -10% (pct=10) -> combine buckets 21 and 22
+    const isBottom = pct === numLevelsPerSide;
+    const contractBucket = middleContractBucket + pct;
+    const lastBucket = totalBuckets - 1;
     
     priceLevels.push({
       price,
       percentChange,
       liquidity: 0,
-      probability: isExtreme
-        ? (probabilities?.[bucketIndex] ?? uniformProbability) + (probabilities?.[lastBucketIndex] ?? uniformProbability)
-        : (probabilities?.[bucketIndex] ?? uniformProbability),
-      bucketIndex: isExtreme ? lastBucketIndex : bucketIndex, // Bet on last bucket for -10%
+      probability: isBottom
+        ? (probabilities?.[contractBucket] ?? uniformProbability) + (probabilities?.[lastBucket] ?? uniformProbability)
+        : (probabilities?.[contractBucket] ?? uniformProbability),
+      bucketIndex: isBottom ? lastBucket : contractBucket,
     });
   }
   
@@ -434,9 +452,9 @@ export function PriceSpinner({
                     !isUp && !isCurrent && 'text-red-500',
                     isCurrent && 'text-muted-foreground'
                   )}>
-                    {level.percentChange > 0 ? `+${level.percentChange.toFixed(0)}%` :
+                    {level.percentChange > 0 ? `+${level.percentChange.toFixed(isAfterHours ? 1 : 0)}%` :
                      level.percentChange === 0 ? '0%' :
-                     `${level.percentChange.toFixed(0)}%`}
+                     `${level.percentChange.toFixed(isAfterHours ? 1 : 0)}%`}
                   </span>
                 </div>
 
@@ -480,9 +498,9 @@ export function PriceSpinner({
                 priceLevels[selectedLevel].percentChange === 0 && 'text-primary'
               )}>
                 ${priceLevels[selectedLevel].price.toFixed(2)} (
-                {priceLevels[selectedLevel].percentChange > 0 ? `+${priceLevels[selectedLevel].percentChange.toFixed(0)}%` :
+                {priceLevels[selectedLevel].percentChange > 0 ? `+${priceLevels[selectedLevel].percentChange.toFixed(isAfterHours ? 1 : 0)}%` :
                  priceLevels[selectedLevel].percentChange === 0 ? '0%' :
-                 `${priceLevels[selectedLevel].percentChange.toFixed(0)}%`})
+                 `${priceLevels[selectedLevel].percentChange.toFixed(isAfterHours ? 1 : 0)}%`})
               </span>
             </div>
             {(() => {
