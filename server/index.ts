@@ -81,10 +81,16 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    // In production, also allow the Railway domain
-    if (origin.endsWith('.railway.app')) {
+    // In production, also allow Railway domains and common deployment platforms
+    if (origin.endsWith('.railway.app') || 
+        origin.endsWith('.vercel.app') || 
+        origin.endsWith('.netlify.app') ||
+        origin.includes('stingmarkets') ||
+        origin.includes('sting-markets')) {
       return callback(null, true);
     }
+    // Log rejected origins for debugging
+    console.log(`⚠️ CORS rejected origin: ${origin}`);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true
