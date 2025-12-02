@@ -94,7 +94,15 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
     setShowBetDialog(true);
   };
 
+  // Check if market is effectively locked (past lock time but status not updated yet)
+  const isEffectivelyLocked = market.status === 'ACTIVE' && market.lockTime && new Date(market.lockTime).getTime() < Date.now();
+
   const getStatusBadge = () => {
+    // If we're past lock time but status is still ACTIVE, show as Locked
+    if (isEffectivelyLocked) {
+      return <Badge variant="secondary" className="bg-yellow-500">Betting Closed</Badge>;
+    }
+    
     switch (market.status) {
       case 'ACTIVE':
         return <Badge variant="default" className="bg-green-500">Active</Badge>;
@@ -167,7 +175,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
           </div>
 
           {/* Price Spinner with Bucket Selection */}
-          {market.status === 'ACTIVE' && market.currentPrice !== undefined && (
+          {market.status === 'ACTIVE' && !isEffectivelyLocked && market.currentPrice !== undefined && (
             <PriceSpinner
               currentPrice={market.currentPrice}
               openingPrice={market.openingPrice}
@@ -184,8 +192,15 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
             />
           )}
 
+          {/* Locked message when betting closed */}
+          {isEffectivelyLocked && (
+            <div className="text-center py-4 text-muted-foreground">
+              <p className="text-sm">Betting is closed. Awaiting settlement.</p>
+            </div>
+          )}
+
           {/* Simple Betting Options (for non-active or fallback) */}
-          {market.status === 'ACTIVE' && market.currentPrice === undefined && (
+          {market.status === 'ACTIVE' && !isEffectivelyLocked && market.currentPrice === undefined && (
             <div className="grid grid-cols-2 gap-3 pt-2">
               {/* UP Button */}
               <button
