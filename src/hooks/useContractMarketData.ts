@@ -15,7 +15,7 @@ export function useContractMarketData(blockchainMarketId: number | undefined) {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getMarket',
-    args: blockchainMarketId !== undefined ? [BigInt(blockchainMarketId)] : undefined,
+    args: blockchainMarketId !== undefined && blockchainMarketId !== null ? [BigInt(blockchainMarketId)] : undefined,
     chainId: baseSepolia.id,
     query: {
       enabled: blockchainMarketId !== undefined && blockchainMarketId !== null,
@@ -30,7 +30,7 @@ export function useContractMarketData(blockchainMarketId: number | undefined) {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getProbabilities',
-    args: blockchainMarketId !== undefined ? [BigInt(blockchainMarketId)] : undefined,
+    args: blockchainMarketId !== undefined && blockchainMarketId !== null ? [BigInt(blockchainMarketId)] : undefined,
     chainId: baseSepolia.id,
     query: {
       enabled: blockchainMarketId !== undefined && blockchainMarketId !== null,
@@ -140,7 +140,7 @@ export function useContractMarketBets(blockchainMarketId: number | undefined) {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getMarket',
-    args: blockchainMarketId !== undefined ? [BigInt(blockchainMarketId)] : undefined,
+    args: blockchainMarketId !== undefined && blockchainMarketId !== null ? [BigInt(blockchainMarketId)] : undefined,
     chainId: baseSepolia.id,
     query: {
       enabled: blockchainMarketId !== undefined && blockchainMarketId !== null,

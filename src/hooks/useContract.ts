@@ -146,7 +146,7 @@ export function useMarketProbabilities(marketId: number | undefined) {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getProbabilities',
-    args: marketId !== undefined ? [BigInt(marketId)] : undefined,
+    args: marketId !== undefined && marketId !== null ? [BigInt(marketId)] : undefined,
     chainId: 84532, // Explicitly use Base Sepolia
     query: {
       enabled: marketId !== undefined && marketId !== null,
