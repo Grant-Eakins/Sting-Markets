@@ -19,6 +19,7 @@ function getUTCTimeInfo(): { hour: number; minute: number } {
 /**
  * Get the next 12-hour settlement time
  * Markets settle at 00:00 UTC and 12:00 UTC
+ * Lock time is 3 seconds before settlement (betting open until the last moment)
  */
 function getNext12HourSettlement(): { lockTime: Date; settleTime: Date; sessionLabel: string } {
   const now = new Date();
@@ -50,8 +51,8 @@ function getNext12HourSettlement(): { lockTime: Date; settleTime: Date; sessionL
     sessionLabel = 'PM Session (12:00-00:00 UTC)';
   }
   
-  // Lock time is 30 minutes before settlement
-  const lockTime = new Date(settleTime.getTime() - 30 * 60 * 1000);
+  // Lock time is 3 seconds before settlement (betting open until the last moment)
+  const lockTime = new Date(settleTime.getTime() - 3 * 1000);
   
   return { lockTime, settleTime, sessionLabel };
 }
