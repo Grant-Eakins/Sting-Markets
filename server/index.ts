@@ -9,7 +9,7 @@ import { syncCryptoMarkets } from './services/cryptoSync';
 import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/marketSettlement';
 import { initializeBlockchain, syncAllMarketPools } from './services/blockchainSync';
 import { getAllMarkets, updateMarketPools, initializeMarketsFromDb } from './services/marketService';
-import { initializeDatabase, cleanupOldSettledMarkets } from './services/database';
+import { initializeDatabase, cleanupOldSettledMarkets, cleanupDuplicateActiveMarkets } from './services/database';
 
 // ES Module dirname workaround
 const __filename = fileURLToPath(import.meta.url);
@@ -182,6 +182,10 @@ app.listen(PORT, async () => {
   // Load existing markets from database
   console.log('📂 Loading markets from database...');
   await initializeMarketsFromDb();
+  
+  // Clean up any duplicate active markets (can happen if sync runs twice)
+  console.log('🧹 Cleaning up duplicate markets...');
+  await cleanupDuplicateActiveMarkets();
   
   // Force settle any stale markets and create new ones
   console.log('🌱 Creating crypto markets (if needed)...');

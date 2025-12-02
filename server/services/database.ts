@@ -357,6 +357,76 @@ export async function cleanupOldSettledMarkets(daysToKeep: number = 7): Promise<
   }
 }
 
+/**
+ * Clean up duplicate active markets (keep only one per symbol)
+ * This can happen if sync runs multiple times before markets settle
+ */
+export async function cleanupDuplicateActiveMarkets(): Promise<number> {
+  if (!supabase) return 0;
+
+  try {
+    // Get all active markets
+    const { data: activeMarkets, error: fetchError } = await supabase
+      .from('markets')
+      .select('*')
+      .eq('status', 'ACTIVE')
+      .order('created_at', { ascending: false });
+
+    if (fetchError) {
+      console.error('❌ Error fetching active markets:', fetchError.message);
+      return 0;
+    }
+
+    if (!activeMarkets || activeMarkets.length === 0) {
+      return 0;
+    }
+
+    // Group by symbol and find duplicates
+    const symbolMap = new Map<string, any[]>();
+    for (const market of activeMarkets) {
+      const symbol = market.stock_symbol?.toUpperCase();
+      if (!symbol) continue;
+      
+      if (!symbolMap.has(symbol)) {
+        symbolMap.set(symbol, []);
+      }
+      symbolMap.get(symbol)!.push(market);
+    }
+
+    // Find markets to delete (keep newest, delete older ones)
+    const marketsToDelete: string[] = [];
+    for (const [symbol, markets] of symbolMap.entries()) {
+      if (markets.length > 1) {
+        // Keep the first one (newest due to order), delete the rest
+        const toDelete = markets.slice(1);
+        console.log(`🔍 Found ${markets.length} active ${symbol} markets, keeping newest, deleting ${toDelete.length}`);
+        marketsToDelete.push(...toDelete.map(m => m.id));
+      }
+    }
+
+    if (marketsToDelete.length === 0) {
+      return 0;
+    }
+
+    // Delete duplicate markets
+    const { error: deleteError } = await supabase
+      .from('markets')
+      .delete()
+      .in('id', marketsToDelete);
+
+    if (deleteError) {
+      console.error('❌ Error deleting duplicate markets:', deleteError.message);
+      return 0;
+    }
+
+    console.log(`🗑️ Cleaned up ${marketsToDelete.length} duplicate active markets`);
+    return marketsToDelete.length;
+  } catch (error: any) {
+    console.error('❌ Error cleaning up duplicates:', error.message);
+    return 0;
+  }
+}
+
 // ============================================
 // BET OPERATIONS (for analytics/history)
 // ============================================
