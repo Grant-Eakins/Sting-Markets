@@ -243,12 +243,12 @@ export default function AdminPage() {
             <CardContent>
               <form onSubmit={handleCreateMarket} className="space-y-4">
                 <div>
-                  <Label htmlFor="stockSymbol">Stock Symbol *</Label>
+                  <Label htmlFor="stockSymbol">Crypto Symbol *</Label>
                   <Input
                     id="stockSymbol"
                     value={formData.stockSymbol}
                     onChange={(e) => setFormData({ ...formData, stockSymbol: e.target.value.toUpperCase() })}
-                    placeholder="e.g., AAPL, TSLA, NVDA"
+                    placeholder="e.g., BTC, ETH, SOL"
                     required
                   />
                 </div>

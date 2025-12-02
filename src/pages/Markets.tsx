@@ -119,7 +119,7 @@ export default function Markets() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Equity Prediction Markets</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Crypto Prediction Markets</h1>
         </div>
 
         {/* Stats Cards */}

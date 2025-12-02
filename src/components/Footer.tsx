@@ -10,7 +10,7 @@ export function Footer() {
             <img src="/Copilot_20251128_175824-removebg-preview.png" alt="Sting Markets" className="h-8" />
             <div>
               <span className="font-bold italic">Sting Markets</span>
-              <p className="text-xs text-muted-foreground">Equity Prediction Markets on Base</p>
+              <p className="text-xs text-muted-foreground">Crypto Prediction Markets on Base</p>
             </div>
           </div>
 
