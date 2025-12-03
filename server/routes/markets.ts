@@ -543,4 +543,63 @@ router.post('/admin/reset', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/markets/admin/test-market
+ * Create a 1-minute test market for testing settlement flow
+ * Locks in 55 seconds, settles in 60 seconds
+ */
+router.post('/admin/test-market', async (req, res) => {
+  try {
+    // Get current XRP price
+    const quote = await getCryptoQuote('XRP');
+    const openingPriceInCents = Math.round(quote.price * 100);
+    
+    // Set lock time to 55 seconds from now, settle 60 seconds from now
+    const now = new Date();
+    const lockTime = new Date(now.getTime() + 55 * 1000);
+    const settleTime = new Date(now.getTime() + 60 * 1000);
+    
+    // Create the market
+    const market = createMarket({
+      stockSymbol: 'XRP',
+      stockName: 'XRP (1-MIN TEST)',
+      openingPrice: openingPriceInCents,
+      currentPrice: openingPriceInCents,
+      lockTime,
+      settleTime,
+      status: MarketStatus.ACTIVE,
+      tradingHours: {
+        start: '00:00',
+        end: '23:59',
+      },
+    });
+    
+    console.log(`🧪 Created 1-minute test market for XRP`);
+    console.log(`   Opening price: $${(openingPriceInCents / 100).toFixed(4)}`);
+    console.log(`   Locks at: ${lockTime.toISOString()}`);
+    console.log(`   Settles at: ${settleTime.toISOString()}`);
+    
+    res.json({
+      success: true,
+      message: 'Created 1-minute test market',
+      market: {
+        id: market.id,
+        symbol: market.stockSymbol,
+        name: market.stockName,
+        openingPrice: `$${(openingPriceInCents / 100).toFixed(4)}`,
+        lockTime: lockTime.toISOString(),
+        settleTime: settleTime.toISOString(),
+        secondsUntilLock: 55,
+        secondsUntilSettle: 60,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error creating test market:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router;
