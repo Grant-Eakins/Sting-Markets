@@ -95,6 +95,8 @@ export interface CreateMarketRequest {
   isAfterHours: boolean;      // True for after-hours markets
   lockHours?: number;         // Hours until betting locks (default varies by market type)
   settleHours?: number;       // Hours until settlement (default varies by market type)
+  lockTime?: Date;            // Direct lock time (overrides lockHours if provided)
+  settleTime?: Date;          // Direct settle time (overrides settleHours if provided)
   imageUrl?: string;
   category?: string;
   blockchainMarketId?: number;  // Optional: on-chain market ID if already created

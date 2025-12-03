@@ -58,9 +58,21 @@ export function createMarket(request: CreateMarketRequest): Market {
   const id = `market-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const now = new Date();
   
-  // Default timeframes based on market type
-  const lockHours = request.lockHours || (request.isAfterHours ? 8 : 2);
-  const settleHours = request.settleHours || (request.isAfterHours ? 16 : 3);
+  // Use passed lockTime/settleTime if provided, otherwise calculate from hours
+  let lockTime: Date;
+  let settleTime: Date;
+  
+  if (request.lockTime && request.settleTime) {
+    // Direct timestamps provided - use them
+    lockTime = request.lockTime;
+    settleTime = request.settleTime;
+  } else {
+    // Calculate from hours (default behavior)
+    const lockHours = request.lockHours || (request.isAfterHours ? 8 : 2);
+    const settleHours = request.settleHours || (request.isAfterHours ? 16 : 3);
+    lockTime = new Date(now.getTime() + lockHours * 60 * 60 * 1000);
+    settleTime = new Date(now.getTime() + settleHours * 60 * 60 * 1000);
+  }
 
   const market: Market = {
     id,
@@ -69,8 +81,8 @@ export function createMarket(request: CreateMarketRequest): Market {
     description: request.description,
     status: MarketStatus.ACTIVE,
     createdAt: now,
-    lockTime: new Date(now.getTime() + lockHours * 60 * 60 * 1000),
-    settleTime: new Date(now.getTime() + settleHours * 60 * 60 * 1000),
+    lockTime,
+    settleTime,
     openingPrice: request.openingPrice,
     currentPrice: request.openingPrice,
     openTimestamp: now,
