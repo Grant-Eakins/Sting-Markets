@@ -1,0 +1,602 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/access/Ownable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/security/ReentrancyGuard.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/security/Pausable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
+
+// Chainlink interface for price feed validation
+interface AggregatorV3Interface {
+    function latestRoundData()
+        external
+        view
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
+}
+
+/**
+ * @title ProportionalMarketUSDC
+ * @notice Simple proportional prediction market with bonding curve for multi-outcome price predictions
+ * @dev Uses USDC instead of ETH. Probability = Bucket Liquidity / Total Liquidity
+ *
+ * USDC on Base Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+ * USDC has 6 decimals (not 18 like ETH)
+ *
+ * SECURITY FEATURES:
+ * - ReentrancyGuard on all state-changing functions
+ * - Access control with Ownable and Pausable
+ * - SafeERC20 for token transfers
+ * - Proportional payout distribution
+ * - Protocol fee collection (2%)
+ * - Minimum bet size (1 USDC) to prevent dust trades
+ * - Bonding curve with safety limits
+ */
+contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
+    using SafeERC20 for IERC20;
+    
+    // USDC on Base Mainnet
+    IERC20 public immutable usdc;
+    
+    enum SessionType { INTRADAY, OVERNIGHT }
+    enum MarketStatus { ACTIVE, LOCKED, SETTLED, CANCELLED }
+    
+    struct Market {
+        string stockSymbol;
+        uint256 marketId;
+        SessionType sessionType;
+        MarketStatus status;
+        uint8 numOutcomes;
+        uint256 referencePrice;
+        uint256 finalPrice;
+        uint256 lockTime;
+        uint256 settleTime;
+        bool settled;
+        uint8 winningOutcome;
+        mapping(uint8 => uint256) bucketLiquidity; // USDC in each bucket
+        uint256 totalLiquidity; // Total USDC in market
+        mapping(uint8 => uint256) totalSharesPerBucket; // Total shares issued per bucket
+    }
+    
+    struct UserPosition {
+        mapping(uint8 => uint256) shares; // User's shares in each bucket
+        uint256 totalInvested; // Total USDC user has put in
+    }
+    
+    uint256 public nextMarketId;
+    uint256 public constant PROTOCOL_FEE_BPS = 200; // 2%
+    uint256 public constant MIN_BET_SIZE = 1_000_000; // 1 USDC (6 decimals)
+    uint256 public constant PRICE_DEVIATION_TOLERANCE_BPS = 10; // 0.1% tolerance for Chainlink validation
+    uint256 public protocolFeesCollected;
+    address public oracle; // Authorized oracle for settlement
+    
+    // Optional: Chainlink price feed addresses for validation (address(0) = disabled)
+    mapping(string => address) public priceFeeds;
+    
+    // Market counter for compatibility
+    uint256 public marketCounter;
+    
+    mapping(uint256 => Market) public markets;
+    mapping(uint256 => mapping(address => UserPosition)) public userPositions;
+    
+    event MarketCreated(
+        uint256 indexed marketId,
+        string stockSymbol,
+        SessionType sessionType,
+        uint8 numOutcomes,
+        uint256 referencePrice,
+        uint256 lockTime,
+        uint256 settleTime
+    );
+    
+    event SharesPurchased(
+        uint256 indexed marketId,
+        address indexed user,
+        uint8 outcomeIndex,
+        uint256 shares,
+        uint256 cost
+    );
+    
+    event MarketSettled(
+        uint256 indexed marketId,
+        uint256 finalPrice,
+        uint8 winningOutcome
+    );
+    
+    event PayoutClaimed(
+        uint256 indexed marketId,
+        address indexed user,
+        uint256 payout
+    );
+    
+    event ProtocolFeeCollected(uint256 indexed marketId, uint256 amount);
+    event ProtocolFeeWithdrawn(address indexed recipient, uint256 amount);
+    event OracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event PriceFeedSet(string indexed stockSymbol, address indexed feedAddress);
+    event MarketLocked(uint256 indexed marketId, uint256 timestamp);
+    
+    event SharesSold(
+        uint256 indexed marketId,
+        address indexed user,
+        uint8 outcomeIndex,
+        uint256 shares,
+        uint256 payout
+    );
+    
+    event RefundClaimed(
+        uint256 indexed marketId,
+        address indexed user,
+        uint256 refundAmount
+    );
+    
+    constructor(address _oracle, address _usdc) Ownable(msg.sender) {
+        require(_oracle != address(0), "Invalid oracle");
+        require(_usdc != address(0), "Invalid USDC address");
+        oracle = _oracle;
+        usdc = IERC20(_usdc);
+        nextMarketId = 1;
+        marketCounter = 0;
+    }
+    
+    /**
+     * @notice Create a new market
+     */
+    function createMarket(
+        string memory stockSymbol,
+        SessionType sessionType,
+        uint256 referencePrice,
+        uint256 lockTime,
+        uint256 settleTime
+    ) external onlyOwner whenNotPaused returns (uint256) {
+        require(referencePrice > 0, "Invalid reference price");
+        require(lockTime > block.timestamp, "Lock time must be future");
+        require(settleTime > lockTime, "Settle time must be after lock");
+        
+        uint256 marketId = nextMarketId++;
+        marketCounter++;
+        Market storage market = markets[marketId];
+        
+        market.stockSymbol = stockSymbol;
+        market.marketId = marketId;
+        market.sessionType = sessionType;
+        market.status = MarketStatus.ACTIVE;
+        market.numOutcomes = sessionType == SessionType.INTRADAY ? 23 : 42;
+        market.referencePrice = referencePrice;
+        market.lockTime = lockTime;
+        market.settleTime = settleTime;
+        
+        emit MarketCreated(marketId, stockSymbol, sessionType, market.numOutcomes, referencePrice, lockTime, settleTime);
+        return marketId;
+    }
+    
+    /**
+     * @notice Buy shares in a bucket with bonding curve
+     * @dev User must approve USDC spending before calling this
+     * @param marketId The market ID
+     * @param outcomeIndex The bucket index to buy
+     * @param amount Amount of USDC to spend (6 decimals)
+     * @param maxCost Maximum USDC willing to spend (slippage protection, same as amount for USDC)
+     */
+    function buyShares(
+        uint256 marketId,
+        uint8 outcomeIndex,
+        uint256 amount,
+        uint256 maxCost
+    ) external nonReentrant whenNotPaused {
+        require(amount >= MIN_BET_SIZE, "Bet below minimum (1 USDC)");
+        require(amount <= maxCost, "Cost exceeds maxCost");
+        
+        Market storage market = markets[marketId];
+        require(market.status == MarketStatus.ACTIVE, "Market not active");
+        require(block.timestamp < market.lockTime, "Market locked");
+        require(outcomeIndex < market.numOutcomes, "Invalid outcome");
+        
+        // Transfer USDC from user to contract
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Deduct protocol fee (2%)
+        uint256 protocolFee = (amount * PROTOCOL_FEE_BPS) / 10000;
+        uint256 netAmount = amount - protocolFee;
+        protocolFeesCollected += protocolFee;
+        emit ProtocolFeeCollected(marketId, protocolFee);
+        
+        // Calculate shares with bonding curve
+        // More liquidity in bucket = more expensive to buy
+        // Formula: shares = netAmount / (1 + bucketLiquidity/totalLiquidity)
+        uint256 shares;
+        if (market.totalLiquidity == 0) {
+            // First buy: 1:1 ratio
+            shares = netAmount;
+        } else {
+            uint256 bucketRatio = (market.bucketLiquidity[outcomeIndex] * 1e18) / market.totalLiquidity;
+            uint256 multiplier = 1e18 + bucketRatio; // 1 + ratio
+            shares = (netAmount * 1e18) / multiplier;
+        }
+        
+        require(shares > 0, "Shares too small");
+        require(shares >= netAmount / 10, "Bonding curve too steep"); // Prevent >90% premium
+        
+        // Update state
+        market.bucketLiquidity[outcomeIndex] += netAmount;
+        market.totalLiquidity += netAmount;
+        market.totalSharesPerBucket[outcomeIndex] += shares;
+        
+        UserPosition storage position = userPositions[marketId][msg.sender];
+        position.shares[outcomeIndex] += shares;
+        position.totalInvested += amount;
+        
+        emit SharesPurchased(marketId, msg.sender, outcomeIndex, shares, amount);
+    }
+    
+    /**
+     * @notice Sell shares back to the pool before market locks
+     * @param marketId The market ID
+     * @param outcomeIndex The bucket index to sell from
+     * @param sharesToSell Number of shares to sell
+     * @param minPayout Minimum USDC payout expected (slippage protection)
+     */
+    function sellShares(
+        uint256 marketId,
+        uint8 outcomeIndex,
+        uint256 sharesToSell,
+        uint256 minPayout
+    ) external nonReentrant whenNotPaused {
+        Market storage market = markets[marketId];
+        require(market.status == MarketStatus.ACTIVE, "Market not active");
+        require(block.timestamp < market.lockTime, "Market locked");
+        require(outcomeIndex < market.numOutcomes, "Invalid outcome");
+        
+        UserPosition storage position = userPositions[marketId][msg.sender];
+        require(position.shares[outcomeIndex] >= sharesToSell, "Insufficient shares");
+        require(sharesToSell > 0, "Must sell at least 1 share");
+        
+        // Calculate payout using reverse bonding curve
+        uint256 totalSharesInBucket = market.totalSharesPerBucket[outcomeIndex];
+        require(totalSharesInBucket > 0, "No shares in bucket");
+        
+        // Value per share = bucket liquidity / total shares in bucket
+        uint256 valuePerShare = (market.bucketLiquidity[outcomeIndex] * 1e18) / totalSharesInBucket;
+        uint256 grossPayout = (sharesToSell * valuePerShare) / 1e18;
+        
+        // Apply 1% sell spread (fee for exiting early)
+        uint256 sellFee = grossPayout / 100;
+        uint256 netPayout = grossPayout - sellFee;
+        
+        require(netPayout >= minPayout, "Payout below minimum");
+        require(grossPayout <= market.bucketLiquidity[outcomeIndex], "Insufficient bucket liquidity");
+        
+        // Update state BEFORE transfer (CEI pattern)
+        position.shares[outcomeIndex] -= sharesToSell;
+        market.totalSharesPerBucket[outcomeIndex] -= sharesToSell;
+        market.bucketLiquidity[outcomeIndex] -= grossPayout;
+        market.totalLiquidity -= grossPayout;
+        
+        // Add sell fee to protocol fees
+        protocolFeesCollected += sellFee;
+        
+        // Transfer USDC payout
+        usdc.safeTransfer(msg.sender, netPayout);
+        
+        emit SharesSold(marketId, msg.sender, outcomeIndex, sharesToSell, netPayout);
+    }
+    
+    /**
+     * @notice Settle market with final price
+     */
+    function settleMarket(
+        uint256 marketId,
+        uint256 finalPrice
+    ) external {
+        require(msg.sender == oracle || msg.sender == owner(), "Not authorized");
+        
+        Market storage market = markets[marketId];
+        require(market.status == MarketStatus.ACTIVE || market.status == MarketStatus.LOCKED, "Market not active");
+        require(block.timestamp >= market.settleTime, "Too early to settle");
+        require(finalPrice > 0, "Invalid final price");
+        
+        // Validate with Chainlink price feed if configured
+        address feedAddress = priceFeeds[market.stockSymbol];
+        if (feedAddress != address(0)) {
+            AggregatorV3Interface priceFeed = AggregatorV3Interface(feedAddress);
+            (, int256 chainlinkPrice, , , ) = priceFeed.latestRoundData();
+            require(chainlinkPrice > 0, "Invalid Chainlink price");
+            
+            uint256 chainlinkPriceScaled = uint256(chainlinkPrice) * 10**10;
+            uint256 priceDiff = chainlinkPriceScaled > finalPrice ? 
+                chainlinkPriceScaled - finalPrice : finalPrice - chainlinkPriceScaled;
+            uint256 tolerance = (chainlinkPriceScaled * PRICE_DEVIATION_TOLERANCE_BPS) / 10000;
+            require(priceDiff <= tolerance, "Price deviation exceeds tolerance");
+        }
+        
+        market.finalPrice = finalPrice;
+        market.status = MarketStatus.SETTLED;
+        market.settled = true;
+        
+        // Calculate winning bucket
+        int256 priceChangePercent = ((int256(finalPrice) - int256(market.referencePrice)) * 10000) / int256(market.referencePrice);
+        market.winningOutcome = getBucketIndex(priceChangePercent, market.sessionType);
+        
+        emit MarketSettled(marketId, finalPrice, market.winningOutcome);
+    }
+    
+    /**
+     * @notice Claim payout for winning shares
+     */
+    function claimPayout(uint256 marketId) external nonReentrant {
+        Market storage market = markets[marketId];
+        require(market.settled, "Market not settled");
+        
+        UserPosition storage position = userPositions[marketId][msg.sender];
+        uint256 userWinningShares = position.shares[market.winningOutcome];
+        require(userWinningShares > 0, "No winning shares");
+        
+        // Calculate total winning shares
+        uint256 totalWinningShares = getTotalSharesInBucket(marketId, market.winningOutcome);
+        require(totalWinningShares > 0, "No winning shares in bucket");
+        
+        // Payout = (user's shares / total winning shares) * total pool
+        uint256 payout = (userWinningShares * market.totalLiquidity) / totalWinningShares;
+        
+        // Mark as claimed BEFORE transfer (CEI pattern)
+        position.shares[market.winningOutcome] = 0;
+        
+        // Transfer USDC payout
+        usdc.safeTransfer(msg.sender, payout);
+        
+        emit PayoutClaimed(marketId, msg.sender, payout);
+    }
+    
+    /**
+     * @notice Claim refund when no one bet on the winning outcome
+     */
+    function claimRefund(uint256 marketId) external nonReentrant {
+        Market storage market = markets[marketId];
+        require(market.settled, "Market not settled");
+        
+        uint256 totalWinningShares = getTotalSharesInBucket(marketId, market.winningOutcome);
+        require(totalWinningShares == 0, "Winners exist - use claimPayout");
+        
+        UserPosition storage position = userPositions[marketId][msg.sender];
+        require(position.totalInvested > 0, "No position to refund");
+        
+        uint256 userNetContribution = (position.totalInvested * (10000 - PROTOCOL_FEE_BPS)) / 10000;
+        uint256 refundAmount = userNetContribution;
+        
+        if (refundAmount > market.totalLiquidity) {
+            refundAmount = market.totalLiquidity;
+        }
+        
+        // Mark as claimed BEFORE transfer (CEI pattern)
+        position.totalInvested = 0;
+        for (uint8 i = 0; i < market.numOutcomes; i++) {
+            position.shares[i] = 0;
+        }
+        
+        market.totalLiquidity -= refundAmount;
+        
+        // Transfer USDC refund
+        usdc.safeTransfer(msg.sender, refundAmount);
+        
+        emit RefundClaimed(marketId, msg.sender, refundAmount);
+    }
+    
+    /**
+     * @notice Check if a market has no winners (refund eligible)
+     */
+    function isRefundEligible(uint256 marketId) external view returns (bool) {
+        Market storage market = markets[marketId];
+        if (!market.settled) return false;
+        return getTotalSharesInBucket(marketId, market.winningOutcome) == 0;
+    }
+    
+    /**
+     * @notice Get current probabilities for all outcomes
+     */
+    function getProbabilities(uint256 marketId) external view returns (uint256[] memory) {
+        Market storage market = markets[marketId];
+        uint256[] memory probabilities = new uint256[](market.numOutcomes);
+        
+        if (market.totalLiquidity == 0) {
+            uint256 uniformProb = 10000 / market.numOutcomes;
+            for (uint8 i = 0; i < market.numOutcomes; i++) {
+                probabilities[i] = uniformProb;
+            }
+        } else {
+            for (uint8 i = 0; i < market.numOutcomes; i++) {
+                probabilities[i] = (market.bucketLiquidity[i] * 10000) / market.totalLiquidity;
+            }
+        }
+        
+        return probabilities;
+    }
+    
+    /**
+     * @notice Get total shares in a specific bucket
+     */
+    function getTotalSharesInBucket(uint256 marketId, uint8 outcomeIndex) internal view returns (uint256) {
+        return markets[marketId].totalSharesPerBucket[outcomeIndex];
+    }
+    
+    /**
+     * @notice Get market details
+     */
+    function getMarket(uint256 marketId) external view returns (
+        string memory stockSymbol,
+        SessionType sessionType,
+        MarketStatus status,
+        uint8 numOutcomes,
+        uint256 referencePrice,
+        uint256 finalPrice,
+        uint256 lockTime,
+        uint256 settleTime,
+        bool settled,
+        uint8 winningOutcome,
+        uint256 totalLiquidity
+    ) {
+        Market storage market = markets[marketId];
+        return (
+            market.stockSymbol,
+            market.sessionType,
+            market.status,
+            market.numOutcomes,
+            market.referencePrice,
+            market.finalPrice,
+            market.lockTime,
+            market.settleTime,
+            market.settled,
+            market.winningOutcome,
+            market.totalLiquidity
+        );
+    }
+    
+    function getBucketIndex(int256 priceChangePercent, SessionType sessionType) public pure returns (uint8) {
+        if (sessionType == SessionType.INTRADAY) {
+            // 23 buckets: 1% increments from -10% to +10%
+            if (priceChangePercent >= 1000) return 0;      // >+10%
+            if (priceChangePercent >= 900) return 1;
+            if (priceChangePercent >= 800) return 2;
+            if (priceChangePercent >= 700) return 3;
+            if (priceChangePercent >= 600) return 4;
+            if (priceChangePercent >= 500) return 5;
+            if (priceChangePercent >= 400) return 6;
+            if (priceChangePercent >= 300) return 7;
+            if (priceChangePercent >= 200) return 8;
+            if (priceChangePercent >= 100) return 9;
+            if (priceChangePercent >= 0) return 10;
+            if (priceChangePercent >= -100) return 11;
+            if (priceChangePercent >= -200) return 12;
+            if (priceChangePercent >= -300) return 13;
+            if (priceChangePercent >= -400) return 14;
+            if (priceChangePercent >= -500) return 15;
+            if (priceChangePercent >= -600) return 16;
+            if (priceChangePercent >= -700) return 17;
+            if (priceChangePercent >= -800) return 18;
+            if (priceChangePercent >= -900) return 19;
+            if (priceChangePercent >= -1000) return 20;
+            return 21; // <-10%
+        } else {
+            // 42 buckets: 0.5% increments from -10% to +10%
+            if (priceChangePercent >= 1000) return 0;
+            if (priceChangePercent >= 950) return 1;
+            if (priceChangePercent >= 900) return 2;
+            if (priceChangePercent >= 850) return 3;
+            if (priceChangePercent >= 800) return 4;
+            if (priceChangePercent >= 750) return 5;
+            if (priceChangePercent >= 700) return 6;
+            if (priceChangePercent >= 650) return 7;
+            if (priceChangePercent >= 600) return 8;
+            if (priceChangePercent >= 550) return 9;
+            if (priceChangePercent >= 500) return 10;
+            if (priceChangePercent >= 450) return 11;
+            if (priceChangePercent >= 400) return 12;
+            if (priceChangePercent >= 350) return 13;
+            if (priceChangePercent >= 300) return 14;
+            if (priceChangePercent >= 250) return 15;
+            if (priceChangePercent >= 200) return 16;
+            if (priceChangePercent >= 150) return 17;
+            if (priceChangePercent >= 100) return 18;
+            if (priceChangePercent >= 50) return 19;
+            if (priceChangePercent >= 0) return 20;
+            if (priceChangePercent >= -50) return 21;
+            if (priceChangePercent >= -100) return 22;
+            if (priceChangePercent >= -150) return 23;
+            if (priceChangePercent >= -200) return 24;
+            if (priceChangePercent >= -250) return 25;
+            if (priceChangePercent >= -300) return 26;
+            if (priceChangePercent >= -350) return 27;
+            if (priceChangePercent >= -400) return 28;
+            if (priceChangePercent >= -450) return 29;
+            if (priceChangePercent >= -500) return 30;
+            if (priceChangePercent >= -550) return 31;
+            if (priceChangePercent >= -600) return 32;
+            if (priceChangePercent >= -650) return 33;
+            if (priceChangePercent >= -700) return 34;
+            if (priceChangePercent >= -750) return 35;
+            if (priceChangePercent >= -800) return 36;
+            if (priceChangePercent >= -850) return 37;
+            if (priceChangePercent >= -900) return 38;
+            if (priceChangePercent >= -950) return 39;
+            if (priceChangePercent >= -1000) return 40;
+            return 41; // <-10%
+        }
+    }
+    
+    /**
+     * @notice Lock market at lockTime
+     */
+    function lockMarket(uint256 marketId) external {
+        Market storage market = markets[marketId];
+        require(market.status == MarketStatus.ACTIVE, "Market not active");
+        require(block.timestamp >= market.lockTime, "Lock time not reached");
+        
+        market.status = MarketStatus.LOCKED;
+        emit MarketLocked(marketId, block.timestamp);
+    }
+    
+    /**
+     * @notice Update the oracle address
+     */
+    function setOracle(address _oracle) external onlyOwner {
+        require(_oracle != address(0), "Invalid oracle");
+        address oldOracle = oracle;
+        oracle = _oracle;
+        emit OracleUpdated(oldOracle, _oracle);
+    }
+    
+    /**
+     * @notice Set Chainlink price feed for a symbol
+     */
+    function setPriceFeed(string calldata stockSymbol, address feedAddress) external onlyOwner {
+        priceFeeds[stockSymbol] = feedAddress;
+        emit PriceFeedSet(stockSymbol, feedAddress);
+    }
+    
+    /**
+     * @notice Withdraw protocol fees (in USDC)
+     */
+    function withdrawFees() external onlyOwner {
+        uint256 amount = protocolFeesCollected;
+        require(amount > 0, "No fees to withdraw");
+        
+        protocolFeesCollected = 0;
+        usdc.safeTransfer(owner(), amount);
+        emit ProtocolFeeWithdrawn(owner(), amount);
+    }
+    
+    function pause() external onlyOwner {
+        _pause();
+    }
+    
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+    
+    /**
+     * @notice Alias for claimPayout (frontend compatibility)
+     */
+    function claimWinnings(uint256 marketId) external nonReentrant {
+        Market storage market = markets[marketId];
+        require(market.settled, "Market not settled");
+        
+        UserPosition storage position = userPositions[marketId][msg.sender];
+        uint256 userWinningShares = position.shares[market.winningOutcome];
+        require(userWinningShares > 0, "No winning shares");
+        
+        uint256 totalWinningShares = getTotalSharesInBucket(marketId, market.winningOutcome);
+        require(totalWinningShares > 0, "No winning shares in bucket");
+        
+        uint256 payout = (userWinningShares * market.totalLiquidity) / totalWinningShares;
+        
+        position.shares[market.winningOutcome] = 0;
+        
+        usdc.safeTransfer(msg.sender, payout);
+        
+        emit PayoutClaimed(marketId, msg.sender, payout);
+    }
+}
