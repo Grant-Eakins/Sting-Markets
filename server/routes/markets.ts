@@ -111,10 +111,11 @@ router.get('/chart/:symbol', async (req, res) => {
 /**
  * POST /api/markets/create
  * Manually create a new market with on-chain liquidity pool
+ * Accepts lockMinutes/settleMinutes for test markets
  */
 router.post('/create', async (req, res) => {
   try {
-    const { stockSymbol, stockName, description, openingPrice, isAfterHours, lockHours, settleHours } = req.body;
+    const { stockSymbol, stockName, description, openingPrice, isAfterHours, lockMinutes, settleMinutes } = req.body;
     
     if (!stockSymbol || openingPrice === undefined) {
       return res.status(400).json({
@@ -123,15 +124,20 @@ router.post('/create', async (req, res) => {
       });
     }
     
-    // Create backend market
+    // Calculate lock/settle times from minutes
+    const now = new Date();
+    const lockTime = new Date(now.getTime() + (lockMinutes || 1) * 60 * 1000);
+    const settleTime = new Date(now.getTime() + (settleMinutes || 2) * 60 * 1000);
+    
+    // Create backend market with direct lock/settle times
     const market = createMarket({
       stockSymbol,
       stockName,
       description: description || `Will ${stockSymbol} go UP or DOWN from $${(openingPrice / 100).toFixed(2)}?`,
       openingPrice,
       isAfterHours: isAfterHours || false,
-      lockHours,
-      settleHours,
+      lockTime,
+      settleTime,
       category: 'Manual',
     });
     

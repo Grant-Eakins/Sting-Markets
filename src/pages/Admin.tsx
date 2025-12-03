@@ -48,8 +48,8 @@ export default function AdminPage() {
     description: '',
     openingPrice: 17500,
     isAfterHours: false,
-    lockHours: 2,
-    settleHours: 3,
+    lockMinutes: 1,
+    settleMinutes: 2,
   });
 
   const [settleData, setSettleData] = useState({
@@ -89,8 +89,8 @@ export default function AdminPage() {
         description: '',
         openingPrice: 17500,
         isAfterHours: false,
-        lockHours: 2,
-        settleHours: 3,
+        lockMinutes: 1,
+        settleMinutes: 2,
       });
       alert(`✅ Market created! On-chain pool ID: ${data.blockchainMarketId}`);
     },
@@ -280,40 +280,33 @@ export default function AdminPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isAfterHours"
-                    checked={formData.isAfterHours}
-                    onChange={(e) => setFormData({ ...formData, isAfterHours: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <Label htmlFor="isAfterHours">After Hours Market (8h lock, 16h settle)</Label>
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="lockHours">Lock After (hours)</Label>
+                    <Label htmlFor="lockMinutes">Lock After (minutes)</Label>
                     <Input
-                      id="lockHours"
+                      id="lockMinutes"
                       type="number"
                       min="1"
-                      value={formData.lockHours}
-                      onChange={(e) => handleNumberChange('lockHours', e.target.value)}
+                      value={formData.lockMinutes}
+                      onChange={(e) => handleNumberChange('lockMinutes', e.target.value)}
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="settleHours">Settle After (hours)</Label>
+                    <Label htmlFor="settleMinutes">Settle After (minutes)</Label>
                     <Input
-                      id="settleHours"
+                      id="settleMinutes"
                       type="number"
                       min="1"
-                      value={formData.settleHours}
-                      onChange={(e) => handleNumberChange('settleHours', e.target.value)}
+                      value={formData.settleMinutes}
+                      onChange={(e) => handleNumberChange('settleMinutes', e.target.value)}
                     />
                   </div>
                 </div>
+
+                <p className="text-xs text-muted-foreground">
+                  ⏱️ Lock in {formData.lockMinutes} min, Settle in {formData.settleMinutes} min
+                </p>
 
                 <Button 
                   type="submit" 
