@@ -11,6 +11,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import Markets from "./pages/Markets";
 import MyBets from "./pages/MyBets";
+import BetHistory from "./pages/BetHistory";
 import HowItWorks from "./pages/HowItWorks";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -35,6 +36,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Markets />} />
                 <Route path="/my-bets" element={<MyBets />} />
+                <Route path="/bet-history" element={<BetHistory />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/admin-167" element={<Admin />} />
                 <Route path="/landing" element={<Index />} />

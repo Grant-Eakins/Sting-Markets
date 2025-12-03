@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TrendingUp, TrendingDown, Trophy, DollarSign, Activity, Wallet, AlertCircle, ArrowRightLeft, Menu, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trophy, DollarSign, Activity, Wallet, AlertCircle, ArrowRightLeft, Menu, X, History } from 'lucide-react';
+import { archiveBet, isBetArchived, type ArchivedBet } from './BetHistory';
 
 // Authorized admin wallet addresses (lowercase for comparison)
 const ADMIN_WALLETS = [
@@ -50,6 +51,7 @@ export default function MyBets() {
   const [sellDialogBet, setSellDialogBet] = useState<EnrichedBet | null>(null);
   const [sellPercentage, setSellPercentage] = useState(100);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [archivedBetIds, setArchivedBetIds] = useState<Set<string>>(new Set());
   
   // Get ETH price for USD display
   const { ethPrice } = useEthPrice();
@@ -60,6 +62,42 @@ export default function MyBets() {
   const { writeContractAsync } = useWriteContract();
   const { bets, isLoading: isLoadingBets, error: betsError, refetch: refetchBets } = useBlockchainBets();
   const { sellShares, isPending: isSellPending, isConfirming: isSellConfirming, isConfirmed: isSellConfirmed, error: sellError, hash: sellHash } = useSellShares();
+
+  // Load archived bet IDs on mount / address change
+  useEffect(() => {
+    if (address) {
+      const archived = new Set<string>();
+      try {
+        const key = `stingMarkets_archivedBets_${address.toLowerCase()}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const bets = JSON.parse(stored) as ArchivedBet[];
+          bets.forEach(b => archived.add(b.betId));
+        }
+      } catch {}
+      setArchivedBetIds(archived);
+    }
+  }, [address]);
+
+  // Archive a bet and update local state
+  const handleArchiveBet = (bet: EnrichedBet) => {
+    if (!address) return;
+    const archivedBet: ArchivedBet = {
+      betId: bet.betId.toString(),
+      marketId: Number(bet.marketId),
+      marketName: bet.marketName,
+      bucketLabel: bet.bucketLabel,
+      amountEth: bet.amountEth,
+      potentialPayout: bet.potentialPayout,
+      won: bet.won,
+      claimed: bet.claimed,
+      txHash: bet.txHash,
+      archivedAt: Date.now(),
+    };
+    archiveBet(address, archivedBet);
+    setArchivedBetIds(prev => new Set([...prev, bet.betId.toString()]));
+    toast.success(bet.won ? 'Bet moved to history!' : 'Bet dismissed');
+  };
 
   // Debug logging
   console.log('📊 MyBets render:', { 
@@ -402,13 +440,15 @@ export default function MyBets() {
     };
   });
 
-  const activeBets = enrichedBets.filter(b => !b.isSettled);
-  const settledBets = enrichedBets.filter(b => b.isSettled);
+  // Filter out archived bets from display
+  const visibleBets = enrichedBets.filter(b => !archivedBetIds.has(b.betId.toString()));
+  const activeBets = visibleBets.filter(b => !b.isSettled);
+  const settledBets = visibleBets.filter(b => b.isSettled);
   const claimableBets = settledBets.filter(b => b.won && !b.claimed);
 
   const stats = {
-    totalBets: enrichedBets.length, // Use enrichedBets to reflect actual positions
-    totalStaked: enrichedBets.reduce((sum, b) => sum + b.amountEth, 0),
+    totalBets: visibleBets.length, // Use visible bets to reflect actual displayed positions
+    totalStaked: visibleBets.reduce((sum, b) => sum + b.amountEth, 0),
     settledBets: settledBets.length,
     wonBets: settledBets.filter(b => b.won).length,
     totalWon: settledBets.filter(b => b.won).reduce((sum, b) => sum + b.potentialPayout, 0),
@@ -482,15 +522,22 @@ export default function MyBets() {
               Track your positions, view your history, and claim your winnings
             </p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => refetchBets()}
-            disabled={isLoadingBets}
-            className="self-start"
-          >
-            {isLoadingBets ? 'Refreshing...' : '🔄 Refresh'}
-          </Button>
+          <div className="flex gap-2 self-start">
+            <Link to="/bet-history">
+              <Button variant="outline" size="sm">
+                <History className="w-4 h-4 mr-2" />
+                Bet History
+              </Button>
+            </Link>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => refetchBets()}
+              disabled={isLoadingBets}
+            >
+              {isLoadingBets ? 'Refreshing...' : '🔄 Refresh'}
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -706,7 +753,26 @@ export default function MyBets() {
                             </Button>
                           )}
                           {bet.claimed && (
-                            <Badge variant="secondary">Claimed</Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleArchiveBet(bet)}
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <History className="w-3 h-3 mr-1" />
+                              Move to History
+                            </Button>
+                          )}
+                          {!bet.won && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleArchiveBet(bet)}
+                              className="text-muted-foreground hover:text-red-500"
+                              title="Dismiss"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
                           )}
                           <a href={`https://sepolia.basescan.org/tx/${bet.txHash}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline">
                             View Tx
