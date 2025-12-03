@@ -547,6 +547,7 @@ router.post('/admin/reset', async (req, res) => {
  * POST /api/markets/admin/test-market
  * Create a 1-minute test market for testing settlement flow
  * Locks in 55 seconds, settles in 60 seconds
+ * Creates BOTH off-chain and on-chain market
  */
 router.post('/admin/test-market', async (req, res) => {
   try {
@@ -559,9 +560,9 @@ router.post('/admin/test-market', async (req, res) => {
     const lockTime = new Date(now.getTime() + 55 * 1000);
     const settleTime = new Date(now.getTime() + 60 * 1000);
     
-    // Create the market
+    // Create the off-chain market
     const market = createMarket({
-      stockSymbol: 'XRP',
+      stockSymbol: 'XRP-TEST',
       stockName: 'XRP (1-MIN TEST)',
       description: 'Test market - 1 minute settlement',
       openingPrice: openingPriceInCents,
@@ -569,6 +570,25 @@ router.post('/admin/test-market', async (req, res) => {
       lockTime,
       settleTime,
     });
+    
+    // Create on-chain market
+    let blockchainMarketId: number | null = null;
+    try {
+      blockchainMarketId = await createOnChainMarket(
+        'XRP-TEST',
+        openingPriceInCents,
+        lockTime,
+        settleTime,
+        false // not after hours
+      );
+      
+      if (blockchainMarketId !== null) {
+        market.blockchainMarketId = blockchainMarketId;
+        console.log(`   ✅ On-chain market created: ID ${blockchainMarketId}`);
+      }
+    } catch (chainError: any) {
+      console.error(`   ⚠️ On-chain creation failed: ${chainError.message}`);
+    }
     
     console.log(`🧪 Created 1-minute test market for XRP`);
     console.log(`   Opening price: $${(openingPriceInCents / 100).toFixed(4)}`);
@@ -587,6 +607,7 @@ router.post('/admin/test-market', async (req, res) => {
         settleTime: settleTime.toISOString(),
         secondsUntilLock: 55,
         secondsUntilSettle: 60,
+        blockchainMarketId,
       },
     });
   } catch (error: any) {
