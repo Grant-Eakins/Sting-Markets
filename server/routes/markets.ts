@@ -563,15 +563,11 @@ router.post('/admin/test-market', async (req, res) => {
     const market = createMarket({
       stockSymbol: 'XRP',
       stockName: 'XRP (1-MIN TEST)',
+      description: 'Test market - 1 minute settlement',
       openingPrice: openingPriceInCents,
-      currentPrice: openingPriceInCents,
+      isAfterHours: false,
       lockTime,
       settleTime,
-      status: MarketStatus.ACTIVE,
-      tradingHours: {
-        start: '00:00',
-        end: '23:59',
-      },
     });
     
     console.log(`🧪 Created 1-minute test market for XRP`);
