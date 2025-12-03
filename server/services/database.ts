@@ -360,6 +360,10 @@ export async function cleanupOldSettledMarkets(daysToKeep: number = 7): Promise<
 /**
  * Clean up duplicate active markets (keep only one per symbol)
  * This can happen if sync runs multiple times before markets settle
+ * 
+ * IMPORTANT: When duplicates exist, we keep the one whose blockchain_market_id
+ * is valid (not null) and matches the symbol. If multiple have blockchain IDs,
+ * keep the one with the highest ID (most recent on-chain market).
  */
 export async function cleanupDuplicateActiveMarkets(): Promise<number> {
   if (!supabase) return 0;
@@ -370,7 +374,7 @@ export async function cleanupDuplicateActiveMarkets(): Promise<number> {
       .from('markets')
       .select('*')
       .eq('status', 'ACTIVE')
-      .order('created_at', { ascending: false });
+      .order('blockchain_market_id', { ascending: false, nullsFirst: false });
 
     if (fetchError) {
       console.error('❌ Error fetching active markets:', fetchError.message);
@@ -393,14 +397,20 @@ export async function cleanupDuplicateActiveMarkets(): Promise<number> {
       symbolMap.get(symbol)!.push(market);
     }
 
-    // Find markets to delete (keep newest, delete older ones)
+    // Find markets to delete
+    // Priority: Keep the one with highest blockchain_market_id (most recent on-chain)
+    // This ensures we keep the market that was actually created on-chain for this session
     const marketsToDelete: string[] = [];
     for (const [symbol, markets] of symbolMap.entries()) {
       if (markets.length > 1) {
-        // Keep the first one (newest due to order), delete the rest
+        // Markets are already sorted by blockchain_market_id DESC
+        // Keep the first one (highest blockchain ID), delete the rest
+        const toKeep = markets[0];
         const toDelete = markets.slice(1);
-        console.log(`🔍 Found ${markets.length} active ${symbol} markets, keeping newest, deleting ${toDelete.length}`);
-        marketsToDelete.push(...toDelete.map(m => m.id));
+        console.log(`🔍 Found ${markets.length} active ${symbol} markets`);
+        console.log(`   Keeping: blockchain_market_id=${toKeep.blockchain_market_id}`);
+        console.log(`   Deleting: ${toDelete.map((m: any) => m.blockchain_market_id).join(', ')}`);
+        marketsToDelete.push(...toDelete.map((m: any) => m.id));
       }
     }
 
