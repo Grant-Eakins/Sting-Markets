@@ -28,6 +28,11 @@ export interface ArchivedBet {
   claimed: boolean;
   txHash: string;
   archivedAt: number; // timestamp
+  // Settlement info
+  settlementPrice?: number | null;
+  referencePrice?: number | null;
+  priceChangePercent?: number | null;
+  winningBucketLabel?: string | null;
 }
 
 // Local storage key for archived bets
@@ -301,6 +306,29 @@ export default function BetHistory() {
                                 <span className="text-muted-foreground">Won:</span>
                                 <span className="font-bold text-green-500 sm:ml-2">+{bet.potentialPayout.toFixed(4)} ETH</span>
                               </div>
+                              {/* Settlement Info */}
+                              {bet.settlementPrice != null && (
+                                <div className="flex justify-between sm:block">
+                                  <span className="text-muted-foreground">Settle Price:</span>
+                                  <span className="font-bold sm:ml-2">${bet.settlementPrice.toFixed(2)}</span>
+                                </div>
+                              )}
+                              {bet.priceChangePercent != null && (
+                                <div className="flex justify-between sm:block">
+                                  <span className="text-muted-foreground">Price Change:</span>
+                                  <span className={`font-bold sm:ml-2 ${bet.priceChangePercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {bet.priceChangePercent >= 0 ? '+' : ''}{bet.priceChangePercent.toFixed(2)}%
+                                  </span>
+                                </div>
+                              )}
+                              {bet.winningBucketLabel && (
+                                <div className="flex justify-between sm:block sm:col-span-2">
+                                  <span className="text-muted-foreground">Winning Bucket:</span>
+                                  <Badge variant="outline" className="font-mono text-xs sm:ml-2">
+                                    {bet.winningBucketLabel}
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0">
@@ -361,6 +389,29 @@ export default function BetHistory() {
                                 <span className="text-muted-foreground">Lost:</span>
                                 <span className="font-bold text-red-500 sm:ml-2">-{bet.amountEth.toFixed(4)} ETH</span>
                               </div>
+                              {/* Settlement Info */}
+                              {bet.settlementPrice != null && (
+                                <div className="flex justify-between sm:block">
+                                  <span className="text-muted-foreground">Settle Price:</span>
+                                  <span className="font-bold sm:ml-2">${bet.settlementPrice.toFixed(2)}</span>
+                                </div>
+                              )}
+                              {bet.priceChangePercent != null && (
+                                <div className="flex justify-between sm:block">
+                                  <span className="text-muted-foreground">Price Change:</span>
+                                  <span className={`font-bold sm:ml-2 ${bet.priceChangePercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {bet.priceChangePercent >= 0 ? '+' : ''}{bet.priceChangePercent.toFixed(2)}%
+                                  </span>
+                                </div>
+                              )}
+                              {bet.winningBucketLabel && (
+                                <div className="flex justify-between sm:block sm:col-span-2">
+                                  <span className="text-muted-foreground">Winning Bucket:</span>
+                                  <Badge variant="outline" className="font-mono text-xs sm:ml-2">
+                                    {bet.winningBucketLabel}
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0">

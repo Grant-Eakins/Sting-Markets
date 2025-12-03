@@ -42,6 +42,11 @@ interface EnrichedBet extends BlockchainBet {
   pnl: number;
   pnlPercent: number;
   isUpBet: boolean;
+  // Settlement info
+  settlementPrice: number | null;
+  referencePrice: number | null;
+  priceChangePercent: number | null;
+  winningBucketLabel: string | null;
 }
 
 export default function MyBets() {
@@ -93,6 +98,11 @@ export default function MyBets() {
       claimed: bet.claimed,
       txHash: bet.txHash,
       archivedAt: Date.now(),
+      // Include settlement info
+      settlementPrice: bet.settlementPrice,
+      referencePrice: bet.referencePrice,
+      priceChangePercent: bet.priceChangePercent,
+      winningBucketLabel: bet.winningBucketLabel,
     };
     archiveBet(address, archivedBet);
     setArchivedBetIds(prev => new Set([...prev, bet.betId.toString()]));
@@ -423,6 +433,27 @@ export default function MyBets() {
     // Override the position from useBlockchainBets with correct calculation
     const isUpBet = getIsUpBet(bet.outcomeIndex, marketData?.numOutcomes);
     
+    // Calculate settlement price info for settled markets
+    let settlementPrice: number | null = null;
+    let referencePrice: number | null = null;
+    let priceChangePercent: number | null = null;
+    let winningBucketLabel: string | null = null;
+    
+    if (isSettled && marketData) {
+      if (marketData.finalPrice) {
+        settlementPrice = Number(marketData.finalPrice) / 1e8; // Assuming 8 decimals like Chainlink
+      }
+      if (marketData.referencePrice) {
+        referencePrice = Number(marketData.referencePrice) / 1e8;
+      }
+      if (settlementPrice && referencePrice && referencePrice > 0) {
+        priceChangePercent = ((settlementPrice - referencePrice) / referencePrice) * 100;
+      }
+      if (marketData.winningOutcome !== undefined) {
+        winningBucketLabel = getBucketLabel(marketData.winningOutcome, marketData.numOutcomes);
+      }
+    }
+    
     return {
       ...bet,
       marketName: marketData?.stockSymbol || market?.stockSymbol || market?.stockName || `Market #${bet.marketId}`,
@@ -437,6 +468,10 @@ export default function MyBets() {
       pnl: 0,
       pnlPercent: 0,
       isUpBet, // Correctly determined UP or DOWN
+      settlementPrice,
+      referencePrice,
+      priceChangePercent,
+      winningBucketLabel,
     };
   });
 
@@ -733,6 +768,29 @@ export default function MyBets() {
                                 {bet.won ? `Won ~${bet.potentialPayout.toFixed(4)} ETH` : 'Lost'}
                               </span>
                             </div>
+                            {/* Settlement Info */}
+                            {bet.settlementPrice !== null && (
+                              <div className="flex justify-between sm:block">
+                                <span className="text-muted-foreground">Settle Price:</span>
+                                <span className="font-bold sm:ml-2">${bet.settlementPrice.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {bet.priceChangePercent !== null && (
+                              <div className="flex justify-between sm:block">
+                                <span className="text-muted-foreground">Price Change:</span>
+                                <span className={`font-bold sm:ml-2 ${bet.priceChangePercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                  {bet.priceChangePercent >= 0 ? '+' : ''}{bet.priceChangePercent.toFixed(2)}%
+                                </span>
+                              </div>
+                            )}
+                            {bet.winningBucketLabel && (
+                              <div className="flex justify-between sm:block sm:col-span-2">
+                                <span className="text-muted-foreground">Winning Bucket:</span>
+                                <Badge variant="outline" className="font-mono text-xs sm:ml-2">
+                                  {bet.winningBucketLabel}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                         </div>
                         {/* Action buttons */}
