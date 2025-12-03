@@ -26,14 +26,14 @@ export interface CryptoQuote {
 
 /**
  * Top cryptos for prediction markets
- * Start with just BTC, expand as user base grows
+ * Start with just XRP, expand as user base grows
  */
 export const POPULAR_CRYPTOS = [
-  { symbol: 'BTC', name: 'Bitcoin', coingeckoId: 'bitcoin' },
+  { symbol: 'XRP', name: 'XRP', coingeckoId: 'ripple' },
   // Uncomment to add more markets:
+  // { symbol: 'BTC', name: 'Bitcoin', coingeckoId: 'bitcoin' },
   // { symbol: 'ETH', name: 'Ethereum', coingeckoId: 'ethereum' },
   // { symbol: 'SOL', name: 'Solana', coingeckoId: 'solana' },
-  // { symbol: 'XRP', name: 'XRP', coingeckoId: 'ripple' },
   // { symbol: 'DOGE', name: 'Dogecoin', coingeckoId: 'dogecoin' },
   // { symbol: 'LINK', name: 'Chainlink', coingeckoId: 'chainlink' },
 ];
