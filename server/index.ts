@@ -127,11 +127,17 @@ cron.schedule('*/2 * * * *', async () => {
   }
 });
 
+// Helper function to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Settlement and new market creation at 00:00 UTC
 cron.schedule('0 0 * * *', async () => {
   console.log(`📊 00:00 UTC - Settling markets and creating new session...`);
   try {
     await updateActiveMarketPrices();
+    // Wait 5 seconds for settlement time (settleTime = lockTime + 3s)
+    console.log('⏳ Waiting 5 seconds for settlement window...');
+    await delay(5000);
     await checkAndSettleMarkets();
     await syncCryptoMarkets();
   } catch (error) {
@@ -144,6 +150,9 @@ cron.schedule('0 12 * * *', async () => {
   console.log(`📊 12:00 UTC - Settling markets and creating new session...`);
   try {
     await updateActiveMarketPrices();
+    // Wait 5 seconds for settlement time (settleTime = lockTime + 3s)
+    console.log('⏳ Waiting 5 seconds for settlement window...');
+    await delay(5000);
     await checkAndSettleMarkets();
     await syncCryptoMarkets();
   } catch (error) {

@@ -135,7 +135,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         uint256 refundAmount
     );
     
-    constructor(address _oracle, address _usdc) Ownable(msg.sender) {
+    constructor(address _oracle, address _usdc) Ownable() {
         require(_oracle != address(0), "Invalid oracle");
         require(_usdc != address(0), "Invalid USDC address");
         oracle = _oracle;

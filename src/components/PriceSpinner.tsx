@@ -368,7 +368,7 @@ export function PriceSpinner({
 
         <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
           <DollarSign className="w-4 h-4" />
-          Select Your Price Bucket
+          Pick a Price
         </h3>
         
         {/* Search bar */}
