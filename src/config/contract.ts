@@ -419,5 +419,5 @@ export const CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0xfB1CcB2EA0441b375244a0A6a98F8a5c97B57496', // ProportionalMarket with bonding curve + sell + refund + getSellQuote
+  84532: '0x1C184a4e374C5a0A85630f7CE27C689273B2FbD3', // ProportionalMarket with bonding curve + sell + refund + getSellQuote
 } as const;
