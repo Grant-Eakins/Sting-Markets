@@ -201,22 +201,28 @@ contract ProportionalMarket is Ownable, ReentrancyGuard, Pausable {
         protocolFeesCollected += protocolFee;
         emit ProtocolFeeCollected(marketId, protocolFee);
         
-        // Calculate shares with bonding curve
-        // More liquidity in bucket = more expensive to buy
-        // Formula: shares = netAmount / (1 + bucketLiquidity/totalLiquidity)
-        // This means if bucket has 50% of liquidity, it costs 1.5x to buy
+        // Calculate shares with STEEP bonding curve
+        // Early bettors get MORE shares per ETH, late bettors get FEWER
+        // This means when you sell: valuePerShare = bucketLiquidity / totalShares
+        // Early bettors profit because they own more of the share pool
+        //
+        // Formula: shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
+        // STEEPNESS = 100 means at 0.01 ETH in bucket, new buyers get 50% fewer shares
+        //
+        // Example with STEEPNESS = 100:
+        // - First 0.01 ETH: gets 0.01e18 shares (1:1)
+        // - Next 1 ETH when bucket has 0.01 ETH: gets 1e18 / (1 + 0.01*100) = 0.5e18 shares
+        // - Alice now owns 0.01e18 / 0.51e18 = 2% of shares but bucket has ~1 ETH
+        // - Alice can sell for: 2% * 1 ETH = 0.02 ETH (2x profit!)
+        
+        uint256 STEEPNESS = 50; // Lower = gentler curve, Higher = steeper advantage for early
         uint256 shares;
-        if (market.totalLiquidity == 0) {
-            // First buy: 1:1 ratio
-            shares = netAmount;
-        } else {
-            uint256 bucketRatio = (market.bucketLiquidity[outcomeIndex] * 1e18) / market.totalLiquidity;
-            uint256 multiplier = 1e18 + bucketRatio; // 1 + ratio
-            shares = (netAmount * 1e18) / multiplier;
-        }
+        
+        // shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
+        uint256 divisor = 1e18 + (market.bucketLiquidity[outcomeIndex] * STEEPNESS);
+        shares = (netAmount * 1e18) / divisor;
         
         require(shares > 0, "Shares too small");
-        require(shares >= netAmount / 10, "Bonding curve too steep"); // Prevent >90% premium
         
         // Update state
         market.bucketLiquidity[outcomeIndex] += netAmount;

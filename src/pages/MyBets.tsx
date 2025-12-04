@@ -457,10 +457,12 @@ export default function MyBets() {
     
     if (isSettled && marketData) {
       if (marketData.finalPrice) {
-        settlementPrice = Number(marketData.finalPrice) / 1e8; // Assuming 8 decimals like Chainlink
+        // Prices are stored in cents (e.g., 231 = $2.31)
+        settlementPrice = Number(marketData.finalPrice) / 100;
       }
       if (marketData.referencePrice) {
-        referencePrice = Number(marketData.referencePrice) / 1e8;
+        // Prices are stored in cents (e.g., 231 = $2.31)
+        referencePrice = Number(marketData.referencePrice) / 100;
       }
       if (settlementPrice && referencePrice && referencePrice > 0) {
         priceChangePercent = ((settlementPrice - referencePrice) / referencePrice) * 100;
