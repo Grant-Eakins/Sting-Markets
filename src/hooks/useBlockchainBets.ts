@@ -67,8 +67,9 @@ export function useBlockchainBets() {
 
       const purchaseLogs: any[] = [];
       const sellLogs: any[] = [];
+      const claimLogs: any[] = [];
       
-      // Query in chunks for both purchase and sell events
+      // Query in chunks for purchase, sell, and claim events
       for (let fromBlock = startBlock; fromBlock < currentBlock; fromBlock += CHUNK_SIZE) {
         const toBlock = fromBlock + CHUNK_SIZE - 1n > currentBlock ? currentBlock : fromBlock + CHUNK_SIZE - 1n;
         
@@ -96,12 +97,30 @@ export function useBlockchainBets() {
           toBlock: toBlock,
         });
         
+        // Fetch PayoutClaimed events to track claimed status
+        const claims = await publicClient.getLogs({
+          address: contractAddress as `0x${string}`,
+          event: parseAbiItem('event PayoutClaimed(uint256 indexed marketId, address indexed user, uint256 payout)'),
+          args: {
+            user: address,
+          },
+          fromBlock: fromBlock,
+          toBlock: toBlock,
+        });
+        
         purchaseLogs.push(...purchases);
         sellLogs.push(...sells);
-        console.log(`📊 Found ${purchases.length} purchases, ${sells.length} sells in chunk`);
+        claimLogs.push(...claims);
+        console.log(`📊 Found ${purchases.length} purchases, ${sells.length} sells, ${claims.length} claims in chunk`);
       }
 
-      console.log(`📊 Total: ${purchaseLogs.length} purchases, ${sellLogs.length} sells for ${address}`);
+      console.log(`📊 Total: ${purchaseLogs.length} purchases, ${sellLogs.length} sells, ${claimLogs.length} claims for ${address}`);
+      
+      // Track which markets have been claimed
+      const claimedMarkets = new Set<string>();
+      for (const log of claimLogs) {
+        claimedMarkets.add(log.args.marketId!.toString());
+      }
 
       // Aggregate positions by market + outcomeIndex
       // Track net shares per position (buys - sells)
@@ -188,13 +207,17 @@ export function useBlockchainBets() {
       console.log(`📊 Processing ${positionMap.size} positions...`);
       
       for (const [key, position] of positionMap) {
+        // Check if this market was claimed
+        const isClaimed = claimedMarkets.has(position.marketId.toString());
+        
         // Skip positions where all shares have been sold (or only dust remains)
-        if (position.totalShares <= DUST_THRESHOLD) {
+        // BUT keep claimed positions so they show in settled bets
+        if (position.totalShares <= DUST_THRESHOLD && !isClaimed) {
           console.log(`📊 Position ${key} fully sold (shares: ${Number(position.totalShares)/1e18}), skipping`);
           continue;
         }
         
-        console.log(`📊 Position ${key} active with ${Number(position.totalShares)/1e18} shares`);
+        console.log(`📊 Position ${key} active with ${Number(position.totalShares)/1e18} shares, claimed: ${isClaimed}`);
         
         // Determine if this is an UP or DOWN position
         // For intraday (23 buckets): bucket 0-10 = UP (positive change), 11-22 = DOWN
@@ -216,7 +239,7 @@ export function useBlockchainBets() {
           position: positionType,
           amount: position.totalCost,
           odds: BigInt(200),
-          claimed: false,
+          claimed: isClaimed,
         });
       }
 
@@ -224,7 +247,7 @@ export function useBlockchainBets() {
       activeBets.sort((a, b) => b.timestamp - a.timestamp);
 
       setBets(activeBets);
-      console.log(`📊 Processed ${activeBets.length} active positions (${purchaseLogs.length} buys, ${sellLogs.length} sells)`);
+      console.log(`📊 Processed ${activeBets.length} active positions (${purchaseLogs.length} buys, ${sellLogs.length} sells, ${claimLogs.length} claims)`);
     } catch (err) {
       console.error('❌ Error fetching bets:', err);
       setError(err as Error);

@@ -11,7 +11,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // ProportionalMarket contract on Base Sepolia
-const CONTRACT_ADDRESS = '0xb7E4C69e39904Db720D39B0C12984108571B3A8E';
+const CONTRACT_ADDRESS = '0x08c490909D57d246171AdA5100b23597e90eb55A';
 const BACKEND_URL = process.env.NODE_ENV === 'production' 
   ? 'https://sting-markets-production.up.railway.app'
   : 'http://localhost:3001';

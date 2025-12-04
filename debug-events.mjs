@@ -2,7 +2,7 @@
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { baseSepolia } from 'viem/chains';
 
-const CONTRACT_ADDRESS = '0xb7E4C69e39904Db720D39B0C12984108571B3A8E';
+const CONTRACT_ADDRESS = '0x08c490909D57d246171AdA5100b23597e90eb55A';
 
 const client = createPublicClient({
   chain: baseSepolia,

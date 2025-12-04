@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // TODO: Deploy MultiOutcomeMarket.sol and update this address
-const CONTRACT_ADDRESS = '0xb7E4C69e39904Db720D39B0C12984108571B3A8E'; // ProportionalMarket with bonding curve + sell + refund
+const CONTRACT_ADDRESS = '0x08c490909D57d246171AdA5100b23597e90eb55A'; // ProportionalMarket with bonding curve + sell + refund + getSellQuote
 
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)

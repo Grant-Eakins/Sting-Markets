@@ -99,6 +99,34 @@ export const PREDICTION_MARKET_ABI = [
     "stateMutability": "view",
     "type": "function"
   },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "marketId", "type": "uint256" },
+      { "internalType": "uint8", "name": "outcomeIndex", "type": "uint8" },
+      { "internalType": "uint256", "name": "sharesToSell", "type": "uint256" }
+    ],
+    "name": "getSellQuote",
+    "outputs": [
+      { "internalType": "uint256", "name": "grossPayout", "type": "uint256" },
+      { "internalType": "uint256", "name": "netPayout", "type": "uint256" },
+      { "internalType": "uint256", "name": "sellFee", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "marketId", "type": "uint256" },
+      { "internalType": "uint8", "name": "outcomeIndex", "type": "uint8" }
+    ],
+    "name": "getBucketData",
+    "outputs": [
+      { "internalType": "uint256", "name": "bucketLiquidity", "type": "uint256" },
+      { "internalType": "uint256", "name": "totalShares", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
   // Events
   {
     "anonymous": false,
@@ -340,5 +368,5 @@ export const CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0xb7E4C69e39904Db720D39B0C12984108571B3A8E', // ProportionalMarket with bonding curve + sell + refund
+  84532: '0x08c490909D57d246171AdA5100b23597e90eb55A', // ProportionalMarket with bonding curve + sell + refund + getSellQuote
 } as const;

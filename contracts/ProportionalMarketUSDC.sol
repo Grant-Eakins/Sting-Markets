@@ -417,6 +417,60 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
+     * @notice Get sell quote - returns the USDC amount user would receive for selling shares
+     * @param marketId The market ID
+     * @param outcomeIndex The bucket index
+     * @param sharesToSell Number of shares to sell
+     * @return grossPayout The payout before fees
+     * @return netPayout The payout after 1% sell fee
+     * @return sellFee The fee amount
+     */
+    function getSellQuote(
+        uint256 marketId, 
+        uint8 outcomeIndex, 
+        uint256 sharesToSell
+    ) external view returns (uint256 grossPayout, uint256 netPayout, uint256 sellFee) {
+        Market storage market = markets[marketId];
+        
+        if (market.status != MarketStatus.ACTIVE || sharesToSell == 0) {
+            return (0, 0, 0);
+        }
+        
+        uint256 totalSharesInBucket = market.totalSharesPerBucket[outcomeIndex];
+        if (totalSharesInBucket == 0) {
+            return (0, 0, 0);
+        }
+        
+        // Value per share = bucket liquidity / total shares in bucket
+        uint256 valuePerShare = (market.bucketLiquidity[outcomeIndex] * 1e18) / totalSharesInBucket;
+        grossPayout = (sharesToSell * valuePerShare) / 1e18;
+        
+        // Apply 1% sell spread
+        sellFee = grossPayout / 100;
+        netPayout = grossPayout - sellFee;
+        
+        return (grossPayout, netPayout, sellFee);
+    }
+    
+    /**
+     * @notice Get bucket data for a specific outcome
+     * @param marketId The market ID
+     * @param outcomeIndex The bucket index
+     * @return bucketLiquidity The USDC in this bucket
+     * @return totalShares Total shares issued for this bucket
+     */
+    function getBucketData(uint256 marketId, uint8 outcomeIndex) external view returns (
+        uint256 bucketLiquidity,
+        uint256 totalShares
+    ) {
+        Market storage market = markets[marketId];
+        return (
+            market.bucketLiquidity[outcomeIndex],
+            market.totalSharesPerBucket[outcomeIndex]
+        );
+    }
+    
+    /**
      * @notice Get total shares in a specific bucket
      */
     function getTotalSharesInBucket(uint256 marketId, uint8 outcomeIndex) internal view returns (uint256) {

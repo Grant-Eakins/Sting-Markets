@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TrendingUp, TrendingDown, Trophy, DollarSign, Activity, Wallet, AlertCircle, ArrowRightLeft, Menu, X, History } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trophy, Wallet, AlertCircle, ArrowRightLeft, Menu, X, History } from 'lucide-react';
 import { archiveBet, isBetArchived, type ArchivedBet } from './BetHistory';
 
 // Authorized admin wallet addresses (lowercase for comparison)
@@ -39,6 +39,7 @@ interface EnrichedBet extends BlockchainBet {
   isSettled: boolean;
   won: boolean;
   currentValue: number;
+  liveSellValue: number | null; // Live sell value from contract
   pnl: number;
   pnlPercent: number;
   isUpBet: boolean;
@@ -154,6 +155,20 @@ export default function MyBets() {
     query: {
       enabled: marketIds.length > 0,
       refetchInterval: 15000,
+    },
+  } as any);
+
+  // Fetch live sell quotes for each bet position
+  const { data: sellQuotesData } = useReadContracts({
+    contracts: bets.map((bet) => ({
+      address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'getSellQuote',
+      args: [bet.marketId, bet.outcomeIndex, bet.shares],
+    })) as any,
+    query: {
+      enabled: bets.length > 0,
+      refetchInterval: 10000, // Refresh every 10 seconds for live updates
     },
   } as any);
 
@@ -354,7 +369,7 @@ export default function MyBets() {
   };
 
   // Enrich bets with market data and categorize
-  const enrichedBets = bets.map(bet => {
+  const enrichedBets = bets.map((bet, index) => {
     const marketData = getBetMarketData(bet.marketId);
     const marketsList = Array.isArray(markets) ? markets : [];
     const market = marketsList.find((m: Market) => m.blockchainMarketId === Number(bet.marketId));
@@ -365,9 +380,18 @@ export default function MyBets() {
     // Win if the user's bet bucket matches the winning outcome
     const won = isSettled && marketData?.winningOutcome === bet.outcomeIndex;
     
+    // Get live sell value from contract
+    let liveSellValue: number | null = null;
+    const sellQuoteResult = sellQuotesData?.[index];
+    if (sellQuoteResult?.status === 'success' && sellQuoteResult.result) {
+      // result is [grossPayout, netPayout, sellFee] - we want netPayout
+      const netPayout = sellQuoteResult.result[1] as bigint;
+      liveSellValue = Number(netPayout) / 1e18; // ETH has 18 decimals
+    }
+    
     // Calculate estimated payout and sell value based on current shares and market state
     let potentialPayout = amountEth * 2; // Default fallback
-    let currentValue = amountEth; // Default to cost basis
+    let currentValue = liveSellValue ?? amountEth; // Use live sell value if available, else cost basis
     let probability = 0;
     
     if (marketData && marketData.probabilities && marketData.probabilities.length > bet.outcomeIndex) {
@@ -381,14 +405,6 @@ export default function MyBets() {
         
         // Cap at reasonable max (can't win more than total pool)
         potentialPayout = Math.min(potentialPayout, marketData.totalLiquidity);
-        
-        // Current sell value estimation:
-        // In a bonding curve market, sell value ≈ shares * pricePerShare
-        // Since probability represents the bucket's share of the pool:
-        // bucketLiquidity ≈ totalLiquidity * probability
-        // Your value ≈ (yourShares / totalSharesInBucket) * bucketLiquidity
-        // Simplified: currentValue ≈ amountEth (your proportional cost basis)
-        currentValue = amountEth;
       }
     }
     
@@ -465,8 +481,9 @@ export default function MyBets() {
       isSettled,
       won,
       currentValue,
-      pnl: 0,
-      pnlPercent: 0,
+      liveSellValue, // Live sell value from contract (null if not available)
+      pnl: liveSellValue !== null ? liveSellValue - amountEth : 0,
+      pnlPercent: liveSellValue !== null && amountEth > 0 ? ((liveSellValue - amountEth) / amountEth) * 100 : 0,
       isUpBet, // Correctly determined UP or DOWN
       settlementPrice,
       referencePrice,
@@ -480,16 +497,6 @@ export default function MyBets() {
   const activeBets = visibleBets.filter(b => !b.isSettled);
   const settledBets = visibleBets.filter(b => b.isSettled);
   const claimableBets = settledBets.filter(b => b.won && !b.claimed);
-
-  const stats = {
-    totalBets: visibleBets.length, // Use visible bets to reflect actual displayed positions
-    totalStaked: visibleBets.reduce((sum, b) => sum + b.amountEth, 0),
-    settledBets: settledBets.length,
-    wonBets: settledBets.filter(b => b.won).length,
-    totalWon: settledBets.filter(b => b.won).reduce((sum, b) => sum + b.potentialPayout, 0),
-    claimable: claimableBets.reduce((sum, b) => sum + b.potentialPayout, 0),
-    winRate: settledBets.length > 0 ? (settledBets.filter(b => b.won).length / settledBets.length) * 100 : 0,
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -575,79 +582,6 @@ export default function MyBets() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <Card>
-            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
-              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Activity className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Total Bets</span>
-                <span className="sm:hidden">Bets</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <div className="text-xl sm:text-2xl font-bold">{stats.totalBets}</div>
-              <p className="text-xs text-muted-foreground mt-1 hidden sm:block">
-                {activeBets.length} active, {settledBets.length} settled
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
-              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <DollarSign className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Total Staked</span>
-                <span className="sm:hidden">Staked</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <div className="text-xl sm:text-2xl font-bold">{stats.totalStaked.toFixed(4)} <span className="text-sm font-normal text-muted-foreground">ETH</span></div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
-              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Win Rate</span>
-                <span className="sm:hidden">Wins</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <div className="text-xl sm:text-2xl font-bold">{stats.winRate.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground mt-1 hidden sm:block">
-                {stats.wonBets} / {stats.settledBets} bets won
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
-              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
-                Claimable
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-green-500">{stats.claimable.toFixed(4)} <span className="text-sm font-normal">ETH</span></div>
-              <p className="text-xs text-muted-foreground mt-1 hidden sm:block">
-                {claimableBets.length} bet{claimableBets.length !== 1 ? 's' : ''} ready
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Claimable Winnings */}
-        {claimableBets.length > 0 && (
-          <Alert className="mb-6 border-green-500 bg-green-500/10">
-            <Trophy className="h-4 w-4 text-green-500" />
-            <AlertDescription>
-              <strong>You have {claimableBets.length} winning bet{claimableBets.length !== 1 ? 's' : ''} ready to claim!</strong> Total: {stats.claimable.toFixed(4)} ETH
-            </AlertDescription>
-          </Alert>
-        )}
-
         {/* Bets List */}
         <div className="space-y-6">
           {/* Active Bets */}
@@ -679,26 +613,25 @@ export default function MyBets() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Staked:</span>
-                              <span className="font-bold sm:ml-2">{bet.amountEth.toFixed(4)} ETH</span>
+                              <span className="font-bold sm:ml-2">{bet.amountEth.toFixed(4)} USDC</span>
                             </div>
                             <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Shares:</span>
-                              <span className="font-bold sm:ml-2">{bet.sharesNum < 0.01 ? bet.sharesNum.toFixed(6) : bet.sharesNum.toFixed(4)}</span>
-                            </div>
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Win Chance:</span>
+                              <span className="text-muted-foreground">Bucket Odds:</span>
                               <span className="font-bold sm:ml-2">{bet.probability}%</span>
                             </div>
                             <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">If Win:</span>
-                              <span className="font-bold text-green-500 sm:ml-2">~{bet.potentialPayout.toFixed(4)} ETH</span>
+                              <span className="text-muted-foreground">Potential Win:</span>
+                              <span className="font-bold text-green-500 sm:ml-2">~{bet.potentialPayout.toFixed(4)} USDC</span>
                             </div>
-                            <div className="flex justify-between sm:block sm:col-span-2">
-                              <span className="text-muted-foreground">Est. Sell Value:</span>
-                              <span>
-                                <span className="font-bold text-orange-500 sm:ml-2">~{(bet.currentValue * 0.99).toFixed(4)} ETH</span>
-                                <span className="text-xs text-muted-foreground ml-1">(1% fee)</span>
-                              </span>
+                            <div className="flex justify-between sm:block">
+                              <span className="text-muted-foreground">Sell Value:</span>
+                              {bet.liveSellValue !== null ? (
+                                <span className={`font-bold sm:ml-2 ${bet.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                  {bet.liveSellValue.toFixed(4)} USDC ({bet.pnl >= 0 ? '+' : ''}{bet.pnlPercent.toFixed(1)}%)
+                                </span>
+                              ) : (
+                                <span className="font-bold text-muted-foreground sm:ml-2">Loading...</span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -870,7 +803,7 @@ export default function MyBets() {
           {/* Empty State */}
           {enrichedBets.length === 0 && !isLoadingBets && !betsError && (
             <Card className="p-12 text-center">
-              <Activity className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <Wallet className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
               <CardTitle className="mb-2">No Bets Yet</CardTitle>
               <CardDescription className="mb-4">
                 Start betting on prediction markets to see your positions here
