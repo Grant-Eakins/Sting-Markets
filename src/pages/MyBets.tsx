@@ -411,11 +411,11 @@ export default function MyBets() {
     // Format the bucket as a price range based on contract's getBucketIndex logic
     // Contract mapping: bucket 0 = >+10%, lower buckets = higher positive %, higher buckets = negative %
     const getBucketLabel = (outcomeIndex: number, numOutcomes: number = 42) => {
-      const isIntraday = numOutcomes === 23;
+      const isIntraday = numOutcomes === 22;
       const increment = isIntraday ? 1 : 0.5;
       const maxBucket = numOutcomes - 1;
       
-      // For intraday (23 buckets): 0=>+10%, 10=0-1%, 11=-1-0%, 21=<-10%
+      // For intraday (22 buckets): 0=>+10%, 10=0-1%, 11=-1-0%, 21=<-10%
       // For overnight (42 buckets): 0=>+10%, 20=0-0.5%, 21=-0.5-0%, 41=<-10%
       
       if (outcomeIndex === 0) return '>+10%';
@@ -439,7 +439,7 @@ export default function MyBets() {
     // UP = positive price change buckets (lower indices)
     // DOWN = negative price change buckets (higher indices)
     const getIsUpBet = (outcomeIndex: number, numOutcomes: number = 42) => {
-      const isIntraday = numOutcomes === 23;
+      const isIntraday = numOutcomes === 22;
       // Middle bucket (0% change): index 10 for intraday, index 20 for overnight
       const zeroChangeBucket = isIntraday ? 10 : 20;
       // Buckets 0 to zeroChangeBucket are UP (positive or zero change)

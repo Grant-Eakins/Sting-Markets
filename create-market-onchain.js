@@ -12,7 +12,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const CONTRACT_ADDRESS = '0x9F9fEAdae49C627daae38ea877849929d3F39465';
+const CONTRACT_ADDRESS = '0xfB1CcB2EA0441b375244a0A6a98F8a5c97B57496';
 
 const ABI = [
   {

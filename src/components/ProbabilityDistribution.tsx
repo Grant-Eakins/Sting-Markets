@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 interface ProbabilityDistributionProps {
   stockSymbol: string;
   referencePrice: number; // In cents
-  probabilities: number[]; // Array of 23 probabilities (0-1)
+  probabilities: number[]; // Array of 22 probabilities (0-1) for intraday
   expectedMovePercent: number; // e.g., 2.37
   impliedFinalPrice: number; // In cents
 }
@@ -28,7 +28,8 @@ export function ProbabilityDistribution({
   // Calculate chart dimensions
   const chartWidth = 800;
   const chartHeight = 300;
-  const barWidth = chartWidth / 23;
+  const numBuckets = probabilities.length || 22;
+  const barWidth = chartWidth / numBuckets;
   const padding = 40;
   
   // Generate SVG path for smooth bell curve
@@ -46,7 +47,7 @@ export function ProbabilityDistribution({
   const areaPath = useMemo(() => {
     const bottomY = chartHeight - padding;
     const startX = padding + (barWidth / 2);
-    const endX = padding + (22 * barWidth) + (barWidth / 2);
+    const endX = padding + ((numBuckets - 1) * barWidth) + (barWidth / 2);
     
     const points = probabilities.map((prob, i) => {
       const x = padding + (i * barWidth) + (barWidth / 2);
@@ -55,7 +56,7 @@ export function ProbabilityDistribution({
     });
     
     return `M ${startX},${bottomY} L ${points.join(' L ')} L ${endX},${bottomY} Z`;
-  }, [probabilities, maxProbability, barWidth]);
+  }, [probabilities, maxProbability, barWidth, numBuckets]);
   
   return (
     <Card className="w-full">

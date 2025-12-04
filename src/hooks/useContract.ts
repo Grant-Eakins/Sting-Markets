@@ -24,7 +24,7 @@ export function usePlaceBet() {
     
     // For multi-outcome LMSR market:
     // marketId: blockchain market ID
-    // outcomeIndex: 0-22 for intraday (23 buckets) or 0-41 for overnight (42 buckets)
+    // outcomeIndex: 0-21 for intraday (22 buckets) or 0-41 for overnight (42 buckets)
     // quantity: number of shares to buy (scaled by bet amount)
     // maxCost: maximum cost willing to pay (slippage protection)
     

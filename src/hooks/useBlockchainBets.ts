@@ -220,11 +220,11 @@ export function useBlockchainBets() {
         console.log(`📊 Position ${key} active with ${Number(position.totalShares)/1e18} shares, claimed: ${isClaimed}`);
         
         // Determine if this is an UP or DOWN position
-        // For intraday (23 buckets): bucket 0-10 = UP (positive change), 11-22 = DOWN
+        // For intraday (22 buckets): bucket 0-10 = UP (positive change), 11-21 = DOWN
         // For overnight (42 buckets): bucket 0-20 = UP, 21-41 = DOWN
         // We assume overnight (42) unless we can determine otherwise
         // UP = 0, DOWN = 1
-        const isUpPosition = position.outcomeIndex <= 20; // Safe for both 23 and 42 buckets
+        const isUpPosition = position.outcomeIndex <= 20; // Safe for both 22 and 42 buckets
         const positionType = isUpPosition ? 0 : 1;
         
         activeBets.push({

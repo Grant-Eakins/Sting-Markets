@@ -151,6 +151,57 @@ export const PREDICTION_MARKET_ABI = [
     ],
     "name": "SharesSold",
     "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "marketId", "type": "uint256" },
+      { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "payout", "type": "uint256" }
+    ],
+    "name": "PayoutClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "marketId", "type": "uint256" },
+      { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "refundAmount", "type": "uint256" }
+    ],
+    "name": "RefundClaimed",
+    "type": "event"
+  },
+  // Refund functions
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "marketId", "type": "uint256" }
+    ],
+    "name": "claimRefund",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "marketId", "type": "uint256" }
+    ],
+    "name": "isRefundEligible",
+    "outputs": [
+      { "internalType": "bool", "name": "", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  // Lock market function
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "marketId", "type": "uint256" }
+    ],
+    "name": "lockMarket",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ] as const;
 
@@ -368,5 +419,5 @@ export const CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0x08c490909D57d246171AdA5100b23597e90eb55A', // ProportionalMarket with bonding curve + sell + refund + getSellQuote
+  84532: '0xfB1CcB2EA0441b375244a0A6a98F8a5c97B57496', // ProportionalMarket with bonding curve + sell + refund + getSellQuote
 } as const;

@@ -11,14 +11,15 @@ import axios from 'axios';
 
 dotenv.config();
 
-const CONTRACT_ADDRESS = '0x9F9fEAdae49C627daae38ea877849929d3F39465';
+const CONTRACT_ADDRESS = '0xfB1CcB2EA0441b375244a0A6a98F8a5c97B57496';
 const BACKEND_URL = 'http://localhost:3001';
 
 const ABI = [
   {
     "inputs": [
-      { "internalType": "string", "name": "trendName", "type": "string" },
-      { "internalType": "uint256", "name": "initialInterest", "type": "uint256" },
+      { "internalType": "string", "name": "stockSymbol", "type": "string" },
+      { "internalType": "uint8", "name": "sessionType", "type": "uint8" },
+      { "internalType": "uint256", "name": "referencePrice", "type": "uint256" },
       { "internalType": "uint256", "name": "lockTime", "type": "uint256" },
       { "internalType": "uint256", "name": "settleTime", "type": "uint256" }
     ],
@@ -90,14 +91,20 @@ async function main() {
     for (const market of markets) {
       // Skip if already has blockchain market ID
       if (market.blockchainMarketId !== undefined && market.blockchainMarketId !== null) {
-        console.log(`✅ ${market.trendName} - Already on-chain (ID: ${market.blockchainMarketId})`);
+        console.log(`✅ ${market.stockSymbol || market.trendName} - Already on-chain (ID: ${market.blockchainMarketId})`);
         continue;
       }
 
-      console.log(`\n🚀 Creating on-chain market for: ${market.trendName}`);
+      const stockSymbol = market.stockSymbol || market.trendName;
+      console.log(`\n🚀 Creating on-chain market for: ${stockSymbol}`);
 
       const lockTime = Math.floor(new Date(market.lockTime).getTime() / 1000);
       const settleTime = Math.floor(new Date(market.settleTime).getTime() / 1000);
+      
+      // SessionType: 0 = INTRADAY (23 buckets), 1 = OVERNIGHT (42 buckets)
+      const sessionType = market.isAfterHours ? 1 : 0;
+      // Reference price in cents (e.g., $100.50 = 10050)
+      const referencePrice = market.openingPrice || market.initialInterest || 10000;
 
       try {
         const hash = await walletClient.writeContract({
@@ -105,8 +112,9 @@ async function main() {
           abi: ABI,
           functionName: 'createMarket',
           args: [
-            market.trendName,
-            BigInt(market.initialInterest),
+            stockSymbol,
+            sessionType,
+            BigInt(referencePrice),
             BigInt(lockTime),
             BigInt(settleTime)
           ]
@@ -117,6 +125,7 @@ async function main() {
 
         if (receipt.status === 'success') {
           console.log(`✅ Created on-chain market ID: ${nextMarketId}`);
+          console.log(`   Symbol: ${stockSymbol}, Session: ${sessionType === 0 ? 'INTRADAY' : 'OVERNIGHT'}, Price: $${(referencePrice / 100).toFixed(2)}`);
           console.log(`🔗 BaseScan: https://sepolia.basescan.org/tx/${hash}`);
           
           // TODO: Update backend market with blockchainMarketId
@@ -125,10 +134,10 @@ async function main() {
           
           nextMarketId++;
         } else {
-          console.error(`❌ Transaction failed for ${market.trendName}`);
+          console.error(`❌ Transaction failed for ${stockSymbol}`);
         }
       } catch (error) {
-        console.error(`❌ Error creating market ${market.trendName}:`, error.message);
+        console.error(`❌ Error creating market ${stockSymbol}:`, error.message);
       }
     }
 

@@ -60,7 +60,7 @@ export function useContractMarketData(blockchainMarketId: number | undefined) {
   
   // Access by index - getMarket returns a tuple
   const totalLiquidityWei = typeof market[10] === 'bigint' ? market[10] : BigInt(market[10] || 0);
-  const numOutcomes = typeof market[3] === 'number' ? market[3] : Number(market[3] || 23);
+  const numOutcomes = typeof market[3] === 'number' ? market[3] : Number(market[3] || 22);
 
   // Convert from wei to ETH
   const totalLiquidity = Number(totalLiquidityWei) / 1e18;

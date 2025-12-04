@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // TODO: Deploy MultiOutcomeMarket.sol and update this address
-const CONTRACT_ADDRESS = '0x08c490909D57d246171AdA5100b23597e90eb55A'; // ProportionalMarket with bonding curve + sell + refund + getSellQuote
+const CONTRACT_ADDRESS = '0xfB1CcB2EA0441b375244a0A6a98F8a5c97B57496'; // ProportionalMarket with bonding curve + sell + refund + getSellQuote
 
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)
@@ -161,7 +161,7 @@ export async function createOnChainMarket(
     const sessionType = isAfterHours ? 1 : 0;
 
     console.log(`⛓️  Creating on-chain market: ${stockSymbol} @ $${(openingPrice / 100).toFixed(2)}`);
-    console.log(`   Session: ${isAfterHours ? 'OVERNIGHT (42 buckets)' : 'INTRADAY (23 buckets)'}`);
+    console.log(`   Session: ${isAfterHours ? 'OVERNIGHT (42 buckets)' : 'INTRADAY (22 buckets)'}`);
 
     const hash = await walletClient.writeContract({
       address: CONTRACT_ADDRESS,

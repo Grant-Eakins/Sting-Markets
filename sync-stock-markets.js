@@ -11,7 +11,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // ProportionalMarket contract on Base Sepolia
-const CONTRACT_ADDRESS = '0x08c490909D57d246171AdA5100b23597e90eb55A';
+const CONTRACT_ADDRESS = '0xfB1CcB2EA0441b375244a0A6a98F8a5c97B57496';
 const BACKEND_URL = process.env.NODE_ENV === 'production' 
   ? 'https://sting-markets-production.up.railway.app'
   : 'http://localhost:3001';
@@ -19,7 +19,7 @@ const BACKEND_URL = process.env.NODE_ENV === 'production'
 const ABI = parseAbi([
   'function createMarket(string stockSymbol, uint8 sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime) external returns (uint256)',
   'function marketCounter() view returns (uint256)',
-  'function getMarket(uint256) view returns (string, uint8, uint8, uint8, int256, int256, uint256, uint256, bool, uint8, uint256)',
+  'function getMarket(uint256) view returns (string, uint8, uint8, uint8, uint256, uint256, uint256, uint256, bool, uint8, uint256)',
   'function owner() view returns (address)',
 ]);
 

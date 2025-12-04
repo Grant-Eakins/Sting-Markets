@@ -166,7 +166,7 @@ contract ProportionalMarket is Ownable, ReentrancyGuard, Pausable {
         market.marketId = marketId;
         market.sessionType = sessionType;
         market.status = MarketStatus.ACTIVE;
-        market.numOutcomes = sessionType == SessionType.INTRADAY ? 23 : 42;
+        market.numOutcomes = sessionType == SessionType.INTRADAY ? 22 : 42;
         market.referencePrice = referencePrice;
         market.lockTime = lockTime;
         market.settleTime = settleTime;
@@ -534,7 +534,7 @@ contract ProportionalMarket is Ownable, ReentrancyGuard, Pausable {
     
     function getBucketIndex(int256 priceChangePercent, SessionType sessionType) public pure returns (uint8) {
         if (sessionType == SessionType.INTRADAY) {
-            // 23 buckets: 1% increments from -10% to +10%
+            // 22 buckets: 1% increments from -10% to +10%
             if (priceChangePercent >= 1000) return 0;      // >+10%
             if (priceChangePercent >= 900) return 1;
             if (priceChangePercent >= 800) return 2;
@@ -656,7 +656,24 @@ contract ProportionalMarket is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice Alias for claimPayout (frontend compatibility)
      */
-    function claimWinnings(uint256 marketId) external {
-        this.claimPayout(marketId);
+    function claimWinnings(uint256 marketId) external nonReentrant {
+        Market storage market = markets[marketId];
+        require(market.settled, "Market not settled");
+        
+        UserPosition storage position = userPositions[marketId][msg.sender];
+        uint256 userWinningShares = position.shares[market.winningOutcome];
+        require(userWinningShares > 0, "No winning shares");
+        
+        uint256 totalWinningShares = getTotalSharesInBucket(marketId, market.winningOutcome);
+        require(totalWinningShares > 0, "No winning shares in bucket");
+        
+        uint256 payout = (userWinningShares * market.totalLiquidity) / totalWinningShares;
+        
+        position.shares[market.winningOutcome] = 0;
+        
+        (bool success, ) = payable(msg.sender).call{value: payout}("");
+        require(success, "Transfer failed");
+        
+        emit PayoutClaimed(marketId, msg.sender, payout);
     }
 }
