@@ -106,9 +106,10 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
     if (isContractDeployed && !useDemoMode) {
       try {
         // Get blockchain market ID from market data
-        const marketId = (market as any).blockchainMarketId ?? 0;
+        const marketId = (market as any).blockchainMarketId;
         
-        if (marketId === undefined || marketId === null) {
+        // Market IDs start at 1 in the contract, so 0, undefined, or null are invalid
+        if (marketId === undefined || marketId === null || marketId === 0) {
           setError('This market has not been created on-chain yet');
           return;
         }
