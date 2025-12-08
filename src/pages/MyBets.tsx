@@ -119,6 +119,18 @@ export default function MyBets() {
     betsError: betsError?.message 
   });
 
+  // Debug: Log bet details
+  useEffect(() => {
+    if (bets.length > 0) {
+      console.log('📊 Bets:', bets.map(b => ({
+        marketId: b.marketId.toString(),
+        outcomeIndex: b.outcomeIndex,
+        shares: Number(b.shares) / 1e18,
+        cost: Number(b.cost) / 1e18
+      })));
+    }
+  }, [bets]);
+
   // Fetch markets to get market details
   const { data: markets = [], isLoading: isLoadingMarkets } = useQuery({
     queryKey: ['markets'],
@@ -143,6 +155,14 @@ export default function MyBets() {
       refetchInterval: 15000,
     },
   } as any);
+
+  // Debug: Log markets data
+  useEffect(() => {
+    if (marketsData) {
+      console.log('📊 marketsData:', marketsData);
+      console.log('📊 marketIds:', marketIds.map(id => id.toString()));
+    }
+  }, [marketsData, marketIds]);
 
   // Fetch probabilities for each market to calculate estimated payouts
   const { data: probabilitiesData } = useReadContracts({
@@ -371,6 +391,14 @@ export default function MyBets() {
   // Enrich bets with market data and categorize
   const enrichedBets = bets.map((bet, index) => {
     const marketData = getBetMarketData(bet.marketId);
+    
+    // Debug: Log market data lookup
+    console.log(`📊 Enriching bet ${index}: marketId=${bet.marketId.toString()}, marketData=`, marketData ? {
+      settled: marketData.settled,
+      winningOutcome: marketData.winningOutcome,
+      status: marketData.status
+    } : 'NULL');
+    
     const marketsList = Array.isArray(markets) ? markets : [];
     const market = marketsList.find((m: Market) => m.blockchainMarketId === Number(bet.marketId));
     const amountEth = Number(bet.cost) / 1e18;  // Remaining cost basis after sells
@@ -379,6 +407,8 @@ export default function MyBets() {
     const isSettled = marketData?.settled || false;
     // Win if the user's bet bucket matches the winning outcome
     const won = isSettled && marketData?.winningOutcome === bet.outcomeIndex;
+    
+    console.log(`📊 Bet ${index} result: isSettled=${isSettled}, won=${won}, outcomeIndex=${bet.outcomeIndex}`);
     
     // Get live sell value from contract
     let liveSellValue: number | null = null;

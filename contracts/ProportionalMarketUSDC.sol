@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/access/Ownable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/security/ReentrancyGuard.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/security/Pausable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // Chainlink interface for price feed validation
 interface AggregatorV3Interface {
@@ -135,7 +135,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         uint256 refundAmount
     );
     
-    constructor(address _oracle, address _usdc) Ownable() {
+    constructor(address _oracle, address _usdc) Ownable(msg.sender) {
         require(_oracle != address(0), "Invalid oracle");
         require(_usdc != address(0), "Invalid USDC address");
         oracle = _oracle;
@@ -166,7 +166,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         market.marketId = marketId;
         market.sessionType = sessionType;
         market.status = MarketStatus.ACTIVE;
-        market.numOutcomes = sessionType == SessionType.INTRADAY ? 23 : 42;
+        market.numOutcomes = sessionType == SessionType.INTRADAY ? 22 : 42;
         market.referencePrice = referencePrice;
         market.lockTime = lockTime;
         market.settleTime = settleTime;
@@ -206,21 +206,22 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         protocolFeesCollected += protocolFee;
         emit ProtocolFeeCollected(marketId, protocolFee);
         
-        // Calculate shares with bonding curve
-        // More liquidity in bucket = more expensive to buy
-        // Formula: shares = netAmount / (1 + bucketLiquidity/totalLiquidity)
+        // Calculate shares with STEEP bonding curve
+        // Early bettors get MORE shares per USDC, late bettors get FEWER
+        // This means when you sell: valuePerShare = bucketLiquidity / totalShares
+        // Early bettors profit because they own more of the share pool
+        //
+        // Formula: shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
+        // STEEPNESS = 50 means bonding curve rewards early bettors
+        
+        uint256 STEEPNESS = 50; // Lower = gentler curve, Higher = steeper advantage for early
         uint256 shares;
-        if (market.totalLiquidity == 0) {
-            // First buy: 1:1 ratio
-            shares = netAmount;
-        } else {
-            uint256 bucketRatio = (market.bucketLiquidity[outcomeIndex] * 1e18) / market.totalLiquidity;
-            uint256 multiplier = 1e18 + bucketRatio; // 1 + ratio
-            shares = (netAmount * 1e18) / multiplier;
-        }
+        
+        // shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
+        uint256 divisor = 1e18 + (market.bucketLiquidity[outcomeIndex] * STEEPNESS);
+        shares = (netAmount * 1e18) / divisor;
         
         require(shares > 0, "Shares too small");
-        require(shares >= netAmount / 10, "Bonding curve too steep"); // Prevent >90% premium
         
         // Update state
         market.bucketLiquidity[outcomeIndex] += netAmount;
@@ -511,7 +512,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
     
     function getBucketIndex(int256 priceChangePercent, SessionType sessionType) public pure returns (uint8) {
         if (sessionType == SessionType.INTRADAY) {
-            // 23 buckets: 1% increments from -10% to +10%
+            // 22 buckets: 1% increments from -10% to +10%
             if (priceChangePercent >= 1000) return 0;      // >+10%
             if (priceChangePercent >= 900) return 1;
             if (priceChangePercent >= 800) return 2;

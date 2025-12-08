@@ -1,6 +1,8 @@
-import { getMarketsReadyToSettle, settleMarket, lockExpiredMarkets, getActiveMarkets, updateMarketPrice } from './marketService';
+import { getMarketsReadyToSettle, settleMarket, lockExpiredMarkets, getActiveMarkets, updateMarketPrice, getAllMarkets } from './marketService';
 import { getCryptoQuote, getBatchQuotes } from './cryptoApi';
 import { sendPriceUpdateTweets, sendClosingPriceTweets, sendOpeningPriceTweets } from './discordBot';
+import { syncCryptoMarkets } from './cryptoSync';
+import { syncSettlementStatusFromChain } from './blockchainSync';
 
 // Track last Discord update time to send every 3 hours
 let lastDiscordUpdateTime: number = 0;
@@ -86,6 +88,15 @@ export async function checkAndSettleMarkets(): Promise<void> {
   console.log('⏰ Checking markets for settlement...');
   
   try {
+    // First, sync settlement status from blockchain (catches manually settled markets)
+    const allMarkets = getAllMarkets();
+    const marketsWithBlockchainId = allMarkets.map(m => ({
+      id: m.id,
+      blockchainMarketId: m.blockchainMarketId,
+      status: Number(m.status)  // Convert enum to number
+    }));
+    const synced = await syncSettlementStatusFromChain(marketsWithBlockchainId);
+    
     // First lock any markets that passed their lock time
     const locked = lockExpiredMarkets();
     if (locked > 0) {
@@ -96,6 +107,16 @@ export async function checkAndSettleMarkets(): Promise<void> {
     const marketsToSettle = getMarketsReadyToSettle();
     
     if (marketsToSettle.length === 0) {
+      // Even if no markets to settle, we may have synced some from blockchain
+      // So try to create new markets for any newly-settled symbols
+      if (synced > 0) {
+        console.log('🔄 Creating new markets for synced settled symbols...');
+        try {
+          await syncCryptoMarkets();
+        } catch (syncError: any) {
+          console.error('⚠️ Error creating new markets:', syncError.message);
+        }
+      }
       console.log('ℹ️  No markets ready for settlement');
       return;
     }
@@ -117,6 +138,14 @@ export async function checkAndSettleMarkets(): Promise<void> {
     if (settledMarkets.length > 0) {
       console.log('📢 Sending closing price tweets to Discord...');
       await sendClosingPriceTweets(settledMarkets);
+      
+      // Automatically create new markets for settled symbols
+      console.log('🔄 Creating new markets for settled symbols...');
+      try {
+        await syncCryptoMarkets();
+      } catch (syncError: any) {
+        console.error('⚠️ Error creating new markets:', syncError.message);
+      }
     }
     
     console.log('✅ Market settlement check completed\n');

@@ -359,3 +359,84 @@ export async function syncAllMarketPools(markets: Array<{ id: string; blockchain
 
   return results;
 }
+
+/**
+ * Get market status from blockchain
+ * Returns { settled, status, winningOutcome } or null if not found
+ */
+export async function getOnChainMarketStatus(blockchainMarketId: number): Promise<{
+  settled: boolean;
+  status: number;
+  winningOutcome: number;
+  finalPrice: bigint;
+} | null> {
+  if (!isInitialized || !publicClient) {
+    return null;
+  }
+
+  try {
+    const result = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: ABI,
+      functionName: 'getMarket',
+      args: [BigInt(blockchainMarketId)]
+    });
+
+    // getMarket returns: [stockSymbol, sessionType, status, numOutcomes, referencePrice, finalPrice, lockTime, settleTime, settled, winningOutcome, totalLiquidity]
+    const data = result as any[];
+    return {
+      settled: data[8] as boolean,
+      status: Number(data[2]),
+      winningOutcome: Number(data[9]),
+      finalPrice: data[5] as bigint,
+    };
+  } catch (error: any) {
+    console.error(`❌ Error getting on-chain status for market ${blockchainMarketId}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Sync settlement status from blockchain for all markets
+ * Updates backend if blockchain shows market is settled but backend doesn't
+ */
+export async function syncSettlementStatusFromChain(markets: Array<{ id: string; blockchainMarketId?: number; status: number }>): Promise<number> {
+  if (!isInitialized || !publicClient) {
+    console.log('⚠️  Blockchain not initialized - skipping settlement sync');
+    return 0;
+  }
+
+  let syncedCount = 0;
+  const { updateMarketStatus } = await import('./database');
+  const { MarketStatus } = await import('../types/market');
+  const SETTLED_STATUS = 2; // On-chain status enum value
+
+  for (const market of markets) {
+    // Only check markets that have a blockchain ID and aren't already settled in backend
+    if (market.blockchainMarketId === undefined || market.blockchainMarketId === null) continue;
+    if (market.status === SETTLED_STATUS) continue;
+
+    try {
+      const onChainStatus = await getOnChainMarketStatus(market.blockchainMarketId);
+      
+      if (onChainStatus && onChainStatus.settled && onChainStatus.status === SETTLED_STATUS) {
+        // Blockchain says settled, backend doesn't - sync it!
+        console.log(`🔄 Syncing settlement from chain: Market ${market.id} (blockchain #${market.blockchainMarketId})`);
+        console.log(`   On-chain: settled=true, winningOutcome=${onChainStatus.winningOutcome}`);
+        
+        // Update backend status to SETTLED
+        await updateMarketStatus(market.id, MarketStatus.SETTLED);
+        
+        syncedCount++;
+      }
+    } catch (error: any) {
+      console.error(`⚠️  Error syncing market ${market.id}:`, error.message);
+    }
+  }
+
+  if (syncedCount > 0) {
+    console.log(`✅ Synced ${syncedCount} market(s) settlement status from blockchain`);
+  }
+
+  return syncedCount;
+}

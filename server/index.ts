@@ -7,7 +7,7 @@ import cron from 'node-cron';
 import marketsRouter from './routes/markets';
 import { syncCryptoMarkets } from './services/cryptoSync';
 import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/marketSettlement';
-import { initializeBlockchain, syncAllMarketPools } from './services/blockchainSync';
+import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain } from './services/blockchainSync';
 import { getAllMarkets, updateMarketPools, initializeMarketsFromDb } from './services/marketService';
 import { initializeDatabase, cleanupOldSettledMarkets, cleanupDuplicateActiveMarkets } from './services/database';
 
@@ -191,6 +191,23 @@ app.listen(PORT, async () => {
   // Load existing markets from database
   console.log('📂 Loading markets from database...');
   await initializeMarketsFromDb();
+  
+  // Sync settlement status from blockchain (catches manually settled markets)
+  console.log('🔄 Syncing settlement status from blockchain...');
+  try {
+    const allMarkets = getAllMarkets();
+    const marketsWithBlockchainId = allMarkets.map(m => ({
+      id: m.id,
+      blockchainMarketId: m.blockchainMarketId,
+      status: Number(m.status)  // Convert enum to number
+    }));
+    await syncSettlementStatusFromChain(marketsWithBlockchainId);
+    
+    // Reload markets after sync to get updated statuses
+    await initializeMarketsFromDb();
+  } catch (error) {
+    console.error('⚠️ Error syncing settlement status:', error);
+  }
   
   // Clean up any duplicate active markets (can happen if sync runs twice)
   console.log('🧹 Cleaning up duplicate markets...');
