@@ -102,30 +102,24 @@ console.log('📁 Serving static files from:', distPath);
 console.log('📁 .well-known path:', wellKnownPath);
 console.log('📁 .well-known exists:', fs.existsSync(wellKnownPath));
 
-// Serve .well-known directory with correct content-type (MUST be before static middleware)
-app.get('/.well-known/farcaster.json', (req, res) => {
-  console.log('📱 Request for farcaster.json');
-  
-  // Try dist path first, then public path as fallback
-  const paths = [
-    path.join(distPath, '.well-known', 'farcaster.json'),
-    path.join(__dirname, '..', 'public', '.well-known', 'farcaster.json'),
-    path.join(process.cwd(), 'dist', '.well-known', 'farcaster.json'),
-    path.join(process.cwd(), 'public', '.well-known', 'farcaster.json'),
-  ];
-  
-  for (const filePath of paths) {
-    if (fs.existsSync(filePath)) {
-      console.log('📱 Serving farcaster.json from:', filePath);
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      return res.sendFile(filePath);
-    }
+// Serve .well-known as static directory with dotfiles enabled (MUST be first)
+app.use('/.well-known', express.static(path.join(distPath, '.well-known'), {
+  dotfiles: 'allow',
+  setHeaders: (res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
   }
-  
-  console.error('❌ farcaster.json not found in any path:', paths);
-  res.status(404).json({ error: 'farcaster.json not found', triedPaths: paths });
+}));
+
+// Also serve at /well-known (without dot) as fallback
+app.get('/well-known/farcaster.json', (req, res) => {
+  const filePath = path.join(distPath, '.well-known', 'farcaster.json');
+  console.log('📱 Serving farcaster.json (no-dot path) from:', filePath);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.sendFile(filePath);
 });
 
 // Serve images with proper headers for Farcaster embed
