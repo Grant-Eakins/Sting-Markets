@@ -1,15 +1,31 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { createConfig, http } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
+import { farcasterFrame } from '@farcaster/miniapp-wagmi-connector';
 
 // WalletConnect Project ID from https://cloud.walletconnect.com/
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'eb33070102c31c71949eeac977f28689';
 
-export const config = getDefaultConfig({
-  appName: 'Sting Markets',
-  projectId,
-  chains: [baseSepolia, base], // Sepolia first since that's our active network
-  ssr: false,
-});
+// Check if we're likely in a Farcaster client
+const isInFarcasterClient = typeof window !== 'undefined' && 
+  (window.parent !== window || window.location.search.includes('fc_'));
+
+// Use different config based on environment
+export const config = isInFarcasterClient
+  ? createConfig({
+      chains: [baseSepolia, base],
+      connectors: [farcasterFrame()],
+      transports: {
+        [baseSepolia.id]: http(),
+        [base.id]: http(),
+      },
+    })
+  : getDefaultConfig({
+      appName: 'Sting Markets',
+      projectId,
+      chains: [baseSepolia, base],
+      ssr: false,
+    });
 
 export const BASE_CHAIN_ID = base.id;
 export const BASE_SEPOLIA_CHAIN_ID = baseSepolia.id;

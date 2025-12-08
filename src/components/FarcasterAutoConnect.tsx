@@ -1,7 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useConnect, useAccount } from 'wagmi';
-import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
-import sdk from '@farcaster/frame-sdk';
 
 /**
  * Auto-connects to the Farcaster wallet when in a Farcaster client.
@@ -10,35 +8,32 @@ import sdk from '@farcaster/frame-sdk';
 export function FarcasterAutoConnect() {
   const { connect, connectors } = useConnect();
   const { isConnected } = useAccount();
-  const { isInFarcasterClient } = useFarcasterAuth();
+  const [hasAttempted, setHasAttempted] = useState(false);
 
   useEffect(() => {
-    // Only auto-connect if in Farcaster client and not already connected
-    if (!isInFarcasterClient || isConnected) return;
+    // Only attempt once and if not connected
+    if (hasAttempted || isConnected) return;
 
     const autoConnect = async () => {
-      try {
-        // Get the Farcaster wallet provider
-        const provider = await sdk.wallet.ethProvider;
-        
-        if (provider) {
-          // Find an injected connector to use with the Farcaster provider
-          const injectedConnector = connectors.find(
-            (connector) => connector.id === 'injected' || connector.id === 'metaMask'
-          );
+      // Find the farcasterFrame connector
+      const farcasterConnector = connectors.find(c => c.id === 'farcasterFrame');
 
-          if (injectedConnector) {
-            connect({ connector: injectedConnector });
-          }
+      if (farcasterConnector) {
+        console.log('🟣 Found Farcaster connector, auto-connecting...');
+        try {
+          connect({ connector: farcasterConnector });
+        } catch (error) {
+          console.log('Farcaster auto-connect failed:', error);
         }
-      } catch (error) {
-        console.log('Farcaster auto-connect failed:', error);
       }
+      
+      setHasAttempted(true);
     };
 
-    // Small delay to let the SDK initialize
-    setTimeout(autoConnect, 500);
-  }, [connect, connectors, isConnected, isInFarcasterClient]);
+    // Small delay to let everything initialize
+    const timer = setTimeout(autoConnect, 500);
+    return () => clearTimeout(timer);
+  }, [connect, connectors, isConnected, hasAttempted]);
 
   return null;
 }
