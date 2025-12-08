@@ -64,6 +64,8 @@ const allowedOrigins = [
   'http://localhost:8082', 
   'http://localhost:8083', 
   'http://localhost:5173',
+  'https://farcaster.xyz',
+  'https://warpcast.com',
   process.env.FRONTEND_URL, // For production
 ].filter(Boolean);
 
@@ -79,7 +81,9 @@ app.use(cors({
         origin.endsWith('.vercel.app') || 
         origin.endsWith('.netlify.app') ||
         origin.includes('stingmarkets') ||
-        origin.includes('sting-markets')) {
+        origin.includes('sting-markets') ||
+        origin.includes('farcaster') ||
+        origin.includes('warpcast')) {
       return callback(null, true);
     }
     // Log rejected origins for debugging
