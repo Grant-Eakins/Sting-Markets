@@ -91,5 +91,3 @@ function FarcasterIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-  );
-}
