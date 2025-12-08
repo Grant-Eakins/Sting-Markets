@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -11,14 +10,7 @@ import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { LogOut, User, ExternalLink, Loader2 } from 'lucide-react';
 
 export function FarcasterConnect() {
-  const { user, isConnected, isLoading, signIn, signOut, error, isInFarcasterClient } = useFarcasterAuth();
-
-  // Auto-connect if in Farcaster client
-  useEffect(() => {
-    if (isInFarcasterClient && !isConnected && !isLoading) {
-      signIn();
-    }
-  }, [isInFarcasterClient, isConnected, isLoading, signIn]);
+  const { user, isConnected, isLoading, signIn, signOut } = useFarcasterAuth();
 
   // Show loading spinner while connecting
   if (isLoading) {

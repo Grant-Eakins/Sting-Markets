@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import sdk from '@farcaster/frame-sdk';
 import { FarcasterUser, FARCASTER_CONFIG } from '@/config/farcaster';
 
 interface FarcasterAuthContextType {
@@ -21,41 +22,73 @@ export function useFarcasterAuth() {
   return context;
 }
 
-// Detect if we're running inside a Farcaster client (Warpcast)
-function detectFarcasterClient(): boolean {
-  if (typeof window === 'undefined') return false;
-  
-  // Check for Farcaster-specific indicators
-  const userAgent = navigator.userAgent.toLowerCase();
-  const isFarcaster = userAgent.includes('warpcast') || 
-                      userAgent.includes('farcaster') ||
-                      window.location.search.includes('fc_') ||
-                      document.referrer.includes('warpcast.com') ||
-                      document.referrer.includes('farcaster');
-  
-  return isFarcaster;
-}
-
 interface FarcasterAuthProviderProps {
   children: ReactNode;
 }
 
 export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) {
   const [user, setUser] = useState<FarcasterUser | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isInFarcasterClient] = useState(() => detectFarcasterClient());
+  const [isInFarcasterClient, setIsInFarcasterClient] = useState(false);
+  const [sdkInitialized, setSdkInitialized] = useState(false);
 
-  // Load saved user from localStorage on mount
+  // Initialize Farcaster SDK on mount
   useEffect(() => {
-    const saved = localStorage.getItem('farcaster_user');
-    if (saved) {
+    const initFarcaster = async () => {
       try {
-        setUser(JSON.parse(saved));
-      } catch {
-        localStorage.removeItem('farcaster_user');
+        // Get context from the Farcaster client
+        const context = await sdk.context;
+        
+        if (context?.user) {
+          // We're in a Farcaster client with user context
+          setIsInFarcasterClient(true);
+          
+          const farcasterUser: FarcasterUser = {
+            fid: context.user.fid,
+            username: context.user.username || '',
+            displayName: context.user.displayName || '',
+            pfpUrl: context.user.pfpUrl || '',
+            custody: '',
+            verifications: [],
+          };
+          
+          setUser(farcasterUser);
+          localStorage.setItem('farcaster_user', JSON.stringify(farcasterUser));
+        } else {
+          // Not in Farcaster client or no user, check localStorage
+          const saved = localStorage.getItem('farcaster_user');
+          if (saved) {
+            try {
+              setUser(JSON.parse(saved));
+            } catch {
+              localStorage.removeItem('farcaster_user');
+            }
+          }
+        }
+        
+        // Signal that the app is ready (dismisses splash screen)
+        await sdk.actions.ready();
+        setSdkInitialized(true);
+        
+      } catch (err) {
+        console.log('Not in Farcaster client, using fallback auth');
+        // Not in Farcaster frame, load from localStorage
+        const saved = localStorage.getItem('farcaster_user');
+        if (saved) {
+          try {
+            setUser(JSON.parse(saved));
+          } catch {
+            localStorage.removeItem('farcaster_user');
+          }
+        }
+        setSdkInitialized(true);
       }
-    }
+      
+      setIsLoading(false);
+    };
+    
+    initFarcaster();
   }, []);
 
   const signIn = useCallback(async () => {
@@ -65,7 +98,33 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
     setError(null);
     
     try {
-      // Create a channel for the auth request
+      // If in Farcaster client, use SDK sign-in
+      if (isInFarcasterClient) {
+        const result = await sdk.actions.signIn({
+          nonce: crypto.randomUUID(),
+        });
+        
+        if (result) {
+          // Re-fetch context after sign-in
+          const context = await sdk.context;
+          if (context?.user) {
+            const farcasterUser: FarcasterUser = {
+              fid: context.user.fid,
+              username: context.user.username || '',
+              displayName: context.user.displayName || '',
+              pfpUrl: context.user.pfpUrl || '',
+              custody: '',
+              verifications: [],
+            };
+            setUser(farcasterUser);
+            localStorage.setItem('farcaster_user', JSON.stringify(farcasterUser));
+          }
+        }
+        setIsLoading(false);
+        return;
+      }
+      
+      // Fallback: Use relay for web auth
       const channelResponse = await fetch(`${FARCASTER_CONFIG.relay}/v1/channel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,7 +191,7 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
       setError(err instanceof Error ? err.message : 'Authentication failed');
       setIsLoading(false);
     }
-  }, [isLoading]);
+  }, [isLoading, isInFarcasterClient]);
 
   const signOut = useCallback(() => {
     setUser(null);

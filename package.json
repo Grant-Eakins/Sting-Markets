@@ -18,6 +18,7 @@
     "start:all": "concurrently \"npm run dev\" \"npm run server\""
   },
   "dependencies": {
+    "@farcaster/frame-sdk": "^0.1.12",
     "@farcaster/hub-nodejs": "^0.15.9",
     "@google-cloud/bigquery": "^8.1.1",
     "@hookform/resolvers": "^3.10.0",
@@ -78,12 +79,12 @@
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3",
     "vaul": "^0.9.9",
     "viem": "^2.21.0",
     "wagmi": "^2.12.0",
-    "zod": "^3.25.76",
-    "tsx": "^4.20.6",
-    "typescript": "^5.8.3"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
