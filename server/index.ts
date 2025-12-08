@@ -98,6 +98,13 @@ app.use(express.json());
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
 
+// Serve .well-known directory with correct content-type
+app.get('/.well-known/farcaster.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.sendFile(path.join(distPath, '.well-known', 'farcaster.json'));
+});
+
 // Routes
 app.use('/api/markets', marketsRouter);
 
