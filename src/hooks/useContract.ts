@@ -119,19 +119,18 @@ export function usePlaceBet() {
     // amount: USDC amount (6 decimals)
     
     const amountInUsdc = parseUnits(amount, USDC_DECIMALS);
-    // ProportionalMarketUSDC uses bonding curve - quantity param is ignored
-    // Contract pulls USDC via transferFrom and calculates shares based on amount
-    const quantity = BigInt(1); // Placeholder - contract ignores this
+    // ProportionalMarketUSDC signature: buyShares(uint256 marketId, uint8 outcomeIndex, uint256 amount, uint256 maxCost)
+    // amount = USDC to spend, maxCost = slippage protection (same as amount for exact)
     const maxCost = amountInUsdc; // Use amount as max cost (slippage protection)
     
-    console.log(`📝 Calling buyShares: marketId=${marketId}, outcomeIndex=${outcomeIndex}, amount=${amount} USDC`);
+    console.log(`📝 Calling buyShares: marketId=${marketId}, outcomeIndex=${outcomeIndex}, amount=${amount} USDC (${amountInUsdc})`);
     
     // Note: No 'value' field - USDC uses approve + transferFrom, not ETH
     writeContract({
       address: contractAddress as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'buyShares',
-      args: [BigInt(marketId), outcomeIndex, quantity, maxCost],
+      args: [BigInt(marketId), outcomeIndex, amountInUsdc, maxCost],
     } as any);
   };
   

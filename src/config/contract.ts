@@ -12,7 +12,7 @@ export const PREDICTION_MARKET_ABI = [
     "inputs": [
       { "internalType": "uint256", "name": "marketId", "type": "uint256" },
       { "internalType": "uint8", "name": "outcomeIndex", "type": "uint8" },
-      { "internalType": "int256", "name": "quantity", "type": "int256" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" },
       { "internalType": "uint256", "name": "maxCost", "type": "uint256" }
     ],
     "name": "buyShares",
