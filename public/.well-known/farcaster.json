@@ -1,0 +1,37 @@
+{
+  "frame": {
+    "name": "Sting Markets",
+    "version": "1",
+    "iconUrl": "https://www.stingmarkets.com/icon.png",
+    "homeUrl": "https://www.stingmarkets.com",
+    "imageUrl": "https://www.stingmarkets.com/image.png",
+    "buttonTitle": "Open Sting Markets",
+    "splashImageUrl": "https://www.stingmarkets.com/splash.png",
+    "splashBackgroundColor": "#fefe68",
+    "webhookUrl": "https://www.stingmarkets.com/api/webhook",
+    "subtitle": "Crypto \"Pick Your Price\" Prediction Markets",
+    "description": "Crypto prediction markets that reward the best speculators with the highest payout!",
+    "primaryCategory": "finance",
+    "screenshotUrls": [
+      "https://www.stingmarkets.com/icon.png"
+    ],
+    "heroImageUrl": "https://www.stingmarkets.com/icon.png",
+    "tags": [
+      "finance",
+      "money",
+      "crypto",
+      "meme",
+      "prediction"
+    ],
+    "tagline": "Pick A Price",
+    "ogTitle": "StingMarkets - Pick A Price PM",
+    "ogDescription": "Crypto prediction markets that reward the best speculators with the highest payout!",
+    "ogImageUrl": "https://www.stingmarkets.com/splash.png",
+    "castShareUrl": "https://www.stingmarkets.com/splash.png"
+  },
+  "accountAssociation": {
+    "header": "eyJmaWQiOjkzMDg5OCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGQ3Yzk2MTllQzEyMDBhN2M3ODA0YWM3MmY2YUYyODY2OTIwZThiNjYifQ",
+    "payload": "eyJkb21haW4iOiJ3d3cuc3RpbmdtYXJrZXRzLmNvbSJ9",
+    "signature": "hJ3URZOOlJSUXQHhEivTa5IzcgPssp8xQtMT3LPQVbM96ESVMo738cXXXEN2wSvN6homEvV7jN9VKGDyq+SkZBw="
+  }
+}

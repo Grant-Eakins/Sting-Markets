@@ -107,6 +107,34 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Farcaster webhook endpoint
+app.post('/api/webhook', (req, res) => {
+  console.log('📱 Farcaster webhook received:', JSON.stringify(req.body, null, 2));
+  
+  // Handle different Farcaster webhook events
+  const { event, data } = req.body || {};
+  
+  switch (event) {
+    case 'frame_added':
+      console.log(`✅ Frame added by FID: ${data?.fid}`);
+      break;
+    case 'frame_removed':
+      console.log(`❌ Frame removed by FID: ${data?.fid}`);
+      break;
+    case 'notifications_enabled':
+      console.log(`🔔 Notifications enabled by FID: ${data?.fid}`);
+      break;
+    case 'notifications_disabled':
+      console.log(`🔕 Notifications disabled by FID: ${data?.fid}`);
+      break;
+    default:
+      console.log(`📨 Unknown webhook event: ${event}`);
+  }
+  
+  // Always respond with 200 OK to acknowledge receipt
+  res.status(200).json({ success: true });
+});
+
 // Schedule market settlement check every 15 minutes
 cron.schedule('*/15 * * * *', async () => {
   console.log('Running scheduled market settlement check...');
