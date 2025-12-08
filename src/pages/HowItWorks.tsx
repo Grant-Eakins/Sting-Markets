@@ -2,6 +2,7 @@ import { WalletConnect } from "@/components/WalletConnect";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
+import { TOKEN_SYMBOL } from "@/config/contract";
 import {
   Coins,
   TrendingUp,
@@ -235,7 +236,7 @@ export default function HowItWorks() {
               <div>
                 <h3 className="text-lg font-semibold mb-2">3. Place Your Bet</h3>
                 <p className="text-muted-foreground">
-                  Choose a target price level, select UP or DOWN, enter your bet amount in ETH, and place your prediction on-chain.
+                  Choose a target price level, select UP or DOWN, enter your bet amount in {TOKEN_SYMBOL}, and place your prediction on-chain.
                 </p>
               </div>
             </Card>

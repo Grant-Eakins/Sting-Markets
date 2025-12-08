@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Market, fetchMarkets } from '@/lib/marketApi';
+import { TOKEN_SYMBOL } from '@/config/contract';
 import { MarketCard } from '@/components/MarketCard';
 import { WalletConnect } from '@/components/WalletConnect';
 import { Input } from '@/components/ui/input';
@@ -146,7 +147,7 @@ export default function Markets() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0">
-              <div className="text-xl sm:text-2xl font-bold">{totalPool.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">ETH</span></div>
+              <div className="text-xl sm:text-2xl font-bold">{totalPool.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">{TOKEN_SYMBOL}</span></div>
             </CardContent>
           </Card>
 

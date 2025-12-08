@@ -255,7 +255,7 @@ export default function BetHistory() {
                 <Card>
                   <CardContent className="p-4 sm:p-6">
                     <div className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Total Won</div>
-                    <div className="text-xl sm:text-2xl font-bold text-green-500">{stats.totalWon.toFixed(4)} ETH</div>
+                    <div className="text-xl sm:text-2xl font-bold text-green-500">{stats.totalWon.toFixed(4)} {TOKEN_SYMBOL}</div>
                   </CardContent>
                 </Card>
               </div>

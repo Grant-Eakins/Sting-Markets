@@ -11,6 +11,7 @@ import axios from 'axios';
 import { CheckCircle, AlertCircle, Plus, Lock, ShieldX } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { useAccount } from 'wagmi';
+import { TOKEN_SYMBOL } from '@/config/contract';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -438,7 +439,7 @@ export default function AdminPage() {
                             <span className="text-muted-foreground">Pool ID:</span> {market.blockchainMarketId ?? 'N/A'}
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Total Pool:</span> {(market.upPool + market.downPool).toFixed(4)} ETH
+                            <span className="text-muted-foreground">Total Pool:</span> {(market.upPool + market.downPool).toFixed(4)} {TOKEN_SYMBOL}
                           </div>
                           <div>
                             <span className="text-muted-foreground">Bets:</span> {market.totalBets}
