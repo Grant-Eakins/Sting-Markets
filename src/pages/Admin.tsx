@@ -10,6 +10,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { CheckCircle, AlertCircle, Plus, Lock, ShieldX } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
+import { FarcasterConnect } from '@/components/FarcasterConnect';
+import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAccount } from 'wagmi';
 import { TOKEN_SYMBOL } from '@/config/contract';
 
@@ -42,6 +44,7 @@ interface Market {
 export default function AdminPage() {
   console.log('AdminPage component rendering...');
   const { address, isConnected, status } = useAccount();
+  const { isInFarcasterClient } = useFarcasterAuth();
   console.log('useAccount result:', { address, isConnected, status });
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
@@ -178,7 +181,10 @@ export default function AdminPage() {
                 </Link>
               </nav>
             </div>
-            <WalletConnect />
+            <div className="flex items-center gap-2">
+              <FarcasterConnect />
+              {!isInFarcasterClient && <WalletConnect />}
+            </div>
           </div>
         </div>
         <div className="container mx-auto px-4 py-16">
@@ -190,7 +196,7 @@ export default function AdminPage() {
                 ? 'Please connect your wallet to access the admin panel.'
                 : 'Your wallet is not authorized to access this page.'}
             </CardDescription>
-            {!isConnected && <WalletConnect />}
+            {!isConnected && !isInFarcasterClient && <WalletConnect />}
           </Card>
         </div>
       </div>
@@ -219,7 +225,10 @@ export default function AdminPage() {
               </Link>
             </nav>
           </div>
-          <WalletConnect />
+          <div className="flex items-center gap-2">
+            <FarcasterConnect />
+            {!isInFarcasterClient && <WalletConnect />}
+          </div>
         </div>
       </div>
       <div className="p-8">

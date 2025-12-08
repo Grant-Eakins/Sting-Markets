@@ -20,6 +20,8 @@ const ADMIN_WALLETS = [
 ];
 import { useState, useMemo, useEffect } from 'react';
 import { WalletConnect } from '@/components/WalletConnect';
+import { FarcasterConnect } from '@/components/FarcasterConnect';
+import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { toast } from 'sonner';
 import { useBlockchainBets, type BlockchainBet } from '@/hooks/useBlockchainBets';
@@ -54,6 +56,7 @@ interface EnrichedBet extends BlockchainBet {
 
 export default function MyBets() {
   const { address, isConnected } = useAccount();
+  const { isInFarcasterClient } = useFarcasterAuth();
   const [claimingBetId, setClaimingBetId] = useState<bigint | null>(null);
   const [sellingBetId, setSellingBetId] = useState<bigint | null>(null);
   const [sellDialogBet, setSellDialogBet] = useState<EnrichedBet | null>(null);
@@ -334,7 +337,10 @@ export default function MyBets() {
                 </Link>
               </nav>
             </div>
-            <WalletConnect />
+            <div className="flex items-center gap-2">
+              <FarcasterConnect />
+              {!isInFarcasterClient && <WalletConnect />}
+            </div>
           </div>
         </div>
         <div className="container mx-auto px-4 py-8">
@@ -346,7 +352,7 @@ export default function MyBets() {
             <CardDescription className="mb-6">
               Connect your wallet to view your betting history and claim winnings
             </CardDescription>
-            <WalletConnect />
+            {!isInFarcasterClient && <WalletConnect />}
           </Card>
         </div>
       </div>
@@ -556,7 +562,8 @@ export default function MyBets() {
           </div>
           
           <div className="flex items-center gap-2">
-            <WalletConnect />
+            <FarcasterConnect />
+            {!isInFarcasterClient && <WalletConnect />}
             {/* Mobile menu button */}
             <Button 
               variant="ghost" 

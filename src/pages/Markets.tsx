@@ -6,6 +6,7 @@ import { TOKEN_SYMBOL } from '@/config/contract';
 import { MarketCard } from '@/components/MarketCard';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
+import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,7 @@ const ADMIN_WALLETS = [
 
 export default function Markets() {
   const { address, isConnected } = useAccount();
+  const { isInFarcasterClient } = useFarcasterAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -88,7 +90,7 @@ export default function Markets() {
           
           <div className="flex items-center gap-2">
             <FarcasterConnect />
-            <WalletConnect />
+            {!isInFarcasterClient && <WalletConnect />}
             {/* Mobile menu button */}
             <Button 
               variant="ghost" 

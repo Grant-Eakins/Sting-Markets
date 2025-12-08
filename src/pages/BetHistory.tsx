@@ -15,6 +15,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
+import { FarcasterConnect } from '@/components/FarcasterConnect';
+import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { TOKEN_SYMBOL } from '@/config/contract';
 
 // Types for archived bets
@@ -89,6 +91,7 @@ const ADMIN_ADDRESSES = [
 
 export default function BetHistory() {
   const { address, isConnected } = useAccount();
+  const { isInFarcasterClient } = useFarcasterAuth();
   const isAdmin = address && ADMIN_ADDRESSES.includes(address.toLowerCase());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [archivedBets, setArchivedBets] = useState<ArchivedBet[]>([]);
@@ -155,7 +158,8 @@ export default function BetHistory() {
           </div>
           
           <div className="flex items-center gap-2">
-            <WalletConnect />
+            <FarcasterConnect />
+            {!isInFarcasterClient && <WalletConnect />}
             {/* Mobile menu button */}
             <Button 
               variant="ghost" 
@@ -225,7 +229,7 @@ export default function BetHistory() {
             <CardDescription className="mb-6">
               Connect your wallet to view your bet history
             </CardDescription>
-            <WalletConnect />
+            {!isInFarcasterClient && <WalletConnect />}
           </Card>
         )}
 

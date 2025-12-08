@@ -1,4 +1,6 @@
 import { WalletConnect } from "@/components/WalletConnect";
+import { FarcasterConnect } from "@/components/FarcasterConnect";
+import { useFarcasterAuth } from "@/hooks/useFarcasterAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -18,9 +20,14 @@ import {
 } from "lucide-react";
 
 export default function HowItWorks() {
+  const { isInFarcasterClient } = useFarcasterAuth();
+  
   return (
     <div className="min-h-screen bg-background">
-      <WalletConnect />
+      <div className="flex items-center gap-2 fixed top-4 right-4 z-50">
+        <FarcasterConnect />
+        {!isInFarcasterClient && <WalletConnect />}
+      </div>
 
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40">
