@@ -1,8 +1,11 @@
 import { useAccount } from 'wagmi';
-import { CONTRACT_ADDRESSES } from '@/config/contract';
+import { CONTRACT_ADDRESSES, USDC_DECIMALS } from '@/config/contract';
 import { useState, useEffect } from 'react';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { baseSepolia } from 'viem/chains';
+
+// USDC uses 6 decimals
+const DECIMALS_DIVISOR = 10 ** USDC_DECIMALS;
 
 // Create a public client for reading events with a proper RPC
 const publicClient = createPublicClient({
@@ -15,7 +18,7 @@ export interface BlockchainBet {
   marketId: bigint;
   outcomeIndex: number;    // Bucket index (0-22 for intraday, 0-41 for overnight)
   shares: bigint;          // Number of shares remaining (after sells)
-  cost: bigint;            // ETH paid (in wei)
+  cost: bigint;            // USDC paid (in 6 decimal units)
   timestamp: number;       // Block timestamp
   txHash: string;          // Transaction hash
   // Legacy compatibility fields
@@ -194,15 +197,15 @@ export function useBlockchainBets() {
             existing.totalCost = 0n;
           }
           
-          console.log(`📊 Sell processed: ${key} - sold ${Number(shares)/1e18} shares (${(percentageSold*100).toFixed(1)}%), remaining: ${Number(existing.totalShares)/1e18}`);
+          console.log(`📊 Sell processed: ${key} - sold ${Number(shares)/DECIMALS_DIVISOR} shares (${(percentageSold*100).toFixed(1)}%), remaining: ${Number(existing.totalShares)/DECIMALS_DIVISOR}`);
         }
       }
 
       // Convert to bets array, filtering out fully sold positions
       const activeBets: BlockchainBet[] = [];
       
-      // Dust threshold: positions with less than 0.000001 shares are considered fully sold
-      const DUST_THRESHOLD = BigInt(1e12); // 0.000001 * 1e18
+      // Dust threshold: positions with less than 0.01 USDC worth are considered fully sold
+      const DUST_THRESHOLD = BigInt(10000); // 0.01 * 1e6
       
       console.log(`📊 Processing ${positionMap.size} positions...`);
       
@@ -213,11 +216,11 @@ export function useBlockchainBets() {
         // Skip positions where all shares have been sold (or only dust remains)
         // BUT keep claimed positions so they show in settled bets
         if (position.totalShares <= DUST_THRESHOLD && !isClaimed) {
-          console.log(`📊 Position ${key} fully sold (shares: ${Number(position.totalShares)/1e18}), skipping`);
+          console.log(`📊 Position ${key} fully sold (shares: ${Number(position.totalShares)/DECIMALS_DIVISOR}), skipping`);
           continue;
         }
         
-        console.log(`📊 Position ${key} active with ${Number(position.totalShares)/1e18} shares, claimed: ${isClaimed}`);
+        console.log(`📊 Position ${key} active with ${Number(position.totalShares)/DECIMALS_DIVISOR} shares, claimed: ${isClaimed}`);
         
         // Determine if this is an UP or DOWN position
         // For intraday (22 buckets): bucket 0-10 = UP (positive change), 11-21 = DOWN

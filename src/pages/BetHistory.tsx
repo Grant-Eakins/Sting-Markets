@@ -22,7 +22,7 @@ export interface ArchivedBet {
   marketId: number;
   marketName: string;
   bucketLabel: string;
-  amountEth: number;
+  amountUsdc: number;
   potentialPayout: number;
   won: boolean;
   claimed: boolean;
@@ -124,7 +124,7 @@ export default function BetHistory() {
     wonCount: wonBets.length,
     lostCount: lostBets.length,
     totalWon: wonBets.reduce((sum, b) => sum + b.potentialPayout, 0),
-    totalLost: lostBets.reduce((sum, b) => sum + b.amountEth, 0),
+    totalLost: lostBets.reduce((sum, b) => sum + b.amountUsdc, 0),
   };
 
   return (
@@ -300,11 +300,11 @@ export default function BetHistory() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                               <div className="flex justify-between sm:block">
                                 <span className="text-muted-foreground">Staked:</span>
-                                <span className="font-bold sm:ml-2">{bet.amountEth.toFixed(4)} ETH</span>
+                                <span className="font-bold sm:ml-2">${bet.amountUsdc.toFixed(2)} USDC</span>
                               </div>
                               <div className="flex justify-between sm:block">
                                 <span className="text-muted-foreground">Won:</span>
-                                <span className="font-bold text-green-500 sm:ml-2">+{bet.potentialPayout.toFixed(4)} ETH</span>
+                                <span className="font-bold text-green-500 sm:ml-2">+${bet.potentialPayout.toFixed(2)} USDC</span>
                               </div>
                               {/* Settlement Info */}
                               {bet.settlementPrice != null && (
@@ -383,11 +383,11 @@ export default function BetHistory() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                               <div className="flex justify-between sm:block">
                                 <span className="text-muted-foreground">Staked:</span>
-                                <span className="font-bold sm:ml-2">{bet.amountEth.toFixed(4)} ETH</span>
+                                <span className="font-bold sm:ml-2">${bet.amountUsdc.toFixed(2)} USDC</span>
                               </div>
                               <div className="flex justify-between sm:block">
                                 <span className="text-muted-foreground">Lost:</span>
-                                <span className="font-bold text-red-500 sm:ml-2">-{bet.amountEth.toFixed(4)} ETH</span>
+                                <span className="font-bold text-red-500 sm:ml-2">-${bet.amountUsdc.toFixed(2)} USDC</span>
                               </div>
                               {/* Settlement Info */}
                               {bet.settlementPrice != null && (

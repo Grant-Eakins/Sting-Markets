@@ -1,7 +1,8 @@
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
-import { parseEther } from 'viem';
-import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES } from '@/config/contract';
-import { useChainId } from 'wagmi';
+import { parseUnits } from 'viem';
+import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES, USDC_ADDRESSES, ERC20_ABI, USDC_DECIMALS } from '@/config/contract';
+import { useChainId, useAccount } from 'wagmi';
+import { useState, useCallback } from 'react';
 
 export enum Position {
   UP = 0,
@@ -9,7 +10,97 @@ export enum Position {
 }
 
 /**
- * Hook to buy shares in a multi-outcome market
+ * Hook to check USDC allowance
+ */
+export function useUsdcAllowance() {
+  const chainId = useChainId();
+  const { address } = useAccount();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
+  
+  const { data: allowance, refetch } = useReadContract({
+    address: usdcAddress as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: address && contractAddress ? [address, contractAddress as `0x${string}`] : undefined,
+    query: {
+      enabled: !!address && !!contractAddress,
+    },
+  });
+  
+  return {
+    allowance: allowance as bigint | undefined,
+    refetch,
+  };
+}
+
+/**
+ * Hook to approve USDC spending
+ */
+export function useUsdcApproval() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const approve = (amount: bigint) => {
+    if (!contractAddress || !usdcAddress) {
+      throw new Error('Contract addresses not available');
+    }
+    
+    console.log(`📝 Approving USDC: amount=${amount}, spender=${contractAddress}`);
+    
+    writeContract({
+      address: usdcAddress as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [contractAddress as `0x${string}`, amount],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    approve,
+    hash,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+  };
+}
+
+/**
+ * Hook to get USDC balance
+ */
+export function useUsdcBalance() {
+  const chainId = useChainId();
+  const { address } = useAccount();
+  const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
+  
+  const { data: balance, refetch } = useReadContract({
+    address: usdcAddress as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && !!usdcAddress,
+      refetchInterval: 10000,
+    },
+  });
+  
+  return {
+    balance: balance as bigint | undefined,
+    balanceFormatted: balance ? Number(balance) / 10 ** USDC_DECIMALS : 0,
+    refetch,
+  };
+}
+
+/**
+ * Hook to buy shares in a multi-outcome market using USDC
  */
 export function usePlaceBet() {
   const chainId = useChainId();
@@ -22,26 +113,25 @@ export function usePlaceBet() {
       throw new Error('Contract not deployed on this network');
     }
     
-    // For multi-outcome LMSR market:
+    // For multi-outcome LMSR market with USDC:
     // marketId: blockchain market ID
     // outcomeIndex: 0-21 for intraday (22 buckets) or 0-41 for overnight (42 buckets)
-    // quantity: number of shares to buy (scaled by bet amount)
-    // maxCost: maximum cost willing to pay (slippage protection)
+    // amount: USDC amount (6 decimals)
     
-    const valueInWei = parseEther(amount);
-    // ProportionalMarket uses bonding curve - quantity param is ignored
-    // Contract calculates shares based on ETH sent and current bucket liquidity
+    const amountInUsdc = parseUnits(amount, USDC_DECIMALS);
+    // ProportionalMarketUSDC uses bonding curve - quantity param is ignored
+    // Contract pulls USDC via transferFrom and calculates shares based on amount
     const quantity = BigInt(1); // Placeholder - contract ignores this
-    const maxCost = valueInWei; // Use sent value as max cost (slippage protection)
+    const maxCost = amountInUsdc; // Use amount as max cost (slippage protection)
     
-    console.log(`📝 Calling buyShares: marketId=${marketId}, outcomeIndex=${outcomeIndex}, value=${amount} ETH`);
+    console.log(`📝 Calling buyShares: marketId=${marketId}, outcomeIndex=${outcomeIndex}, amount=${amount} USDC`);
     
+    // Note: No 'value' field - USDC uses approve + transferFrom, not ETH
     writeContract({
       address: contractAddress as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'buyShares',
       args: [BigInt(marketId), outcomeIndex, quantity, maxCost],
-      value: valueInWei,
     } as any);
   };
   

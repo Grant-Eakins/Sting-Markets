@@ -9,7 +9,6 @@ import { useContractMarketData, useContractMarketBets } from '@/hooks/useContrac
 import { StockChart } from '@/components/StockChart';
 import { PriceSpinner } from '@/components/PriceSpinner';
 import { useMarketProbabilities } from '@/hooks/useContract';
-import { useEthPrice, formatEthToUsd } from '@/hooks/useEthPrice';
 import { formatCryptoPrice } from '@/lib/utils';
 
 interface MarketCardProps {
@@ -20,9 +19,6 @@ interface MarketCardProps {
 export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
   const [showBetDialog, setShowBetDialog] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<'UP' | 'DOWN'>('UP');
-
-  // Get ETH price for USD conversion
-  const { ethPrice } = useEthPrice();
 
   // Read real-time probabilities from blockchain
   const { probabilities, refetch: refetchProbabilities } = useMarketProbabilities(market.blockchainMarketId);
@@ -157,12 +153,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               <span>Total Pool:</span>
             </div>
             <span className="font-bold">
-              {totalPool.toFixed(4)} ETH
-              {ethPrice && totalPool > 0 && (
-                <span className="font-normal text-muted-foreground ml-1">
-                  ({formatEthToUsd(totalPool, ethPrice)})
-                </span>
-              )}
+              ${totalPool.toFixed(2)} USDC
             </span>
           </div>
 

@@ -7,9 +7,9 @@ import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-reac
 import { Market, placeBet } from '@/lib/marketApi';
 import { useAccount, useChainId } from 'wagmi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { usePlaceBet, Position, useMarketProbabilities } from '@/hooks/useContract';
-import { CONTRACT_ADDRESSES } from '@/config/contract';
-import { useEthPrice, formatEthToUsd } from '@/hooks/useEthPrice';
+import { usePlaceBet, Position, useMarketProbabilities, useUsdcAllowance, useUsdcApproval, useUsdcBalance } from '@/hooks/useContract';
+import { CONTRACT_ADDRESSES, USDC_DECIMALS } from '@/config/contract';
+import { parseUnits } from 'viem';
 
 interface BetDialogProps {
   market: Market;
@@ -23,12 +23,15 @@ interface BetDialogProps {
 export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetPlaced }: BetDialogProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const [amount, setAmount] = useState('0.01');
+  const [amount, setAmount] = useState('5'); // Default 5 USDC
   const [error, setError] = useState<string | null>(null);
   const [useDemoMode, setUseDemoMode] = useState(false);
+  const [needsApproval, setNeedsApproval] = useState(false);
 
-  // Get ETH price for USD conversion
-  const { ethPrice } = useEthPrice();
+  // USDC hooks
+  const { balance: usdcBalance, balanceFormatted: usdcBalanceFormatted } = useUsdcBalance();
+  const { allowance, refetch: refetchAllowance } = useUsdcAllowance();
+  const { approve: approveUsdc, isPending: isApproving, isConfirming: isApprovalConfirming, isConfirmed: isApprovalConfirmed, error: approvalError } = useUsdcApproval();
 
   // Get live probabilities to calculate bucket-specific odds
   const { probabilities } = useMarketProbabilities(market.blockchainMarketId);
@@ -71,12 +74,34 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
     }
   }, [isConfirmed, onBetPlaced, onClose]);
 
+  // Check if approval is needed
+  useEffect(() => {
+    const betAmountBigInt = parseUnits(amount || '0', USDC_DECIMALS);
+    if (allowance !== undefined && betAmountBigInt > allowance) {
+      setNeedsApproval(true);
+    } else {
+      setNeedsApproval(false);
+    }
+  }, [amount, allowance]);
+
+  // Refetch allowance after approval confirmed
+  useEffect(() => {
+    if (isApprovalConfirmed) {
+      setTimeout(() => {
+        refetchAllowance();
+      }, 1000);
+    }
+  }, [isApprovalConfirmed, refetchAllowance]);
+
   // Handle contract errors
   useEffect(() => {
     if (contractError) {
       setError(contractError.message || 'Transaction failed');
     }
-  }, [contractError]);
+    if (approvalError) {
+      setError(approvalError.message || 'Approval failed');
+    }
+  }, [contractError, approvalError]);
 
   const handlePlaceBet = async () => {
     if (!isConnected || !address) {
@@ -90,14 +115,23 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
       return;
     }
 
-    if (betAmount < 0.001) {
-      setError('Minimum bet is 0.001 ETH (~$3 USD)');
+    if (betAmount < 1) {
+      setError('Minimum bet is 1 USDC');
       return;
     }
 
-    if (betAmount > 10) {
-      setError('Maximum bet is 10 ETH');
+    if (betAmount > 10000) {
+      setError('Maximum bet is 10,000 USDC');
       return;
+    }
+
+    // Check USDC balance
+    if (usdcBalance !== undefined) {
+      const betAmountBigInt = parseUnits(amount, USDC_DECIMALS);
+      if (betAmountBigInt > usdcBalance) {
+        setError(`Insufficient USDC balance. You have ${usdcBalanceFormatted.toFixed(2)} USDC`);
+        return;
+      }
     }
 
     setError(null);
@@ -123,6 +157,15 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
           const isAfterHours = market.isAfterHours;
           const middleBucket = isAfterHours ? 20 : 10;
           outcomeIndex = position === 'UP' ? middleBucket - 1 : middleBucket + 1;
+        }
+        
+        // Check if approval is needed first
+        const betAmountBigInt = parseUnits(amount, USDC_DECIMALS);
+        if (needsApproval) {
+          console.log(`🔓 Approving USDC: ${amount} USDC`);
+          // Approve a large amount to avoid multiple approvals
+          approveUsdc(betAmountBigInt * 100n); // Approve 100x for convenience
+          return;
         }
         
         console.log(`🎯 Placing bet on bucket ${outcomeIndex} for market ${marketId}`);
@@ -165,25 +208,30 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* USDC Balance */}
+          {isConnected && (
+            <div className="text-sm text-muted-foreground">
+              USDC Balance: <span className="font-medium text-foreground">${usdcBalanceFormatted.toFixed(2)}</span>
+            </div>
+          )}
+
           {/* Amount Input */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <Label htmlFor="amount">Bet Amount (ETH)</Label>
-              {ethPrice && amount && (
-                <span className="text-xs text-muted-foreground">
-                  ≈ {formatEthToUsd(parseFloat(amount) || 0, ethPrice)}
-                </span>
-              )}
+              <Label htmlFor="amount">Bet Amount (USDC)</Label>
+              <span className="text-xs text-muted-foreground">
+                ${parseFloat(amount || '0').toFixed(2)}
+              </span>
             </div>
             <Input
               id="amount"
               type="number"
-              step="0.001"
-              min="0.001"
-              max="10"
+              step="1"
+              min="1"
+              max="10000"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.01"
+              placeholder="5"
             />
           </div>
 
@@ -206,19 +254,13 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Potential Win:</span>
               <span className="font-bold text-green-500">
-                {potentialWin.toFixed(4)} ETH
-                {ethPrice && <span className="font-normal text-muted-foreground ml-1">({formatEthToUsd(potentialWin, ethPrice)})</span>}
+                ${potentialWin.toFixed(2)} USDC
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Profit:</span>
               <span className="font-bold">
-                {(potentialWin - parseFloat(amount || '0')).toFixed(4)} ETH
-                {ethPrice && (
-                  <span className="font-normal text-muted-foreground ml-1">
-                    ({formatEthToUsd(potentialWin - parseFloat(amount || '0'), ethPrice)})
-                  </span>
-                )}
+                ${(potentialWin - parseFloat(amount || '0')).toFixed(2)} USDC
               </span>
             </div>
           </div>
@@ -273,13 +315,16 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
           </Button>
           <Button
             onClick={handlePlaceBet}
-            disabled={!isConnected || isPending || isConfirming || isConfirmed}
+            disabled={!isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming}
             className={position === 'UP' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
           >
-            {isPending ? 'Confirm in Wallet...' : 
+            {isApproving ? 'Approving USDC...' :
+             isApprovalConfirming ? 'Confirming Approval...' :
+             needsApproval ? `Approve USDC` :
+             isPending ? 'Confirm in Wallet...' : 
              isConfirming ? 'Processing Transaction...' : 
              isConfirmed ? 'Bet Placed!' : 
-             `Bet ${amount} ETH ${position}`}
+             `Bet $${amount} ${position}`}
           </Button>
         </DialogFooter>
       </DialogContent>

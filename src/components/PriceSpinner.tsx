@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TrendingUp, TrendingDown, DollarSign, Loader2, CheckCircle2 } from 'lucide-react';
 import { cn, formatCryptoPrice } from '@/lib/utils';
-import { usePlaceBet } from '@/hooks/useContract';
+import { usePlaceBet, useUsdcAllowance, useUsdcApproval, useUsdcBalance } from '@/hooks/useContract';
 import { useAccount, useChainId } from 'wagmi';
-import { CONTRACT_ADDRESSES } from '@/config/contract';
-import { useEthPrice, formatEthToUsd } from '@/hooks/useEthPrice';
+import { CONTRACT_ADDRESSES, USDC_DECIMALS } from '@/config/contract';
+import { parseUnits } from 'viem';
 
 interface PriceLevel {
   price: number;
@@ -40,15 +40,18 @@ export function PriceSpinner({
   onBetPlaced,
   onBet 
 }: PriceSpinnerProps) {
-  const [betAmount, setBetAmount] = useState('0.01');
+  const [betAmount, setBetAmount] = useState('5'); // Default 5 USDC
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [searchPrice, setSearchPrice] = useState('');
+  const [needsApproval, setNeedsApproval] = useState(false);
   const hasScrolled = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Get ETH price for USD conversion
-  const { ethPrice } = useEthPrice();
+  // USDC hooks
+  const { balance: usdcBalance, balanceFormatted: usdcBalanceFormatted } = useUsdcBalance();
+  const { allowance, refetch: refetchAllowance } = useUsdcAllowance();
+  const { approve: approveUsdc, isPending: isApproving, isConfirming: isApprovalConfirming, isConfirmed: isApprovalConfirmed, error: approvalError } = useUsdcApproval();
 
   // Reset scroll flag when market changes so it re-centers
   useEffect(() => {
@@ -209,7 +212,7 @@ export function PriceSpinner({
   }
   
   // Calculate liquidity for each level based on probability and total pool
-  // Filter out dust amounts (< 0.0001 ETH) from display
+  // Filter out dust amounts (< 0.01 USDC) from display
   const dustThreshold = 0.0001;
   priceLevels.forEach(level => {
     const rawLiquidity = (totalPool * level.probability) / 100;
@@ -223,7 +226,7 @@ export function PriceSpinner({
       return;
     }
     if (amount < 0.001) {
-      alert('Minimum bet is 0.001 ETH');
+      alert('Minimum bet is 1 USDC');
       return;
     }
     if (selectedLevel === null) {
@@ -317,7 +320,7 @@ export function PriceSpinner({
   
   // Check if there are any real bets (non-uniform distribution)
   // If all probabilities are roughly equal (within 0.5%), no bets have been placed
-  // Also consider very small liquidity (< 0.001 ETH total) as "no bets"
+  // Also consider very small liquidity (< 1 USDC total) as "no bets"
   const uniformProb = 100 / priceLevels.length;
   const minLiquidityThreshold = 0.001; // Minimum total liquidity to consider "real bets"
   const probDeviationThreshold = 0.5; // % deviation from uniform to consider a real bet
@@ -473,7 +476,7 @@ export function PriceSpinner({
 
                 <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
                   <span>
-                    {hasLiquidity ? level.liquidity.toFixed(3) : '0.000'} ETH
+                    ${hasLiquidity ? level.liquidity.toFixed(2) : '0.00'} USDC
                   </span>
                   <span>
                     {hasLiquidity ? `${probabilityPercent.toFixed(1)}%` : '—'} probability
@@ -518,22 +521,20 @@ export function PriceSpinner({
               const currentMultiplier = betAmt > 0 ? currentPayout / betAmt : 1;
               
               // Check if this is effectively a new market
-              const isNewMarket = totalPool < 0.001;
+              const isNewMarket = totalPool < 1; // Less than $1 USDC
               
               return (
                 <>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Pool in this bucket:</span>
                     <span className="font-medium">
-                      {bucketLiquidity.toFixed(4)} ETH
-                      {ethPrice && <span className="text-muted-foreground ml-1">({formatEthToUsd(bucketLiquidity, ethPrice)})</span>}
+                      ${bucketLiquidity.toFixed(2)} USDC
                     </span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Total market pool:</span>
                     <span className="font-medium">
-                      {totalPool.toFixed(4)} ETH
-                      {ethPrice && <span className="text-muted-foreground ml-1">({formatEthToUsd(totalPool, ethPrice)})</span>}
+                      ${totalPool.toFixed(2)} USDC
                     </span>
                   </div>
                   <div className="border-t border-muted my-2" />
@@ -545,8 +546,7 @@ export function PriceSpinner({
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Est. payout if win:</span>
                       <span className="font-medium text-green-500">
-                        {currentPayout.toFixed(4)} ETH ({currentMultiplier.toFixed(2)}x)
-                        {ethPrice && <span className="text-muted-foreground ml-1">≈ {formatEthToUsd(currentPayout, ethPrice)}</span>}
+                        ${currentPayout.toFixed(2)} USDC ({currentMultiplier.toFixed(2)}x)
                       </span>
                     </div>
                   )}
@@ -558,22 +558,20 @@ export function PriceSpinner({
 
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="text-xs text-muted-foreground">Bet Amount (ETH)</label>
-            {ethPrice && betAmount && (
-              <span className="text-xs text-muted-foreground">
-                ≈ {formatEthToUsd(parseFloat(betAmount) || 0, ethPrice)}
-              </span>
-            )}
+            <label className="text-xs text-muted-foreground">Bet Amount (USDC)</label>
+            <span className="text-xs text-muted-foreground">
+              ${parseFloat(betAmount) || 0}
+            </span>
           </div>
           <Input
             type="number"
-            step="0.001"
-            min="0.001"
+            step="1"
+            min="1"
             value={betAmount}
             onChange={(e) => setBetAmount(e.target.value)}
-            placeholder="0.01"
+            placeholder="5"
             className="text-sm"
-            disabled={isPending || isConfirming}
+            disabled={isPending || isConfirming || isApproving || isApprovalConfirming}
           />
         </div>
 
@@ -633,15 +631,15 @@ export function PriceSpinner({
           ) : (
             <>
               <DollarSign className="w-4 h-4 mr-1" />
-              Bet {parseFloat(betAmount || '0').toFixed(3)} ETH on {priceLevels[selectedLevel].percentChange > 0 ? '+' : ''}{priceLevels[selectedLevel].percentChange.toFixed(1)}%
+              Bet ${parseFloat(betAmount || '0').toFixed(0)} USDC on {priceLevels[selectedLevel].percentChange > 0 ? '+' : ''}{priceLevels[selectedLevel].percentChange.toFixed(1)}%
             </>
           )}
         </Button>
 
         <div className="text-xs text-muted-foreground text-center">
-          Total Pool: {totalPool.toFixed(4)} ETH
+          Total Pool: ${totalPool.toFixed(2)} USDC
           <br />
-          {totalBuckets} buckets | Min bet: 0.001 ETH
+          {totalBuckets} buckets | Min bet: 1 USDC
         </div>
       </div>
     </Card>

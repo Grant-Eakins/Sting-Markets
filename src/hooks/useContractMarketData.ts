@@ -62,8 +62,8 @@ export function useContractMarketData(blockchainMarketId: number | undefined) {
   const totalLiquidityWei = typeof market[10] === 'bigint' ? market[10] : BigInt(market[10] || 0);
   const numOutcomes = typeof market[3] === 'number' ? market[3] : Number(market[3] || 22);
 
-  // Convert from wei to ETH
-  const totalLiquidity = Number(totalLiquidityWei) / 1e18;
+  // Convert from USDC units (6 decimals) to decimal
+  const totalLiquidity = Number(totalLiquidityWei) / 1e6;
 
   // For backwards compatibility with binary pool display,
   // calculate approximate up/down pools from probabilities

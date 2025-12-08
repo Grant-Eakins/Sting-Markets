@@ -1,8 +1,9 @@
-// ProportionalMarket ABI (Multi-Outcome with Bonding Curve)
+// ProportionalMarketUSDC ABI (Multi-Outcome with Bonding Curve, USDC payments)
 export const PREDICTION_MARKET_ABI = [
   {
     "inputs": [
-      { "internalType": "address", "name": "_oracle", "type": "address" }
+      { "internalType": "address", "name": "_oracle", "type": "address" },
+      { "internalType": "address", "name": "_usdc", "type": "address" }
     ],
     "stateMutability": "nonpayable",
     "type": "constructor"
@@ -16,7 +17,7 @@ export const PREDICTION_MARKET_ABI = [
     ],
     "name": "buyShares",
     "outputs": [],
-    "stateMutability": "payable",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -419,5 +420,54 @@ export const CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0x1C184a4e374C5a0A85630f7CE27C689273B2FbD3', // ProportionalMarket with bonding curve + sell + refund + getSellQuote
+  84532: '0xcddCc37B9A6a5736953C81E7AB0fca40f293B1ff', // ProportionalMarketUSDC with bonding curve + sell + refund + getSellQuote
 } as const;
+
+// USDC contract addresses
+export const USDC_ADDRESSES = {
+  // Base Mainnet
+  8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  // Base Sepolia Testnet (mock USDC)
+  84532: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Circle's USDC on Base Sepolia
+} as const;
+
+// USDC has 6 decimals (not 18 like ETH)
+export const USDC_DECIMALS = 6;
+
+// ERC20 ABI for USDC approval
+export const ERC20_ABI = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "spender", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "approve",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "owner", "type": "address" },
+      { "internalType": "address", "name": "spender", "type": "address" }
+    ],
+    "name": "allowance",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
+    "name": "balanceOf",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "decimals",
+    "outputs": [{ "internalType": "uint8", "name": "", "type": "uint8" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
