@@ -2,12 +2,14 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { TrendingUp, TrendingDown, DollarSign, Loader2, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Loader2, CheckCircle2, Share2 } from 'lucide-react';
 import { cn, formatCryptoPrice } from '@/lib/utils';
 import { usePlaceBet, useTokenAllowance, useTokenApproval, useTokenBalance } from '@/hooks/useContract';
 import { useAccount, useChainId } from 'wagmi';
 import { CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { parseUnits } from 'viem';
+import sdk from '@farcaster/frame-sdk';
+import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 
 interface PriceLevel {
   price: number;
@@ -25,6 +27,7 @@ interface PriceSpinnerProps {
   isAfterHours: boolean;
   probabilities?: number[]; // Probabilities from blockchain (0-100% per bucket)
   blockchainMarketId?: number;
+  symbol?: string; // Market symbol for sharing (e.g. "BTC", "ETH")
   onBetPlaced?: () => void;
   onBet: (bucketIndex: number, percentChange: number, targetPrice: number, amount: number) => void;
 }
@@ -37,6 +40,7 @@ export function PriceSpinner({
   isAfterHours,
   probabilities,
   blockchainMarketId,
+  symbol,
   onBetPlaced,
   onBet 
 }: PriceSpinnerProps) {
@@ -44,14 +48,40 @@ export function PriceSpinner({
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [searchPrice, setSearchPrice] = useState('');
   const [needsApproval, setNeedsApproval] = useState(false);
+  const [lastBetDetails, setLastBetDetails] = useState<{ percentChange: number; targetPrice: number } | null>(null);
   const hasScrolled = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Farcaster client detection
+  const { isInFarcasterClient } = useFarcasterAuth();
   
   // Token hooks
   const { balance: tokenBalance, balanceFormatted: tokenBalanceFormatted } = useTokenBalance();
   const { allowance, refetch: refetchAllowance } = useTokenAllowance();
   const { approve: approveToken, isPending: isApproving, isConfirming: isApprovalConfirming, isConfirmed: isApprovalConfirmed, error: approvalError } = useTokenApproval();
+
+  // Share bet on Farcaster
+  const shareBetOnFarcaster = async () => {
+    if (!lastBetDetails || !symbol) return;
+    
+    const { percentChange, targetPrice } = lastBetDetails;
+    const direction = percentChange >= 0 ? 'up' : 'down';
+    const sign = percentChange >= 0 ? '+' : '';
+    const priceFormatted = formatCryptoPrice(targetPrice);
+    
+    const castText = `🎯 Just made a prediction on @stingmarkets!\n\n$${symbol} will go ${direction} ${sign}${percentChange.toFixed(1)}% to $${priceFormatted}\n\nThink you can do better? Make your prediction 👇`;
+    
+    try {
+      // Use Farcaster SDK to open cast composer
+      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}&embeds[]=https://www.stingmarkets.com`);
+    } catch (error) {
+      console.error('Failed to open Farcaster composer:', error);
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(castText);
+      alert('Cast text copied to clipboard!');
+    }
+  };
 
   // Reset scroll flag when market changes so it re-centers
   useEffect(() => {
@@ -254,6 +284,12 @@ export function PriceSpinner({
     }
     
     const level = priceLevels[selectedLevel];
+    
+    // Save bet details for sharing after confirmation
+    setLastBetDetails({
+      percentChange: level.percentChange,
+      targetPrice: level.price,
+    });
     
     console.log('🎯 handleBet called:', {
       isContractDeployed,
@@ -605,9 +641,22 @@ export function PriceSpinner({
 
         {/* Transaction status */}
         {isConfirmed && (
-          <div className="flex items-center gap-2 text-green-600 text-sm justify-center py-2">
-            <CheckCircle2 className="w-4 h-4" />
-            Bet placed successfully!
+          <div className="flex flex-col items-center gap-2 py-2">
+            <div className="flex items-center gap-2 text-green-600 text-sm">
+              <CheckCircle2 className="w-4 h-4" />
+              Bet placed successfully!
+            </div>
+            {isInFarcasterClient && symbol && lastBetDetails && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={shareBetOnFarcaster}
+                className="flex items-center gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                Share on Farcaster
+              </Button>
+            )}
           </div>
         )}
         

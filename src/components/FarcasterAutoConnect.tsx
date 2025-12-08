@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useConnect, useAccount } from 'wagmi';
+import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
+import sdk from '@farcaster/frame-sdk';
 
 /**
  * Auto-connects to the Farcaster wallet when in a Farcaster client.
@@ -8,21 +10,35 @@ import { useConnect, useAccount } from 'wagmi';
 export function FarcasterAutoConnect() {
   const { connect, connectors } = useConnect();
   const { isConnected } = useAccount();
+  const { isInFarcasterClient } = useFarcasterAuth();
 
   useEffect(() => {
-    // If already connected, don't try to connect again
-    if (isConnected) return;
+    // Only auto-connect if in Farcaster client and not already connected
+    if (!isInFarcasterClient || isConnected) return;
 
-    // Find the farcasterFrame connector
-    const farcasterConnector = connectors.find(
-      (connector) => connector.id === 'farcasterFrame'
-    );
+    const autoConnect = async () => {
+      try {
+        // Get the Farcaster wallet provider
+        const provider = await sdk.wallet.ethProvider;
+        
+        if (provider) {
+          // Find an injected connector to use with the Farcaster provider
+          const injectedConnector = connectors.find(
+            (connector) => connector.id === 'injected' || connector.id === 'metaMask'
+          );
 
-    if (farcasterConnector) {
-      // Auto-connect to Farcaster wallet
-      connect({ connector: farcasterConnector });
-    }
-  }, [connect, connectors, isConnected]);
+          if (injectedConnector) {
+            connect({ connector: injectedConnector });
+          }
+        }
+      } catch (error) {
+        console.log('Farcaster auto-connect failed:', error);
+      }
+    };
+
+    // Small delay to let the SDK initialize
+    setTimeout(autoConnect, 500);
+  }, [connect, connectors, isConnected, isInFarcasterClient]);
 
   return null;
 }
