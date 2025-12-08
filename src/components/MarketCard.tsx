@@ -242,10 +242,10 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Current Price:</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg">${(market.currentPrice / 100).toFixed(2)}</span>
+                  <span className="font-bold text-lg">${(market.currentPrice / 100).toFixed(3)}</span>
                   {market.priceChange != null && market.priceChangePercent != null && (
                     <span className={market.priceChange >= 0 ? 'text-green-500 text-sm' : 'text-red-500 text-sm'}>
-                      ({market.priceChange >= 0 ? '+' : ''}${(market.priceChange / 100).toFixed(2)} / {market.priceChangePercent.toFixed(2)}%)
+                      ({market.priceChange >= 0 ? '+' : ''}${(market.priceChange / 100).toFixed(3)} / {market.priceChangePercent.toFixed(2)}%)
                     </span>
                   )}
                 </div>
@@ -259,10 +259,10 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               <div className="flex justify-between">
                 <span>Settlement Result:</span>
                 <div className="text-right">
-                  <div className="font-bold">${(market.closingPrice / 100).toFixed(2)}</div>
+                  <div className="font-bold">${(market.closingPrice / 100).toFixed(3)}</div>
                   {market.priceChange != null && market.priceChangePercent != null && (
                     <div className={market.priceChange >= 0 ? 'text-green-500 text-xs' : 'text-red-500 text-xs'}>
-                      {market.priceChange >= 0 ? '+' : ''}${(market.priceChange / 100).toFixed(2)} ({market.priceChangePercent.toFixed(2)}%)
+                      {market.priceChange >= 0 ? '+' : ''}${(market.priceChange / 100).toFixed(3)} ({market.priceChangePercent.toFixed(2)}%)
                     </div>
                   )}
                 </div>

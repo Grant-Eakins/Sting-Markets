@@ -28,14 +28,14 @@ interface MarketData {
 function formatPrice(priceInCents: number, symbol: string): string {
   const price = priceInCents / 100;
   
-  // High-value cryptos (BTC, ETH) - show with commas, 2 decimals
+  // High-value cryptos (BTC, ETH) - show with commas, 3 decimals
   if (price >= 100) {
-    return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return price.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
   }
   
-  // Mid-range ($1-$100) - 2 decimals
+  // Mid-range ($1-$100) - 3 decimals
   if (price >= 1) {
-    return price.toFixed(2);
+    return price.toFixed(3);
   }
   
   // Sub-dollar ($0.01-$0.99) - 4 decimals
