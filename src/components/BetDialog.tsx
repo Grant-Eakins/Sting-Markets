@@ -27,6 +27,7 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
   const [error, setError] = useState<string | null>(null);
   const [useDemoMode, setUseDemoMode] = useState(false);
   const [needsApproval, setNeedsApproval] = useState(false);
+  const [approvalJustConfirmed, setApprovalJustConfirmed] = useState(false);
 
   // USDC hooks
   const { balance: usdcBalance, balanceFormatted: usdcBalanceFormatted } = useUsdcBalance();
@@ -87,11 +88,26 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
   // Refetch allowance after approval confirmed
   useEffect(() => {
     if (isApprovalConfirmed) {
+      console.log('✅ Approval confirmed, refetching allowance...');
+      setApprovalJustConfirmed(true);
+      // Give it time for the blockchain state to update
       setTimeout(() => {
         refetchAllowance();
-      }, 1000);
+      }, 2000);
     }
   }, [isApprovalConfirmed, refetchAllowance]);
+
+  // After approval, automatically update needsApproval state
+  useEffect(() => {
+    if (approvalJustConfirmed && allowance !== undefined) {
+      const betAmountBigInt = parseUnits(amount || '0', USDC_DECIMALS);
+      if (betAmountBigInt <= allowance) {
+        console.log('✅ Allowance sufficient, ready to place bet');
+        setNeedsApproval(false);
+        setApprovalJustConfirmed(false);
+      }
+    }
+  }, [approvalJustConfirmed, allowance, amount]);
 
   // Handle contract errors
   useEffect(() => {
@@ -292,6 +308,13 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
                 Deploy contract to Base Sepolia for real transactions.
               </AlertDescription>
             </Alert>
+          ) : isApprovalConfirmed && needsApproval ? (
+            <Alert className="bg-blue-50 border-blue-200">
+              <CheckCircle2 className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Approval confirmed!</strong> Updating... Please wait then click "Bet" again.
+              </AlertDescription>
+            </Alert>
           ) : isConfirmed ? (
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -306,6 +329,13 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
                 <strong>Wrong Network:</strong> Please switch to Base Sepolia testnet.
               </AlertDescription>
             </Alert>
+          ) : needsApproval ? (
+            <Alert className="bg-amber-50 border-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 text-xs">
+                <strong>Step 1:</strong> You need to approve USDC spending first. Click "Approve USDC" below.
+              </AlertDescription>
+            </Alert>
           ) : null}
         </div>
 
@@ -315,11 +345,12 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
           </Button>
           <Button
             onClick={handlePlaceBet}
-            disabled={!isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming}
+            disabled={!isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming || approvalJustConfirmed}
             className={position === 'UP' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
           >
             {isApproving ? 'Approving USDC...' :
              isApprovalConfirming ? 'Confirming Approval...' :
+             approvalJustConfirmed ? 'Updating Allowance...' :
              needsApproval ? `Approve USDC` :
              isPending ? 'Confirm in Wallet...' : 
              isConfirming ? 'Processing Transaction...' : 
