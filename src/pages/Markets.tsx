@@ -5,6 +5,7 @@ import { Market, fetchMarkets } from '@/lib/marketApi';
 import { TOKEN_SYMBOL } from '@/config/contract';
 import { MarketCard } from '@/components/MarketCard';
 import { WalletConnect } from '@/components/WalletConnect';
+import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,6 +87,7 @@ export default function Markets() {
           </div>
           
           <div className="flex items-center gap-2">
+            <FarcasterConnect />
             <WalletConnect />
             {/* Mobile menu button */}
             <Button 

@@ -8,6 +8,7 @@ import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { config } from "@/config/wagmi";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { FarcasterAuthProvider } from "@/hooks/useFarcasterAuth";
 import Index from "./pages/Index";
 import Markets from "./pages/Markets";
 import MyBets from "./pages/MyBets";
@@ -28,12 +29,13 @@ const App = () => (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <ScrollToTop />
-              <Routes>
+          <FarcasterAuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <ScrollToTop />
+                <Routes>
                 <Route path="/" element={<Markets />} />
                 <Route path="/my-bets" element={<MyBets />} />
                 <Route path="/bet-history" element={<BetHistory />} />
@@ -47,7 +49,10 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </TooltipProvider>
+              </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </FarcasterAuthProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
