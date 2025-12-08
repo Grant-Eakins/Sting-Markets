@@ -22,12 +22,12 @@ interface AggregatorV3Interface {
 }
 
 /**
- * @title ProportionalMarketUSDC
+ * @title ProportionalMarketMIND
  * @notice Simple proportional prediction market with bonding curve for multi-outcome price predictions
- * @dev Uses USDC instead of ETH. Probability = Bucket Liquidity / Total Liquidity
+ * @dev Uses MIND token (18 decimals). Probability = Bucket Liquidity / Total Liquidity
  *
- * USDC on Base Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
- * USDC has 6 decimals (not 18 like ETH)
+ * MIND Token on Base Sepolia: 0xCe31Ae82c11dd708eF51c93dEEb5Be0474A132D1
+ * MIND has 18 decimals (standard ERC20)
  *
  * SECURITY FEATURES:
  * - ReentrancyGuard on all state-changing functions
@@ -35,14 +35,14 @@ interface AggregatorV3Interface {
  * - SafeERC20 for token transfers
  * - Proportional payout distribution
  * - Protocol fee collection (2%)
- * - Minimum bet size (1 USDC) to prevent dust trades
+ * - Minimum bet size (1 MIND) to prevent dust trades
  * - Bonding curve with safety limits
  */
-contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
+contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
     
-    // USDC on Base Mainnet
-    IERC20 public immutable usdc;
+    // MIND token (or any ERC20)
+    IERC20 public immutable token;
     
     enum SessionType { INTRADAY, OVERNIGHT }
     enum MarketStatus { ACTIVE, LOCKED, SETTLED, CANCELLED }
@@ -59,19 +59,19 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         uint256 settleTime;
         bool settled;
         uint8 winningOutcome;
-        mapping(uint8 => uint256) bucketLiquidity; // USDC in each bucket
-        uint256 totalLiquidity; // Total USDC in market
+        mapping(uint8 => uint256) bucketLiquidity; // Tokens in each bucket
+        uint256 totalLiquidity; // Total tokens in market
         mapping(uint8 => uint256) totalSharesPerBucket; // Total shares issued per bucket
     }
     
     struct UserPosition {
         mapping(uint8 => uint256) shares; // User's shares in each bucket
-        uint256 totalInvested; // Total USDC user has put in
+        uint256 totalInvested; // Total tokens user has put in
     }
     
     uint256 public nextMarketId;
     uint256 public constant PROTOCOL_FEE_BPS = 200; // 2%
-    uint256 public constant MIN_BET_SIZE = 1_000_000; // 1 USDC (6 decimals)
+    uint256 public constant MIN_BET_SIZE = 1 * 10**18; // 1 MIND (18 decimals)
     uint256 public constant PRICE_DEVIATION_TOLERANCE_BPS = 10; // 0.1% tolerance for Chainlink validation
     uint256 public protocolFeesCollected;
     address public oracle; // Authorized oracle for settlement
@@ -135,11 +135,11 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         uint256 refundAmount
     );
     
-    constructor(address _oracle, address _usdc) Ownable(msg.sender) {
+    constructor(address _oracle, address _token) Ownable(msg.sender) {
         require(_oracle != address(0), "Invalid oracle");
-        require(_usdc != address(0), "Invalid USDC address");
+        require(_token != address(0), "Invalid token address");
         oracle = _oracle;
-        usdc = IERC20(_usdc);
+        token = IERC20(_token);
         nextMarketId = 1;
         marketCounter = 0;
     }
@@ -177,11 +177,11 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
     
     /**
      * @notice Buy shares in a bucket with bonding curve
-     * @dev User must approve USDC spending before calling this
+     * @dev User must approve token spending before calling this
      * @param marketId The market ID
      * @param outcomeIndex The bucket index to buy
-     * @param amount Amount of USDC to spend (6 decimals)
-     * @param maxCost Maximum USDC willing to spend (slippage protection, same as amount for USDC)
+     * @param amount Amount of tokens to spend (18 decimals)
+     * @param maxCost Maximum tokens willing to spend (slippage protection)
      */
     function buyShares(
         uint256 marketId,
@@ -189,7 +189,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         uint256 amount,
         uint256 maxCost
     ) external nonReentrant whenNotPaused {
-        require(amount >= MIN_BET_SIZE, "Bet below minimum (1 USDC)");
+        require(amount >= MIN_BET_SIZE, "Bet below minimum (1 MIND)");
         require(amount <= maxCost, "Cost exceeds maxCost");
         
         Market storage market = markets[marketId];
@@ -197,8 +197,8 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         require(block.timestamp < market.lockTime, "Market locked");
         require(outcomeIndex < market.numOutcomes, "Invalid outcome");
         
-        // Transfer USDC from user to contract
-        usdc.safeTransferFrom(msg.sender, address(this), amount);
+        // Transfer tokens from user to contract
+        token.safeTransferFrom(msg.sender, address(this), amount);
         
         // Deduct protocol fee (2%)
         uint256 protocolFee = (amount * PROTOCOL_FEE_BPS) / 10000;
@@ -207,7 +207,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         emit ProtocolFeeCollected(marketId, protocolFee);
         
         // Calculate shares with STEEP bonding curve
-        // Early bettors get MORE shares per USDC, late bettors get FEWER
+        // Early bettors get MORE shares per token, late bettors get FEWER
         // This means when you sell: valuePerShare = bucketLiquidity / totalShares
         // Early bettors profit because they own more of the share pool
         //
@@ -240,7 +240,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
      * @param marketId The market ID
      * @param outcomeIndex The bucket index to sell from
      * @param sharesToSell Number of shares to sell
-     * @param minPayout Minimum USDC payout expected (slippage protection)
+     * @param minPayout Minimum token payout expected (slippage protection)
      */
     function sellShares(
         uint256 marketId,
@@ -281,8 +281,8 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         // Add sell fee to protocol fees
         protocolFeesCollected += sellFee;
         
-        // Transfer USDC payout
-        usdc.safeTransfer(msg.sender, netPayout);
+        // Transfer token payout
+        token.safeTransfer(msg.sender, netPayout);
         
         emit SharesSold(marketId, msg.sender, outcomeIndex, sharesToSell, netPayout);
     }
@@ -347,8 +347,8 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         // Mark as claimed BEFORE transfer (CEI pattern)
         position.shares[market.winningOutcome] = 0;
         
-        // Transfer USDC payout
-        usdc.safeTransfer(msg.sender, payout);
+        // Transfer token payout
+        token.safeTransfer(msg.sender, payout);
         
         emit PayoutClaimed(marketId, msg.sender, payout);
     }
@@ -381,8 +381,8 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         
         market.totalLiquidity -= refundAmount;
         
-        // Transfer USDC refund
-        usdc.safeTransfer(msg.sender, refundAmount);
+        // Transfer token refund
+        token.safeTransfer(msg.sender, refundAmount);
         
         emit RefundClaimed(marketId, msg.sender, refundAmount);
     }
@@ -418,7 +418,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
-     * @notice Get sell quote - returns the USDC amount user would receive for selling shares
+     * @notice Get sell quote - returns the token amount user would receive for selling shares
      * @param marketId The market ID
      * @param outcomeIndex The bucket index
      * @param sharesToSell Number of shares to sell
@@ -457,7 +457,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
      * @notice Get bucket data for a specific outcome
      * @param marketId The market ID
      * @param outcomeIndex The bucket index
-     * @return bucketLiquidity The USDC in this bucket
+     * @return bucketLiquidity The tokens in this bucket
      * @return totalShares Total shares issued for this bucket
      */
     function getBucketData(uint256 marketId, uint8 outcomeIndex) external view returns (
@@ -613,14 +613,14 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
-     * @notice Withdraw protocol fees (in USDC)
+     * @notice Withdraw protocol fees
      */
     function withdrawFees() external onlyOwner {
         uint256 amount = protocolFeesCollected;
         require(amount > 0, "No fees to withdraw");
         
         protocolFeesCollected = 0;
-        usdc.safeTransfer(owner(), amount);
+        token.safeTransfer(owner(), amount);
         emit ProtocolFeeWithdrawn(owner(), amount);
     }
     
@@ -650,7 +650,7 @@ contract ProportionalMarketUSDC is Ownable, ReentrancyGuard, Pausable {
         
         position.shares[market.winningOutcome] = 0;
         
-        usdc.safeTransfer(msg.sender, payout);
+        token.safeTransfer(msg.sender, payout);
         
         emit PayoutClaimed(marketId, msg.sender, payout);
     }

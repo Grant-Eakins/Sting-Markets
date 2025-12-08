@@ -118,10 +118,10 @@ export function useAggregateMarketStats(markets: Market[]) {
           ? marketData[10] 
           : BigInt(marketData[10] || marketData.totalLiquidity || 0);
         
-        const poolUsdc = Number(totalLiquidityWei) / 1e6; // USDC has 6 decimals
+        const poolTokens = Number(totalLiquidityWei) / 1e18; // MIND has 18 decimals
         
-        if (!isNaN(poolUsdc) && isFinite(poolUsdc)) {
-          totalPool += poolUsdc;
+        if (!isNaN(poolTokens) && isFinite(poolTokens)) {
+          totalPool += poolTokens;
         }
       }
     }

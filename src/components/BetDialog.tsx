@@ -7,8 +7,8 @@ import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-reac
 import { Market, placeBet } from '@/lib/marketApi';
 import { useAccount, useChainId } from 'wagmi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { usePlaceBet, Position, useMarketProbabilities, useUsdcAllowance, useUsdcApproval, useUsdcBalance } from '@/hooks/useContract';
-import { CONTRACT_ADDRESSES, USDC_DECIMALS } from '@/config/contract';
+import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance } from '@/hooks/useContract';
+import { CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { parseUnits } from 'viem';
 
 interface BetDialogProps {
@@ -23,16 +23,16 @@ interface BetDialogProps {
 export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetPlaced }: BetDialogProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const [amount, setAmount] = useState('5'); // Default 5 USDC
+  const [amount, setAmount] = useState('5'); // Default 5 tokens
   const [error, setError] = useState<string | null>(null);
   const [useDemoMode, setUseDemoMode] = useState(false);
   const [needsApproval, setNeedsApproval] = useState(false);
   const [approvalJustConfirmed, setApprovalJustConfirmed] = useState(false);
 
-  // USDC hooks
-  const { balance: usdcBalance, balanceFormatted: usdcBalanceFormatted } = useUsdcBalance();
-  const { allowance, refetch: refetchAllowance } = useUsdcAllowance();
-  const { approve: approveUsdc, isPending: isApproving, isConfirming: isApprovalConfirming, isConfirmed: isApprovalConfirmed, error: approvalError } = useUsdcApproval();
+  // Token hooks
+  const { balance: tokenBalance, balanceFormatted: tokenBalanceFormatted } = useTokenBalance();
+  const { allowance, refetch: refetchAllowance } = useTokenAllowance();
+  const { approve: approveToken, isPending: isApproving, isConfirming: isApprovalConfirming, isConfirmed: isApprovalConfirmed, error: approvalError } = useTokenApproval();
 
   // Get live probabilities to calculate bucket-specific odds
   const { probabilities } = useMarketProbabilities(market.blockchainMarketId);
@@ -77,8 +77,12 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
 
   // Check if approval is needed
   useEffect(() => {
-    const betAmountBigInt = parseUnits(amount || '0', USDC_DECIMALS);
-    if (allowance !== undefined && betAmountBigInt > allowance) {
+    const betAmountBigInt = parseUnits(amount || '0', TOKEN_DECIMALS);
+    // If allowance is undefined, we haven't loaded it yet - assume approval is needed
+    // If allowance is loaded and less than bet amount, approval is needed
+    if (allowance === undefined) {
+      setNeedsApproval(true); // Assume needs approval until we know otherwise
+    } else if (betAmountBigInt > allowance) {
       setNeedsApproval(true);
     } else {
       setNeedsApproval(false);
@@ -100,7 +104,7 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
   // After approval, automatically update needsApproval state
   useEffect(() => {
     if (approvalJustConfirmed && allowance !== undefined) {
-      const betAmountBigInt = parseUnits(amount || '0', USDC_DECIMALS);
+      const betAmountBigInt = parseUnits(amount || '0', TOKEN_DECIMALS);
       if (betAmountBigInt <= allowance) {
         console.log('✅ Allowance sufficient, ready to place bet');
         setNeedsApproval(false);
@@ -132,20 +136,20 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
     }
 
     if (betAmount < 1) {
-      setError('Minimum bet is 1 USDC');
+      setError(`Minimum bet is 1 ${TOKEN_SYMBOL}`);
       return;
     }
 
     if (betAmount > 10000) {
-      setError('Maximum bet is 10,000 USDC');
+      setError(`Maximum bet is 10,000 ${TOKEN_SYMBOL}`);
       return;
     }
 
-    // Check USDC balance
-    if (usdcBalance !== undefined) {
-      const betAmountBigInt = parseUnits(amount, USDC_DECIMALS);
-      if (betAmountBigInt > usdcBalance) {
-        setError(`Insufficient USDC balance. You have ${usdcBalanceFormatted.toFixed(2)} USDC`);
+    // Check token balance
+    if (tokenBalance !== undefined) {
+      const betAmountBigInt = parseUnits(amount, TOKEN_DECIMALS);
+      if (betAmountBigInt > tokenBalance) {
+        setError(`Insufficient ${TOKEN_SYMBOL} balance. You have ${tokenBalanceFormatted.toFixed(2)} ${TOKEN_SYMBOL}`);
         return;
       }
     }
@@ -176,15 +180,17 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
         }
         
         // Check if approval is needed first
-        const betAmountBigInt = parseUnits(amount, USDC_DECIMALS);
+        const betAmountBigInt = parseUnits(amount, TOKEN_DECIMALS);
+        console.log(`🔍 Checking approval: needsApproval=${needsApproval}, allowance=${allowance}, betAmount=${betAmountBigInt}`);
+        
         if (needsApproval) {
-          console.log(`🔓 Approving USDC: ${amount} USDC`);
+          console.log(`🔓 Approving ${TOKEN_SYMBOL}: ${amount} ${TOKEN_SYMBOL} (${betAmountBigInt * 100n} wei)`);
           // Approve a large amount to avoid multiple approvals
-          approveUsdc(betAmountBigInt * 100n); // Approve 100x for convenience
+          approveToken(betAmountBigInt * 100n); // Approve 100x for convenience
           return;
         }
         
-        console.log(`🎯 Placing bet on bucket ${outcomeIndex} for market ${marketId}`);
+        console.log(`🎯 Placing bet on bucket ${outcomeIndex} for market ${marketId}, amount=${amount} ${TOKEN_SYMBOL}`);
         placeBetOnChain(marketId, outcomeIndex, amount);
       } catch (err: any) {
         setError(err.message || 'Failed to place bet');
@@ -224,17 +230,17 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* USDC Balance */}
+          {/* Token Balance */}
           {isConnected && (
             <div className="text-sm text-muted-foreground">
-              USDC Balance: <span className="font-medium text-foreground">${usdcBalanceFormatted.toFixed(2)}</span>
+              {TOKEN_SYMBOL} Balance: <span className="font-medium text-foreground">{tokenBalanceFormatted.toFixed(2)}</span>
             </div>
           )}
 
           {/* Amount Input */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <Label htmlFor="amount">Bet Amount (USDC)</Label>
+              <Label htmlFor="amount">Bet Amount ({TOKEN_SYMBOL})</Label>
               <span className="text-xs text-muted-foreground">
                 ${parseFloat(amount || '0').toFixed(2)}
               </span>
@@ -270,13 +276,13 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Potential Win:</span>
               <span className="font-bold text-green-500">
-                ${potentialWin.toFixed(2)} USDC
+                {potentialWin.toFixed(2)} {TOKEN_SYMBOL}
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Profit:</span>
               <span className="font-bold">
-                ${(potentialWin - parseFloat(amount || '0')).toFixed(2)} USDC
+                {(potentialWin - parseFloat(amount || '0')).toFixed(2)} {TOKEN_SYMBOL}
               </span>
             </div>
           </div>
@@ -333,7 +339,7 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
             <Alert className="bg-amber-50 border-amber-200">
               <AlertCircle className="h-4 w-4 text-amber-600" />
               <AlertDescription className="text-amber-800 text-xs">
-                <strong>Step 1:</strong> You need to approve USDC spending first. Click "Approve USDC" below.
+                <strong>Step 1:</strong> You need to approve {TOKEN_SYMBOL} spending first. Click "Approve {TOKEN_SYMBOL}" below.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -348,14 +354,14 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
             disabled={!isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming || approvalJustConfirmed}
             className={position === 'UP' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
           >
-            {isApproving ? 'Approving USDC...' :
+            {isApproving ? `Approving ${TOKEN_SYMBOL}...` :
              isApprovalConfirming ? 'Confirming Approval...' :
              approvalJustConfirmed ? 'Updating Allowance...' :
-             needsApproval ? `Approve USDC` :
+             needsApproval ? `Approve ${TOKEN_SYMBOL}` :
              isPending ? 'Confirm in Wallet...' : 
              isConfirming ? 'Processing Transaction...' : 
              isConfirmed ? 'Bet Placed!' : 
-             `Bet $${amount} ${position}`}
+             `Bet ${amount} ${position}`}
           </Button>
         </DialogFooter>
       </DialogContent>

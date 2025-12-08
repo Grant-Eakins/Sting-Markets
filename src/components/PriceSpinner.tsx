@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TrendingUp, TrendingDown, DollarSign, Loader2, CheckCircle2 } from 'lucide-react';
 import { cn, formatCryptoPrice } from '@/lib/utils';
-import { usePlaceBet, useUsdcAllowance, useUsdcApproval, useUsdcBalance } from '@/hooks/useContract';
+import { usePlaceBet, useTokenAllowance, useTokenApproval, useTokenBalance } from '@/hooks/useContract';
 import { useAccount, useChainId } from 'wagmi';
-import { CONTRACT_ADDRESSES, USDC_DECIMALS } from '@/config/contract';
+import { CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { parseUnits } from 'viem';
 
 interface PriceLevel {
@@ -40,7 +40,7 @@ export function PriceSpinner({
   onBetPlaced,
   onBet 
 }: PriceSpinnerProps) {
-  const [betAmount, setBetAmount] = useState('5'); // Default 5 USDC
+  const [betAmount, setBetAmount] = useState('5'); // Default 5 tokens
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [searchPrice, setSearchPrice] = useState('');
   const [needsApproval, setNeedsApproval] = useState(false);
@@ -48,10 +48,10 @@ export function PriceSpinner({
   const listRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // USDC hooks
-  const { balance: usdcBalance, balanceFormatted: usdcBalanceFormatted } = useUsdcBalance();
-  const { allowance, refetch: refetchAllowance } = useUsdcAllowance();
-  const { approve: approveUsdc, isPending: isApproving, isConfirming: isApprovalConfirming, isConfirmed: isApprovalConfirmed, error: approvalError } = useUsdcApproval();
+  // Token hooks
+  const { balance: tokenBalance, balanceFormatted: tokenBalanceFormatted } = useTokenBalance();
+  const { allowance, refetch: refetchAllowance } = useTokenAllowance();
+  const { approve: approveToken, isPending: isApproving, isConfirming: isApprovalConfirming, isConfirmed: isApprovalConfirmed, error: approvalError } = useTokenApproval();
 
   // Reset scroll flag when market changes so it re-centers
   useEffect(() => {
@@ -102,7 +102,22 @@ export function PriceSpinner({
     if (contractError) {
       console.error('❌ Contract error:', contractError);
     }
-  }, [txHash, contractError]);
+    if (approvalError) {
+      console.error('❌ Approval error:', approvalError);
+      alert(`${TOKEN_SYMBOL} approval failed. Please try again.`);
+    }
+  }, [txHash, contractError, approvalError]);
+
+  // Refetch allowance after approval is confirmed
+  useEffect(() => {
+    if (isApprovalConfirmed) {
+      console.log(`✅ ${TOKEN_SYMBOL} approval confirmed! Refetching allowance...`);
+      alert(`${TOKEN_SYMBOL} approved! Please click the Bet button again to place your bet.`);
+      setTimeout(() => {
+        refetchAllowance();
+      }, 2000);
+    }
+  }, [isApprovalConfirmed, refetchAllowance]);
 
   // Reset state after successful bet
   useEffect(() => {
@@ -110,7 +125,7 @@ export function PriceSpinner({
       console.log('✅ Bet confirmed! Resetting state...');
       setTimeout(() => {
         setSelectedLevel(null);
-        setBetAmount('0.01');
+        setBetAmount('1');
         onBetPlaced?.();
       }, 1500);
     }
@@ -212,7 +227,7 @@ export function PriceSpinner({
   }
   
   // Calculate liquidity for each level based on probability and total pool
-  // Filter out dust amounts (< 0.01 USDC) from display
+  // Filter out dust amounts (< 0.0001 tokens) from display
   const dustThreshold = 0.0001;
   priceLevels.forEach(level => {
     const rawLiquidity = (totalPool * level.probability) / 100;
@@ -225,8 +240,8 @@ export function PriceSpinner({
       alert('Please enter a valid amount');
       return;
     }
-    if (amount < 0.001) {
-      alert('Minimum bet is 1 USDC');
+    if (amount < 1) {
+      alert(`Minimum bet is 1 ${TOKEN_SYMBOL}`);
       return;
     }
     if (selectedLevel === null) {
@@ -246,11 +261,24 @@ export function PriceSpinner({
       contractAddress,
       bucketIndex: level.bucketIndex,
       betAmount,
+      allowance: allowance?.toString(),
     });
     
     // Direct blockchain transaction - this is the primary path
     if (isContractDeployed && blockchainMarketId !== undefined && blockchainMarketId !== null) {
-      console.log('✅ Placing BLOCKCHAIN bet directly (no dialog)');
+      // Check if token approval is needed
+      const betAmountBigInt = parseUnits(betAmount, TOKEN_DECIMALS);
+      const needsApproval = allowance === undefined || betAmountBigInt > allowance;
+      
+      if (needsApproval) {
+        console.log(`🔓 ${TOKEN_SYMBOL} approval needed. Requesting approval...`);
+        alert(`You need to approve ${TOKEN_SYMBOL} spending first. Please confirm the approval transaction in your wallet.`);
+        // Approve 100x the bet amount for convenience
+        approveToken(betAmountBigInt * 100n);
+        return;
+      }
+      
+      console.log('✅ Placing BLOCKCHAIN bet directly (allowance sufficient)');
       placeBetOnChain(blockchainMarketId, level.bucketIndex, betAmount);
     } else {
       // Fallback to callback (demo mode) - this opens BetDialog
@@ -260,7 +288,7 @@ export function PriceSpinner({
         reason: !isContractDeployed ? 'Contract not deployed' : 'No blockchainMarketId',
       });
       onBet(level.bucketIndex, level.percentChange, level.price, amount);
-      setBetAmount('0.01');
+      setBetAmount('1');
       setSelectedLevel(null);
     }
   };
@@ -320,7 +348,7 @@ export function PriceSpinner({
   
   // Check if there are any real bets (non-uniform distribution)
   // If all probabilities are roughly equal (within 0.5%), no bets have been placed
-  // Also consider very small liquidity (< 1 USDC total) as "no bets"
+  // Also consider very small liquidity (< 1 token total) as "no bets"
   const uniformProb = 100 / priceLevels.length;
   const minLiquidityThreshold = 0.001; // Minimum total liquidity to consider "real bets"
   const probDeviationThreshold = 0.5; // % deviation from uniform to consider a real bet
@@ -476,7 +504,7 @@ export function PriceSpinner({
 
                 <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
                   <span>
-                    ${hasLiquidity ? level.liquidity.toFixed(2) : '0.00'} USDC
+                    {hasLiquidity ? level.liquidity.toFixed(2) : '0.00'} {TOKEN_SYMBOL}
                   </span>
                   <span>
                     {hasLiquidity ? `${probabilityPercent.toFixed(1)}%` : '—'} probability
@@ -521,20 +549,20 @@ export function PriceSpinner({
               const currentMultiplier = betAmt > 0 ? currentPayout / betAmt : 1;
               
               // Check if this is effectively a new market
-              const isNewMarket = totalPool < 1; // Less than $1 USDC
+              const isNewMarket = totalPool < 1; // Less than 1 token
               
               return (
                 <>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Pool in this bucket:</span>
                     <span className="font-medium">
-                      ${bucketLiquidity.toFixed(2)} USDC
+                      {bucketLiquidity.toFixed(2)} {TOKEN_SYMBOL}
                     </span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Total market pool:</span>
                     <span className="font-medium">
-                      ${totalPool.toFixed(2)} USDC
+                      {totalPool.toFixed(2)} {TOKEN_SYMBOL}
                     </span>
                   </div>
                   <div className="border-t border-muted my-2" />
@@ -546,7 +574,7 @@ export function PriceSpinner({
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Est. payout if win:</span>
                       <span className="font-medium text-green-500">
-                        ${currentPayout.toFixed(2)} USDC ({currentMultiplier.toFixed(2)}x)
+                        {currentPayout.toFixed(2)} {TOKEN_SYMBOL} ({currentMultiplier.toFixed(2)}x)
                       </span>
                     </div>
                   )}
@@ -558,9 +586,9 @@ export function PriceSpinner({
 
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="text-xs text-muted-foreground">Bet Amount (USDC)</label>
+            <label className="text-xs text-muted-foreground">Bet Amount ({TOKEN_SYMBOL})</label>
             <span className="text-xs text-muted-foreground">
-              ${parseFloat(betAmount) || 0}
+              {parseFloat(betAmount) || 0} {TOKEN_SYMBOL}
             </span>
           </div>
           <Input
@@ -604,10 +632,20 @@ export function PriceSpinner({
             selectedLevel !== null && priceLevels[selectedLevel].percentChange < 0 && 'bg-red-600 hover:bg-red-700',
             (selectedLevel === null || priceLevels[selectedLevel].percentChange === 0) && 'bg-primary hover:bg-primary/90'
           )}
-          disabled={selectedLevel === null || !betAmount || parseFloat(betAmount) < 0.001 || !isConnected || isPending || isConfirming || isConfirmed || chainId !== 84532}
+          disabled={selectedLevel === null || !betAmount || parseFloat(betAmount) < 1 || !isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming || chainId !== 84532}
           size="sm"
         >
-          {isPending ? (
+          {isApproving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              Approving {TOKEN_SYMBOL}...
+            </>
+          ) : isApprovalConfirming ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              Confirming Approval...
+            </>
+          ) : isPending ? (
             <>
               <Loader2 className="w-4 h-4 mr-1 animate-spin" />
               Confirm in Wallet...
@@ -631,15 +669,15 @@ export function PriceSpinner({
           ) : (
             <>
               <DollarSign className="w-4 h-4 mr-1" />
-              Bet ${parseFloat(betAmount || '0').toFixed(0)} USDC on {priceLevels[selectedLevel].percentChange > 0 ? '+' : ''}{priceLevels[selectedLevel].percentChange.toFixed(1)}%
+              Bet {parseFloat(betAmount || '0').toFixed(0)} {TOKEN_SYMBOL} on {priceLevels[selectedLevel].percentChange > 0 ? '+' : ''}{priceLevels[selectedLevel].percentChange.toFixed(1)}%
             </>
           )}
         </Button>
 
         <div className="text-xs text-muted-foreground text-center">
-          Total Pool: ${totalPool.toFixed(2)} USDC
+          Total Pool: {totalPool.toFixed(2)} {TOKEN_SYMBOL}
           <br />
-          {totalBuckets} buckets | Min bet: 1 USDC
+          {totalBuckets} buckets | Min bet: 1 {TOKEN_SYMBOL}
         </div>
       </div>
     </Card>

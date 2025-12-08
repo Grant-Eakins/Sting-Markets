@@ -10,6 +10,7 @@ import { StockChart } from '@/components/StockChart';
 import { PriceSpinner } from '@/components/PriceSpinner';
 import { useMarketProbabilities } from '@/hooks/useContract';
 import { formatCryptoPrice } from '@/lib/utils';
+import { TOKEN_SYMBOL } from '@/config/contract';
 
 interface MarketCardProps {
   market: Market;
@@ -153,7 +154,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               <span>Total Pool:</span>
             </div>
             <span className="font-bold">
-              ${totalPool.toFixed(2)} USDC
+              {totalPool.toFixed(2)} {TOKEN_SYMBOL}
             </span>
           </div>
 

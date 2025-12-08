@@ -8,8 +8,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// ProportionalMarketUSDC contract address
-const CONTRACT_ADDRESS = '0xcddCc37B9A6a5736953C81E7AB0fca40f293B1ff'; // ProportionalMarketUSDC with bonding curve + sell + refund + getSellQuote
+// ProportionalMarketMIND contract address
+const CONTRACT_ADDRESS = '0x221EDE572F99557f2e73A4aed21330e580a89445'; // ProportionalMarketMIND with MIND token (18 decimals)
 
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)
@@ -163,6 +163,15 @@ export async function createOnChainMarket(
     console.log(`⛓️  Creating on-chain market: ${stockSymbol} @ $${(openingPrice / 100).toFixed(2)}`);
     console.log(`   Session: ${isAfterHours ? 'OVERNIGHT (42 buckets)' : 'INTRADAY (22 buckets)'}`);
 
+    // Read nextMarketId BEFORE the transaction - this will be the ID of our new market
+    const marketIdBeforeCreate = await publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: ABI,
+      functionName: 'nextMarketId'
+    });
+    const expectedMarketId = Number(marketIdBeforeCreate);
+    console.log(`   Expected market ID: ${expectedMarketId}`);
+
     const hash = await walletClient.writeContract({
       address: CONTRACT_ADDRESS,
       abi: ABI,
@@ -181,14 +190,9 @@ export async function createOnChainMarket(
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status === 'success') {
-      // Get the market ID from the current counter - 1 (since it increments after creation)
-      const currentCounter = await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: ABI,
-        functionName: 'nextMarketId'
-      });
-      
-      const marketId = Number(currentCounter) - 1;
+      // Use the market ID we captured before the transaction
+      // This avoids race conditions with nextMarketId reads
+      const marketId = expectedMarketId;
       
       console.log(`✅ On-chain market created! ID: ${marketId}`);
       console.log(`🔗 https://sepolia.basescan.org/tx/${hash}`);

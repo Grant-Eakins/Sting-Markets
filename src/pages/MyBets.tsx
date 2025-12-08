@@ -20,21 +20,21 @@ const ADMIN_WALLETS = [
 ];
 import { useState, useMemo, useEffect } from 'react';
 import { WalletConnect } from '@/components/WalletConnect';
-import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI, USDC_DECIMALS } from '@/config/contract';
+import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { toast } from 'sonner';
 import { useBlockchainBets, type BlockchainBet } from '@/hooks/useBlockchainBets';
 import { useSellShares } from '@/hooks/useContract';
 import { BetCardSkeleton, StatCardSkeleton } from '@/components/ui/skeleton';
 import { Footer } from '@/components/Footer';
 
-// USDC divisor
-const USDC_DIVISOR = 10 ** USDC_DECIMALS;
+// Token divisor (18 decimals for MIND)
+const TOKEN_DIVISOR = 10 ** TOKEN_DECIMALS;
 
 // Enriched bet type for display
 interface EnrichedBet extends BlockchainBet {
   marketName: string;
   bucketLabel: string;
-  amountUsdc: number;
+  amountToken: number;
   sharesNum: number;
   potentialPayout: number;
   probability: string;
@@ -92,7 +92,7 @@ export default function MyBets() {
       marketId: Number(bet.marketId),
       marketName: bet.marketName,
       bucketLabel: bet.bucketLabel,
-      amountUsdc: bet.amountUsdc,
+      amountToken: bet.amountToken,
       potentialPayout: bet.potentialPayout,
       won: bet.won,
       claimed: bet.claimed,
@@ -124,8 +124,8 @@ export default function MyBets() {
       console.log('📊 Bets:', bets.map(b => ({
         marketId: b.marketId.toString(),
         outcomeIndex: b.outcomeIndex,
-        shares: Number(b.shares) / USDC_DIVISOR,
-        cost: Number(b.cost) / USDC_DIVISOR
+        shares: Number(b.shares) / TOKEN_DIVISOR,
+        cost: Number(b.cost) / TOKEN_DIVISOR
       })));
     }
   }, [bets]);
@@ -382,7 +382,7 @@ export default function MyBets() {
       finalPrice: result[5],
       settled: result[8] === true,
       winningOutcome: Number(result[9]), // The winning bucket index
-      totalLiquidity: Number(result[10]) / USDC_DIVISOR,
+      totalLiquidity: Number(result[10]) / TOKEN_DIVISOR,
       probabilities,
     };
   };
@@ -400,8 +400,8 @@ export default function MyBets() {
     
     const marketsList = Array.isArray(markets) ? markets : [];
     const market = marketsList.find((m: Market) => m.blockchainMarketId === Number(bet.marketId));
-    const amountUsdc = Number(bet.cost) / USDC_DIVISOR;  // Remaining cost basis after sells (6 decimals)
-    const sharesNum = Number(bet.shares) / USDC_DIVISOR; // Remaining shares after sells (6 decimals)
+    const amountToken = Number(bet.cost) / TOKEN_DIVISOR;  // Remaining cost basis after sells (18 decimals)
+    const sharesNum = Number(bet.shares) / TOKEN_DIVISOR; // Remaining shares after sells (18 decimals)
     
     const isSettled = marketData?.settled || false;
     // Win if the user's bet bucket matches the winning outcome
@@ -415,12 +415,12 @@ export default function MyBets() {
     if (sellQuoteResult?.status === 'success' && sellQuoteResult.result) {
       // result is [grossPayout, netPayout, sellFee] - we want netPayout
       const netPayout = sellQuoteResult.result[1] as bigint;
-      liveSellValue = Number(netPayout) / USDC_DIVISOR; // USDC has 6 decimals
+      liveSellValue = Number(netPayout) / TOKEN_DIVISOR; // MIND has 18 decimals
     }
     
     // Calculate estimated payout and sell value based on current shares and market state
-    let potentialPayout = amountUsdc * 2; // Default fallback
-    let currentValue = liveSellValue ?? amountUsdc; // Use live sell value if available, else cost basis
+    let potentialPayout = amountToken * 2; // Default fallback
+    let currentValue = liveSellValue ?? amountToken; // Use live sell value if available, else cost basis
     let probability = 0;
     
     if (marketData && marketData.probabilities && marketData.probabilities.length > bet.outcomeIndex) {
@@ -430,7 +430,7 @@ export default function MyBets() {
         // In proportional markets:
         // If your bucket wins, you split the total pool with others in your bucket
         // Estimated payout = totalPool * (yourShares / totalSharesInYourBucket)
-        potentialPayout = amountUsdc / probability;
+        potentialPayout = amountToken / probability;
         
         // Cap at reasonable max (can't win more than total pool)
         potentialPayout = Math.min(potentialPayout, marketData.totalLiquidity);
@@ -505,7 +505,7 @@ export default function MyBets() {
       ...bet,
       marketName: marketData?.stockSymbol || market?.stockSymbol || market?.stockName || `Market #${bet.marketId}`,
       bucketLabel: getBucketLabel(bet.outcomeIndex, marketData?.numOutcomes),
-      amountUsdc,
+      amountToken,
       sharesNum,
       potentialPayout,
       probability: (probability * 100).toFixed(1), // As percentage string
@@ -513,8 +513,8 @@ export default function MyBets() {
       won,
       currentValue,
       liveSellValue, // Live sell value from contract (null if not available)
-      pnl: liveSellValue !== null ? liveSellValue - amountUsdc : 0,
-      pnlPercent: liveSellValue !== null && amountUsdc > 0 ? ((liveSellValue - amountUsdc) / amountUsdc) * 100 : 0,
+      pnl: liveSellValue !== null ? liveSellValue - amountToken : 0,
+      pnlPercent: liveSellValue !== null && amountToken > 0 ? ((liveSellValue - amountToken) / amountToken) * 100 : 0,
       isUpBet, // Correctly determined UP or DOWN
       settlementPrice,
       referencePrice,
@@ -644,7 +644,7 @@ export default function MyBets() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Staked:</span>
-                              <span className="font-bold sm:ml-2">${bet.amountUsdc.toFixed(2)} USDC</span>
+                              <span className="font-bold sm:ml-2">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</span>
                             </div>
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Bucket Odds:</span>
@@ -652,13 +652,13 @@ export default function MyBets() {
                             </div>
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Potential Win:</span>
-                              <span className="font-bold text-green-500 sm:ml-2">~${bet.potentialPayout.toFixed(2)} USDC</span>
+                              <span className="font-bold text-green-500 sm:ml-2">~{bet.potentialPayout.toFixed(2)} {TOKEN_SYMBOL}</span>
                             </div>
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Sell Value:</span>
                               {bet.liveSellValue !== null ? (
                                 <span className={`font-bold sm:ml-2 ${bet.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  ${bet.liveSellValue.toFixed(2)} USDC ({bet.pnl >= 0 ? '+' : ''}{bet.pnlPercent.toFixed(1)}%)
+                                  {bet.liveSellValue.toFixed(2)} {TOKEN_SYMBOL} ({bet.pnl >= 0 ? '+' : ''}{bet.pnlPercent.toFixed(1)}%)
                                 </span>
                               ) : (
                                 <span className="font-bold text-muted-foreground sm:ml-2">Loading...</span>
@@ -724,12 +724,12 @@ export default function MyBets() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Staked:</span>
-                              <span className="font-bold sm:ml-2">${bet.amountUsdc.toFixed(2)} USDC</span>
+                              <span className="font-bold sm:ml-2">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</span>
                             </div>
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Result:</span>
                               <span className={`font-bold sm:ml-2 ${bet.won ? 'text-green-500' : 'text-red-500'}`}>
-                                {bet.won ? `Won ~$${bet.potentialPayout.toFixed(2)} USDC` : 'Lost'}
+                                {bet.won ? `Won ~${bet.potentialPayout.toFixed(2)} ${TOKEN_SYMBOL}` : 'Lost'}
                               </span>
                             </div>
                             {/* Settlement Info */}
@@ -894,7 +894,7 @@ export default function MyBets() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Est. Full Value:</span>
                   <span className="font-bold text-orange-500">
-                    ~${(sellDialogBet.currentValue * 0.99).toFixed(2)} USDC
+                    ~{(sellDialogBet.currentValue * 0.99).toFixed(2)} {TOKEN_SYMBOL}
                   </span>
                 </div>
               </div>
@@ -944,7 +944,7 @@ export default function MyBets() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Est. Payout:</span>
                   <span className="font-bold text-orange-500">
-                    ~${(sellDialogBet.currentValue * 0.99 * sellPercentage / 100).toFixed(2)} USDC
+                    ~{(sellDialogBet.currentValue * 0.99 * sellPercentage / 100).toFixed(2)} {TOKEN_SYMBOL}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">

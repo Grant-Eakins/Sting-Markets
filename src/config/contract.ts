@@ -1,9 +1,9 @@
-// ProportionalMarketUSDC ABI (Multi-Outcome with Bonding Curve, USDC payments)
+// ProportionalMarketMIND ABI (Multi-Outcome with Bonding Curve, MIND token payments)
 export const PREDICTION_MARKET_ABI = [
   {
     "inputs": [
       { "internalType": "address", "name": "_oracle", "type": "address" },
-      { "internalType": "address", "name": "_usdc", "type": "address" }
+      { "internalType": "address", "name": "_token", "type": "address" }
     ],
     "stateMutability": "nonpayable",
     "type": "constructor"
@@ -420,21 +420,24 @@ export const CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0xcddCc37B9A6a5736953C81E7AB0fca40f293B1ff', // ProportionalMarketUSDC with bonding curve + sell + refund + getSellQuote
+  84532: '0x221EDE572F99557f2e73A4aed21330e580a89445', // ProportionalMarketMIND
 } as const;
 
-// USDC contract addresses
-export const USDC_ADDRESSES = {
+// MIND token contract addresses (your custom token)
+export const TOKEN_ADDRESSES = {
   // Base Mainnet
-  8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-  // Base Sepolia Testnet (mock USDC)
-  84532: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // Circle's USDC on Base Sepolia
+  8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy MIND to mainnet
+  // Base Sepolia Testnet
+  84532: '0xCe31Ae82c11dd708eF51c93dEEb5Be0474A132D1', // Mindshare Token (MIND)
 } as const;
 
-// USDC has 6 decimals (not 18 like ETH)
-export const USDC_DECIMALS = 6;
+// MIND token has 18 decimals (standard ERC20)
+export const TOKEN_DECIMALS = 18;
 
-// ERC20 ABI for USDC approval
+// Token symbol for display
+export const TOKEN_SYMBOL = 'MIND';
+
+// ERC20 ABI for token approval
 export const ERC20_ABI = [
   {
     "inputs": [

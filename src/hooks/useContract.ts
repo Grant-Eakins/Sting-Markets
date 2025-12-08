@@ -1,6 +1,6 @@
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import { parseUnits } from 'viem';
-import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES, USDC_ADDRESSES, ERC20_ABI, USDC_DECIMALS } from '@/config/contract';
+import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES, TOKEN_ADDRESSES, ERC20_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { useChainId, useAccount } from 'wagmi';
 import { useState, useCallback } from 'react';
 
@@ -10,23 +10,27 @@ export enum Position {
 }
 
 /**
- * Hook to check USDC allowance
+ * Hook to check token allowance
  */
-export function useUsdcAllowance() {
+export function useTokenAllowance() {
   const chainId = useChainId();
   const { address } = useAccount();
   const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
-  const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
+  const tokenAddress = TOKEN_ADDRESSES[chainId as keyof typeof TOKEN_ADDRESSES];
+  
+  console.log(`🔍 useTokenAllowance: chainId=${chainId}, address=${address}, contract=${contractAddress}, token=${tokenAddress}`);
   
   const { data: allowance, refetch } = useReadContract({
-    address: usdcAddress as `0x${string}`,
+    address: tokenAddress as `0x${string}`,
     abi: ERC20_ABI,
     functionName: 'allowance',
     args: address && contractAddress ? [address, contractAddress as `0x${string}`] : undefined,
     query: {
-      enabled: !!address && !!contractAddress,
+      enabled: !!address && !!contractAddress && !!tokenAddress,
     },
   });
+  
+  console.log(`🔍 useTokenAllowance result: allowance=${allowance}`);
   
   return {
     allowance: allowance as bigint | undefined,
@@ -35,24 +39,24 @@ export function useUsdcAllowance() {
 }
 
 /**
- * Hook to approve USDC spending
+ * Hook to approve token spending
  */
-export function useUsdcApproval() {
+export function useTokenApproval() {
   const chainId = useChainId();
   const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
-  const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
+  const tokenAddress = TOKEN_ADDRESSES[chainId as keyof typeof TOKEN_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const approve = (amount: bigint) => {
-    if (!contractAddress || !usdcAddress) {
+    if (!contractAddress || !tokenAddress) {
       throw new Error('Contract addresses not available');
     }
     
-    console.log(`📝 Approving USDC: amount=${amount}, spender=${contractAddress}`);
+    console.log(`📝 Approving ${TOKEN_SYMBOL}: amount=${amount}, spender=${contractAddress}`);
     
     writeContract({
-      address: usdcAddress as `0x${string}`,
+      address: tokenAddress as `0x${string}`,
       abi: ERC20_ABI,
       functionName: 'approve',
       args: [contractAddress as `0x${string}`, amount],
@@ -74,33 +78,33 @@ export function useUsdcApproval() {
 }
 
 /**
- * Hook to get USDC balance
+ * Hook to get token balance
  */
-export function useUsdcBalance() {
+export function useTokenBalance() {
   const chainId = useChainId();
   const { address } = useAccount();
-  const usdcAddress = USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES];
+  const tokenAddress = TOKEN_ADDRESSES[chainId as keyof typeof TOKEN_ADDRESSES];
   
   const { data: balance, refetch } = useReadContract({
-    address: usdcAddress as `0x${string}`,
+    address: tokenAddress as `0x${string}`,
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!usdcAddress,
+      enabled: !!address && !!tokenAddress,
       refetchInterval: 10000,
     },
   });
   
   return {
     balance: balance as bigint | undefined,
-    balanceFormatted: balance ? Number(balance) / 10 ** USDC_DECIMALS : 0,
+    balanceFormatted: balance ? Number(balance) / 10 ** TOKEN_DECIMALS : 0,
     refetch,
   };
 }
 
 /**
- * Hook to buy shares in a multi-outcome market using USDC
+ * Hook to buy shares in a multi-outcome market using MIND token
  */
 export function usePlaceBet() {
   const chainId = useChainId();
@@ -113,24 +117,24 @@ export function usePlaceBet() {
       throw new Error('Contract not deployed on this network');
     }
     
-    // For multi-outcome LMSR market with USDC:
+    // For multi-outcome market with MIND token:
     // marketId: blockchain market ID
     // outcomeIndex: 0-21 for intraday (22 buckets) or 0-41 for overnight (42 buckets)
-    // amount: USDC amount (6 decimals)
+    // amount: token amount (18 decimals)
     
-    const amountInUsdc = parseUnits(amount, USDC_DECIMALS);
-    // ProportionalMarketUSDC signature: buyShares(uint256 marketId, uint8 outcomeIndex, uint256 amount, uint256 maxCost)
-    // amount = USDC to spend, maxCost = slippage protection (same as amount for exact)
-    const maxCost = amountInUsdc; // Use amount as max cost (slippage protection)
+    const amountInToken = parseUnits(amount, TOKEN_DECIMALS);
+    // ProportionalMarketMIND signature: buyShares(uint256 marketId, uint8 outcomeIndex, uint256 amount, uint256 maxCost)
+    // amount = tokens to spend, maxCost = slippage protection (same as amount for exact)
+    const maxCost = amountInToken; // Use amount as max cost (slippage protection)
     
-    console.log(`📝 Calling buyShares: marketId=${marketId}, outcomeIndex=${outcomeIndex}, amount=${amount} USDC (${amountInUsdc})`);
+    console.log(`📝 Calling buyShares: marketId=${marketId}, outcomeIndex=${outcomeIndex}, amount=${amount} ${TOKEN_SYMBOL} (${amountInToken})`);
     
-    // Note: No 'value' field - USDC uses approve + transferFrom, not ETH
+    // Note: No 'value' field - ERC20 uses approve + transferFrom, not ETH
     writeContract({
       address: contractAddress as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'buyShares',
-      args: [BigInt(marketId), outcomeIndex, amountInUsdc, maxCost],
+      args: [BigInt(marketId), outcomeIndex, amountInToken, maxCost],
     } as any);
   };
   
