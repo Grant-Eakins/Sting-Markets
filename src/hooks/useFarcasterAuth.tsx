@@ -1,10 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { FarcasterUser, FARCASTER_CONFIG } from '@/config/farcaster';
 
 interface FarcasterAuthContextType {
   user: FarcasterUser | null;
   isConnected: boolean;
   isLoading: boolean;
+  isInFarcasterClient: boolean;
   signIn: () => Promise<void>;
   signOut: () => void;
   error: string | null;
@@ -20,6 +21,21 @@ export function useFarcasterAuth() {
   return context;
 }
 
+// Detect if we're running inside a Farcaster client (Warpcast)
+function detectFarcasterClient(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  // Check for Farcaster-specific indicators
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isFarcaster = userAgent.includes('warpcast') || 
+                      userAgent.includes('farcaster') ||
+                      window.location.search.includes('fc_') ||
+                      document.referrer.includes('warpcast.com') ||
+                      document.referrer.includes('farcaster');
+  
+  return isFarcaster;
+}
+
 interface FarcasterAuthProviderProps {
   children: ReactNode;
 }
@@ -28,6 +44,7 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
   const [user, setUser] = useState<FarcasterUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInFarcasterClient] = useState(() => detectFarcasterClient());
 
   // Load saved user from localStorage on mount
   useEffect(() => {
@@ -41,7 +58,9 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
     }
   }, []);
 
-  const signIn = async () => {
+  const signIn = useCallback(async () => {
+    if (isLoading) return;
+    
     setIsLoading(true);
     setError(null);
     
@@ -106,22 +125,19 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
       // Timeout after 5 minutes
       setTimeout(() => {
         clearInterval(pollInterval);
-        if (isLoading) {
-          setError('Authentication timed out');
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }, 300000);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
       setIsLoading(false);
     }
-  };
+  }, [isLoading]);
 
-  const signOut = () => {
+  const signOut = useCallback(() => {
     setUser(null);
     localStorage.removeItem('farcaster_user');
-  };
+  }, []);
 
   return (
     <FarcasterAuthContext.Provider
@@ -129,6 +145,7 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
         user,
         isConnected: !!user,
         isLoading,
+        isInFarcasterClient,
         signIn,
         signOut,
         error,
