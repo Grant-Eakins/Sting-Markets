@@ -166,6 +166,21 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint to check file paths
+app.get('/debug/paths', (req, res) => {
+  const paths = {
+    __dirname,
+    cwd: process.cwd(),
+    distPath,
+    wellKnownExists: fs.existsSync(path.join(distPath, '.well-known', 'farcaster.json')),
+    publicWellKnownExists: fs.existsSync(path.join(__dirname, '..', 'public', '.well-known', 'farcaster.json')),
+    distExists: fs.existsSync(distPath),
+    distContents: fs.existsSync(distPath) ? fs.readdirSync(distPath) : [],
+    wellKnownDir: fs.existsSync(path.join(distPath, '.well-known')) ? fs.readdirSync(path.join(distPath, '.well-known')) : 'not found',
+  };
+  res.json(paths);
+});
+
 // Farcaster webhook endpoint
 app.post('/api/webhook', (req, res) => {
   console.log('📱 Farcaster webhook received:', JSON.stringify(req.body, null, 2));
