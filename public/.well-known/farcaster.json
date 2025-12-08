@@ -14,7 +14,7 @@
     "splashImageUrl": "https://www.stingmarkets.com/splash.png",
     "splashBackgroundColor": "#fefe68",
     "webhookUrl": "https://www.stingmarkets.com/api/webhook",
-    "subtitle": "Crypto \"Pick Your Price\" Prediction Markets",
+    "subtitle": "Pick Your Price Markets",
     "description": "Crypto prediction markets that reward the best speculators with the highest payout!",
     "primaryCategory": "finance",
     "tags": ["finance", "money", "crypto", "meme", "prediction"],
