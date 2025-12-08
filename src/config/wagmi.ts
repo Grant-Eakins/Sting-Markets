@@ -1,7 +1,7 @@
 import { createConfig, http } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors';
-import { farcasterFrame } from '@farcaster/frame-wagmi-connector';
+import { farcasterFrame } from '@farcaster/miniapp-wagmi-connector';
 
 // WalletConnect Project ID from https://cloud.walletconnect.com/
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'eb33070102c31c71949eeac977f28689';
