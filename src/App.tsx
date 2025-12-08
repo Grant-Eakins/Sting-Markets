@@ -36,20 +36,18 @@ const App = () => (
               <BrowserRouter>
                 <ScrollToTop />
                 <Routes>
-                <Route path="/" element={<Markets />} />
-                <Route path="/my-bets" element={<MyBets />} />
-                <Route path="/bet-history" element={<BetHistory />} />
-                <Route path="/how-it-works" element={<HowItWorks />} />
-                <Route path="/admin-167" element={<Admin />} />
-                <Route path="/landing" element={<Index />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/risk-disclaimer" element={<RiskDisclaimer />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-              </Routes>
+                  <Route path="/" element={<Markets />} />
+                  <Route path="/my-bets" element={<MyBets />} />
+                  <Route path="/bet-history" element={<BetHistory />} />
+                  <Route path="/how-it-works" element={<HowItWorks />} />
+                  <Route path="/admin-167" element={<Admin />} />
+                  <Route path="/landing" element={<Index />} />
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/risk-disclaimer" element={<RiskDisclaimer />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
               </BrowserRouter>
             </TooltipProvider>
           </FarcasterAuthProvider>
