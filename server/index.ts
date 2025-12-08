@@ -96,14 +96,40 @@ app.use(express.json());
 
 // Serve static frontend files in production
 const distPath = path.join(__dirname, '..', 'dist');
-app.use(express.static(distPath));
 
-// Serve .well-known directory with correct content-type
+// Serve .well-known directory with correct content-type (MUST be before static middleware)
 app.get('/.well-known/farcaster.json', (req, res) => {
+  console.log('📱 Serving farcaster.json');
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.sendFile(path.join(distPath, '.well-known', 'farcaster.json'));
 });
+
+// Serve images with proper headers for Farcaster embed
+app.get('/icon.png', (req, res) => {
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(path.join(distPath, 'icon.png'));
+});
+
+app.get('/image.png', (req, res) => {
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(path.join(distPath, 'image.png'));
+});
+
+app.get('/splash.png', (req, res) => {
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(path.join(distPath, 'splash.png'));
+});
+
+// Static file serving (after explicit routes)
+app.use(express.static(distPath));
 
 // Routes
 app.use('/api/markets', marketsRouter);
