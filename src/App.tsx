@@ -9,6 +9,7 @@ import { config } from "@/config/wagmi";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { FarcasterAuthProvider } from "@/hooks/useFarcasterAuth";
+import { FarcasterAutoConnect } from "@/components/FarcasterAutoConnect";
 import Index from "./pages/Index";
 import Markets from "./pages/Markets";
 import MyBets from "./pages/MyBets";
@@ -30,6 +31,7 @@ const App = () => (
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
           <FarcasterAuthProvider>
+            <FarcasterAutoConnect />
             <TooltipProvider>
               <Toaster />
               <Sonner />
