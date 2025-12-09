@@ -73,8 +73,8 @@ export function PriceSpinner({
     const castText = `🎯 Just made a prediction on @stingmarkets!\n\n$${symbol} will go ${direction} ${sign}${percentChange.toFixed(1)}% to $${priceFormatted}\n\nThink you can do better? Make your prediction 👇`;
     
     try {
-      // Use Farcaster SDK to open cast composer
-      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}&embeds[]=https://www.stingmarkets.com`);
+      // Use Farcaster SDK to open cast composer with miniapp link
+      await sdk.actions.openUrl(`https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}&embeds[]=https://farcaster.xyz/miniapps/Qk-jqzie7XlI/sting-markets`);
     } catch (error) {
       console.error('Failed to open Farcaster composer:', error);
       // Fallback: copy to clipboard
