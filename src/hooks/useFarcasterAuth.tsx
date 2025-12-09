@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import sdk from '@farcaster/frame-sdk';
 import { FarcasterUser, FARCASTER_CONFIG } from '@/config/farcaster';
 
@@ -32,6 +32,22 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
   const [error, setError] = useState<string | null>(null);
   const [isInFarcasterClient, setIsInFarcasterClient] = useState(false);
   const [sdkInitialized, setSdkInitialized] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Initialize Farcaster SDK on mount
   useEffect(() => {
@@ -49,7 +65,7 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
             username: context.user.username || '',
             displayName: context.user.displayName || '',
             pfpUrl: context.user.pfpUrl || '',
-            custody: '',
+            custody: undefined,
             verifications: [],
           };
           
@@ -113,7 +129,7 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
               username: context.user.username || '',
               displayName: context.user.displayName || '',
               pfpUrl: context.user.pfpUrl || '',
-              custody: '',
+              custody: undefined,
               verifications: [],
             };
             setUser(farcasterUser);
@@ -145,8 +161,16 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
       // Open Warpcast for authentication
       window.open(connectUrl, '_blank', 'width=400,height=700');
       
+      // Clear any existing polling
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
       // Poll for auth completion
-      const pollInterval = setInterval(async () => {
+      pollIntervalRef.current = setInterval(async () => {
         try {
           const statusResponse = await fetch(
             `${FARCASTER_CONFIG.relay}/v1/channel/status?channelToken=${channelToken}`
@@ -157,7 +181,10 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
           const status = await statusResponse.json();
           
           if (status.state === 'completed') {
-            clearInterval(pollInterval);
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
             
             const farcasterUser: FarcasterUser = {
               fid: status.fid,
@@ -172,7 +199,10 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
             localStorage.setItem('farcaster_user', JSON.stringify(farcasterUser));
             setIsLoading(false);
           } else if (status.state === 'error') {
-            clearInterval(pollInterval);
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
             setError('Authentication failed');
             setIsLoading(false);
           }
@@ -182,8 +212,11 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
       }, 1500);
       
       // Timeout after 5 minutes
-      setTimeout(() => {
-        clearInterval(pollInterval);
+      timeoutRef.current = setTimeout(() => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
         setIsLoading(false);
       }, 300000);
       

@@ -24,6 +24,6 @@ export interface FarcasterUser {
   username?: string;              // @username
   displayName?: string;           // Display name
   pfpUrl?: string;                // Profile picture URL
-  custody: `0x${string}`;         // Custody address
+  custody?: `0x${string}`;        // Custody address (optional - may not be available from SDK)
   verifications: `0x${string}`[]; // Verified wallet addresses
 }
