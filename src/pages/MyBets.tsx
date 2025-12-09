@@ -71,7 +71,7 @@ export default function MyBets() {
   const { bets, isLoading: isLoadingBets, error: betsError, refetch: refetchBets } = useBlockchainBets();
   const { sellShares, isPending: isSellPending, isConfirming: isSellConfirming, isConfirmed: isSellConfirmed, error: sellError, hash: sellHash } = useSellShares();
 
-  // Load archived bet IDs on mount / address change
+  // Load archived bet IDs on mount / address change / bets change
   useEffect(() => {
     if (address) {
       const archived = new Set<string>();
@@ -84,8 +84,9 @@ export default function MyBets() {
         }
       } catch {}
       setArchivedBetIds(archived);
+      console.log('📦 Loaded archived bet IDs:', [...archived]);
     }
-  }, [address]);
+  }, [address, bets]); // Re-check when bets are fetched
 
   // Archive a bet and update local state
   const handleArchiveBet = (bet: EnrichedBet) => {

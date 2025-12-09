@@ -159,6 +159,10 @@ export function useBlockchainBets() {
           existing.totalShares += shares;
           existing.totalCost += cost;
         } else {
+          // Create a stable betId from marketId and outcomeIndex
+          // This ensures the same position always has the same betId
+          const stableBetId = marketId * 1000n + BigInt(outcomeIndex);
+          
           positionMap.set(key, {
             marketId,
             outcomeIndex,
@@ -166,7 +170,7 @@ export function useBlockchainBets() {
             totalCost: cost,
             firstTimestamp: timestamp,
             firstTxHash: log.transactionHash,
-            firstBetId: BigInt(log.blockNumber) * BigInt(1000) + BigInt(log.logIndex ?? 0),
+            firstBetId: stableBetId,
           });
         }
       }

@@ -173,8 +173,26 @@ export function FarcasterAuthProvider({ children }: FarcasterAuthProviderProps) 
       pollIntervalRef.current = setInterval(async () => {
         try {
           const statusResponse = await fetch(
-            `${FARCASTER_CONFIG.relay}/v1/channel/status?channelToken=${channelToken}`
+            `${FARCASTER_CONFIG.relay}/v1/channel/status?channelToken=${channelToken}`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            }
           );
+          
+          // Handle 403/401 errors - token might be expired
+          if (statusResponse.status === 403 || statusResponse.status === 401) {
+            console.warn('Farcaster auth token expired or invalid, stopping poll');
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setError('Authentication session expired. Please try again.');
+            setIsLoading(false);
+            return;
+          }
           
           if (!statusResponse.ok) return;
           
