@@ -138,16 +138,21 @@ export function PriceSpinner({
     }
   }, [txHash, contractError, approvalError]);
 
-  // Refetch allowance after approval is confirmed
+  // Auto-place bet after approval is confirmed
   useEffect(() => {
-    if (isApprovalConfirmed) {
-      console.log(`✅ ${TOKEN_SYMBOL} approval confirmed! Refetching allowance...`);
-      alert(`${TOKEN_SYMBOL} approved! Please click the Bet button again to place your bet.`);
-      setTimeout(() => {
-        refetchAllowance();
-      }, 2000);
+    if (isApprovalConfirmed && selectedLevel !== null && blockchainMarketId !== undefined) {
+      console.log(`✅ ${TOKEN_SYMBOL} approval confirmed! Auto-placing bet...`);
+      // Refetch allowance first
+      refetchAllowance().then(() => {
+        // Small delay to ensure state is updated, then place bet
+        setTimeout(() => {
+          const level = priceLevels[selectedLevel];
+          console.log(`🎯 Auto-placing bet on bucket ${level.bucketIndex} for ${betAmount} ${TOKEN_SYMBOL}`);
+          placeBetOnChain(blockchainMarketId, level.bucketIndex, betAmount);
+        }, 1000);
+      });
     }
-  }, [isApprovalConfirmed, refetchAllowance]);
+  }, [isApprovalConfirmed]);
 
   // Reset state after successful bet
   useEffect(() => {
@@ -264,7 +269,7 @@ export function PriceSpinner({
     level.liquidity = rawLiquidity >= dustThreshold ? rawLiquidity : 0;
   });
 
-  const handleBet = () => {
+  const handleBet = async () => {
     const amount = parseFloat(betAmount);
     if (isNaN(amount) || amount <= 0) {
       alert('Please enter a valid amount');
@@ -307,15 +312,24 @@ export function PriceSpinner({
       const needsApproval = allowance === undefined || betAmountBigInt > allowance;
       
       if (needsApproval) {
-        console.log(`🔓 ${TOKEN_SYMBOL} approval needed. Requesting approval...`);
-        alert(`You need to approve ${TOKEN_SYMBOL} spending first. Please confirm the approval transaction in your wallet.`);
-        // Approve 100x the bet amount for convenience
-        approveToken(betAmountBigInt * 100n);
+        console.log(`🔓 ${TOKEN_SYMBOL} approval needed. Requesting exact amount approval...`);
+        try {
+          // Approve exact bet amount - bet will auto-trigger after approval confirms
+          await approveToken(betAmountBigInt);
+        } catch (err: any) {
+          console.error('Approval failed:', err);
+          alert(`Approval failed: ${err.shortMessage || err.message || 'Unknown error'}`);
+        }
         return;
       }
       
       console.log('✅ Placing BLOCKCHAIN bet directly (allowance sufficient)');
-      placeBetOnChain(blockchainMarketId, level.bucketIndex, betAmount);
+      try {
+        await placeBetOnChain(blockchainMarketId, level.bucketIndex, betAmount);
+      } catch (err: any) {
+        console.error('Bet failed:', err);
+        alert(`Bet failed: ${err.shortMessage || err.message || 'Unknown error'}`);
+      }
     } else {
       // Fallback to callback (demo mode) - this opens BetDialog
       console.warn('⚠️ Using DEMO mode (this will open dialog):', {

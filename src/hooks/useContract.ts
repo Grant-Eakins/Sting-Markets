@@ -1,8 +1,8 @@
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount as useWagmiAccount } from 'wagmi';
 import { parseUnits } from 'viem';
 import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES, TOKEN_ADDRESSES, ERC20_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { useChainId, useAccount } from 'wagmi';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export enum Position {
   UP = 0,
@@ -38,29 +38,63 @@ export function useTokenAllowance() {
   };
 }
 
+// Maximum uint256 value for unlimited approval (not used - we approve exact amounts)
+// const MAX_UINT256 = 2n ** 256n - 1n;
+
 /**
  * Hook to approve token spending
+ * Approves the exact amount needed for each transaction for transparency
  */
 export function useTokenApproval() {
   const chainId = useChainId();
+  const { address, isConnected, connector } = useAccount();
   const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
   const tokenAddress = TOKEN_ADDRESSES[chainId as keyof typeof TOKEN_ADDRESSES];
   
-  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  const { data: hash, isPending, writeContract, writeContractAsync, error, reset, status } = useWriteContract();
   
-  const approve = (amount: bigint) => {
+  // Log status changes for debugging
+  useEffect(() => {
+    console.log(`🔄 useTokenApproval status: ${status}, error:`, error?.message || 'none');
+  }, [status, error]);
+  
+  // Approve exact amount for transparency - user sees exactly what they're approving
+  const approve = async (amount: bigint) => {
     if (!contractAddress || !tokenAddress) {
+      console.error('❌ Contract addresses not available for approval');
       throw new Error('Contract addresses not available');
     }
     
-    console.log(`📝 Approving ${TOKEN_SYMBOL}: amount=${amount}, spender=${contractAddress}`);
+    if (!isConnected || !address) {
+      console.error('❌ Wallet not connected');
+      throw new Error('Wallet not connected');
+    }
     
-    writeContract({
-      address: tokenAddress as `0x${string}`,
-      abi: ERC20_ABI,
-      functionName: 'approve',
-      args: [contractAddress as `0x${string}`, amount],
-    } as any);
+    if (!amount || amount <= 0n) {
+      console.error('❌ Invalid approval amount');
+      throw new Error('Invalid approval amount');
+    }
+    
+    console.log(`🔗 Connected wallet: ${address}, connector: ${connector?.name || 'unknown'}, chainId: ${chainId}`);
+    console.log(`📝 Approving exact amount: ${amount} (${Number(amount) / 10 ** TOKEN_DECIMALS} ${TOKEN_SYMBOL})`);
+    
+    try {
+      // Use writeContractAsync for better error handling
+      const result = await writeContractAsync({
+        address: tokenAddress as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [contractAddress as `0x${string}`, amount],
+      } as any);
+      console.log('✅ Approval transaction submitted:', result);
+      return result;
+    } catch (err: any) {
+      console.error('❌ Failed to initiate approval:', err);
+      if (err.cause) console.error('  Cause:', err.cause);
+      if (err.details) console.error('  Details:', err.details);
+      if (err.shortMessage) console.error('  Short message:', err.shortMessage);
+      throw err;
+    }
   };
   
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -74,6 +108,7 @@ export function useTokenApproval() {
     isConfirming,
     isConfirmed,
     error,
+    reset,
   };
 }
 
@@ -108,34 +143,62 @@ export function useTokenBalance() {
  */
 export function usePlaceBet() {
   const chainId = useChainId();
+  const { address, isConnected, connector } = useAccount();
   const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
   
-  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  const { data: hash, isPending, writeContract, writeContractAsync, error, reset, status } = useWriteContract();
   
-  const placeBet = (marketId: number, outcomeIndex: number, amount: string) => {
+  // Log status changes for debugging
+  useEffect(() => {
+    if (status !== 'idle') {
+      console.log(`🔄 usePlaceBet status: ${status}, hash: ${hash || 'none'}, error:`, error?.message || 'none');
+    }
+  }, [status, hash, error]);
+  
+  const placeBet = async (marketId: number, outcomeIndex: number, amount: string) => {
     if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
+      console.error('❌ Contract not deployed on this network');
       throw new Error('Contract not deployed on this network');
     }
     
+    if (!isConnected || !address) {
+      console.error('❌ Wallet not connected');
+      throw new Error('Wallet not connected');
+    }
+    
+    console.log(`🔗 Connected wallet: ${address}, connector: ${connector?.name || 'unknown'}, chainId: ${chainId}`);
+    
     // For multi-outcome market with MIND token:
     // marketId: blockchain market ID
-    // outcomeIndex: 0-21 for intraday (22 buckets) or 0-41 for overnight (42 buckets)
+    // outcomeIndex: 0-22 for intraday (23 buckets) or 0-41 for overnight (42 buckets)
     // amount: token amount (18 decimals)
     
     const amountInToken = parseUnits(amount, TOKEN_DECIMALS);
     // ProportionalMarketMIND signature: buyShares(uint256 marketId, uint8 outcomeIndex, uint256 amount, uint256 maxCost)
-    // amount = tokens to spend, maxCost = slippage protection (same as amount for exact)
-    const maxCost = amountInToken; // Use amount as max cost (slippage protection)
+    // amount = tokens to spend, maxCost = slippage protection (add 1% for safety)
+    const maxCost = amountInToken + (amountInToken / 100n); // 1% slippage tolerance
     
-    console.log(`📝 Calling buyShares: marketId=${marketId}, outcomeIndex=${outcomeIndex}, amount=${amount} ${TOKEN_SYMBOL} (${amountInToken})`);
+    console.log(`📝 Calling buyShares: marketId=${marketId}, outcomeIndex=${outcomeIndex}, amount=${amount} ${TOKEN_SYMBOL} (${amountInToken}), maxCost=${maxCost}`);
+    console.log(`📍 Contract address: ${contractAddress}`);
     
-    // Note: No 'value' field - ERC20 uses approve + transferFrom, not ETH
-    writeContract({
-      address: contractAddress as `0x${string}`,
-      abi: PREDICTION_MARKET_ABI,
-      functionName: 'buyShares',
-      args: [BigInt(marketId), outcomeIndex, amountInToken, maxCost],
-    } as any);
+    try {
+      // Use writeContractAsync for better error handling
+      const result = await writeContractAsync({
+        address: contractAddress as `0x${string}`,
+        abi: PREDICTION_MARKET_ABI,
+        functionName: 'buyShares',
+        args: [BigInt(marketId), outcomeIndex, amountInToken, maxCost],
+      } as any);
+      console.log('✅ Bet transaction submitted:', result);
+      return result;
+    } catch (err: any) {
+      console.error('❌ Failed to initiate transaction:', err);
+      // Log more details about the error
+      if (err.cause) console.error('  Cause:', err.cause);
+      if (err.details) console.error('  Details:', err.details);
+      if (err.shortMessage) console.error('  Short message:', err.shortMessage);
+      throw err;
+    }
   };
   
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -149,6 +212,7 @@ export function usePlaceBet() {
     isConfirming,
     isConfirmed,
     error,
+    reset,
   };
 }
 
