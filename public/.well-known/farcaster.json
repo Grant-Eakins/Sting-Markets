@@ -10,7 +10,7 @@
     "iconUrl": "https://www.stingmarkets.com/icon.png",
     "homeUrl": "https://www.stingmarkets.com",
     "imageUrl": "https://www.stingmarkets.com/image.png",
-    "buttonTitle": "Open Sting Markets",
+    "buttonTitle": "Open Marketplace",
     "splashImageUrl": "https://www.stingmarkets.com/splash.png",
     "splashBackgroundColor": "#fefe68",
     "webhookUrl": "https://www.stingmarkets.com/api/webhook",
