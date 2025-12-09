@@ -1,10 +1,23 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { createConfig, http } from 'wagmi';
+import { createConfig, http, fallback } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 import { farcasterFrame } from '@farcaster/miniapp-wagmi-connector';
 
 // WalletConnect Project ID from https://cloud.walletconnect.com/
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'eb33070102c31c71949eeac977f28689';
+
+// RPC endpoints with fallbacks for reliability
+const BASE_SEPOLIA_RPC_URLS = [
+  'https://base-sepolia-rpc.publicnode.com',
+  'https://base-sepolia.blockpi.network/v1/rpc/public',
+  'https://sepolia.base.org',
+];
+
+const BASE_MAINNET_RPC_URLS = [
+  'https://base-rpc.publicnode.com',
+  'https://base.blockpi.network/v1/rpc/public', 
+  'https://mainnet.base.org',
+];
 
 /**
  * Check if we're likely running inside a Farcaster client/mini-app
@@ -55,8 +68,8 @@ export const config = isInFarcasterClient
       chains: [baseSepolia, base],
       connectors: [farcasterFrame()],
       transports: {
-        [baseSepolia.id]: http(),
-        [base.id]: http(),
+        [baseSepolia.id]: fallback(BASE_SEPOLIA_RPC_URLS.map(url => http(url))),
+        [base.id]: fallback(BASE_MAINNET_RPC_URLS.map(url => http(url))),
       },
     })
   : getDefaultConfig({
@@ -64,6 +77,10 @@ export const config = isInFarcasterClient
       projectId,
       chains: [baseSepolia, base],
       ssr: false,
+      transports: {
+        [baseSepolia.id]: fallback(BASE_SEPOLIA_RPC_URLS.map(url => http(url))),
+        [base.id]: fallback(BASE_MAINNET_RPC_URLS.map(url => http(url))),
+      },
     });
 
 export const BASE_CHAIN_ID = base.id;
