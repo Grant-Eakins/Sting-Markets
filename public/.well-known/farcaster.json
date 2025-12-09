@@ -7,11 +7,11 @@
   "frame": {
     "version": "0.0.1",
     "name": "Sting Markets",
-    "iconUrl": "https://www.stingmarkets.com/icon.png",
+    "iconUrl": "https://www.stingmarkets.com/icon.png?v=2",
     "homeUrl": "https://www.stingmarkets.com",
-    "imageUrl": "https://www.stingmarkets.com/image.png",
+    "imageUrl": "https://www.stingmarkets.com/image.png?v=2",
     "buttonTitle": "Open Marketplace",
-    "splashImageUrl": "https://www.stingmarkets.com/splash.png",
+    "splashImageUrl": "https://www.stingmarkets.com/splash.png?v=2",
     "splashBackgroundColor": "#fefe68",
     "webhookUrl": "https://www.stingmarkets.com/api/webhook",
     "subtitle": "Pick Your Price Markets",
@@ -19,11 +19,11 @@
     "primaryCategory": "finance",
     "tags": ["finance", "money", "crypto", "meme", "prediction"],
     "tagline": "Pick A Price",
-    "screenshotUrls": ["https://www.stingmarkets.com/splash.png"],
-    "heroImageUrl": "https://www.stingmarkets.com/image.png",
+    "screenshotUrls": ["https://www.stingmarkets.com/splash.png?v=2"],
+    "heroImageUrl": "https://www.stingmarkets.com/image.png?v=2",
     "ogTitle": "StingMarkets - Pick A Price PM",
     "ogDescription": "Crypto prediction markets that reward the best speculators with the highest payout!",
-    "ogImageUrl": "https://www.stingmarkets.com/image.png"
+    "ogImageUrl": "https://www.stingmarkets.com/image.png?v=2"
   }
 }
 
