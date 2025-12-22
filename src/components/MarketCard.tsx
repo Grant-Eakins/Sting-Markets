@@ -120,6 +120,18 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
     <>
       <Card className="overflow-hidden hover:shadow-lg transition-shadow">
         <CardHeader className="pb-3">
+          {/* Token Image - centered at top */}
+          {market.imageUrl && (
+            <div className="flex justify-center mb-3">
+              <img 
+                src={market.imageUrl} 
+                alt={market.stockSymbol}
+                className="w-16 h-16 rounded-full object-cover border-2 border-muted"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            </div>
+          )}
+          
           <div className="flex justify-between items-start mb-2">
             <div className="flex items-center gap-2">
               {getStatusBadge()}
@@ -130,14 +142,6 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
                   <Clock className="w-4 h-4 mr-1" />
                   {hoursUntilSettle}h {minutesUntilSettle}m
                 </div>
-              )}
-              {market.imageUrl && (
-                <img 
-                  src={market.imageUrl} 
-                  alt={market.stockSymbol}
-                  className="w-8 h-8 rounded-full object-cover"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
               )}
             </div>
           </div>

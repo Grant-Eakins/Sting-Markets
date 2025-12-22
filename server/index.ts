@@ -30,11 +30,17 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Redirect Railway URL to custom domain in production
+// Only redirect browser requests, not API calls
 app.use((req, res, next) => {
   const host = req.get('host') || '';
-  // Redirect Railway URL to custom domain
-  if (host.includes('railway.app') && process.env.NODE_ENV === 'production') {
-    return res.redirect(301, `https://stingmarkets.com${req.originalUrl}`);
+  // Only redirect if:
+  // 1. Host is the Railway domain (not custom domain)
+  // 2. Not an API request
+  // 3. Not a health check or internal request
+  if (host === 'sting-markets-production.up.railway.app' && 
+      !req.path.startsWith('/api/') &&
+      !req.path.startsWith('/.well-known/')) {
+    return res.redirect(301, `https://www.stingmarkets.com${req.originalUrl}`);
   }
   next();
 });
