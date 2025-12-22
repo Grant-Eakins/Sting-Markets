@@ -99,7 +99,7 @@ export default function AdminPage() {
   const { data: pausedSymbols = [] } = useQuery({
     queryKey: ['paused-symbols'],
     queryFn: async () => {
-      const response = await axios.get(`${API_BASE}/markets/paused`);
+      const response = await axios.get(`${API_BASE}/markets/paused-symbols`);
       return response.data.pausedSymbols as string[];
     },
     refetchInterval: 10000,
@@ -109,7 +109,7 @@ export default function AdminPage() {
   // Pause market mutation
   const pauseMarket = useMutation({
     mutationFn: async (symbol: string) => {
-      const response = await axios.post(`${API_BASE}/markets/pause/${symbol}`);
+      const response = await axios.post(`${API_BASE}/markets/symbol/${symbol}/pause`);
       return response.data;
     },
     onSuccess: () => {
@@ -123,7 +123,7 @@ export default function AdminPage() {
   // Resume market mutation
   const resumeMarket = useMutation({
     mutationFn: async (symbol: string) => {
-      const response = await axios.post(`${API_BASE}/markets/resume/${symbol}`);
+      const response = await axios.post(`${API_BASE}/markets/symbol/${symbol}/resume`);
       return response.data;
     },
     onSuccess: () => {
