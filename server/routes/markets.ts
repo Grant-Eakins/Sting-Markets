@@ -20,6 +20,7 @@ import { Position, MarketStatus } from '../types/market';
 import { testDiscordWebhook } from '../services/discordBot';
 import { getCryptoQuote } from '../services/cryptoApi';
 import { getTokenByAddress, searchTokens, getTokenHistory } from '../services/dexScreenerApi';
+import { saveMarket } from '../services/database';
 
 const router = express.Router();
 
@@ -413,6 +414,8 @@ router.post('/create-by-contract', async (req, res) => {
       
       if (blockchainMarketId !== null) {
         market.blockchainMarketId = blockchainMarketId;
+        // Save the updated market with blockchain ID to database
+        await saveMarket(market);
       }
       
       res.json({
