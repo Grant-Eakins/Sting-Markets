@@ -9,10 +9,13 @@ Color theme: Blue (#209ee8), Yellow (#ffff68), White
 
 @layer base {
   :root {
-    --background: 55 98% 76%;
-    --foreground: 222 47% 11%;
+    --background: 222 40% 14%;
+    --foreground: 210 40% 98%;
+    
+    --background-yellow: 59 100% 75%;
+    --navy-light: 222 40% 14%;
 
-    --card: 222 47% 8%;
+    --card: 222 40% 18%;
     --card-foreground: 210 40% 98%;
 
     --popover: 222 47% 8%;
@@ -24,8 +27,8 @@ Color theme: Blue (#209ee8), Yellow (#ffff68), White
     --secondary: 270 70% 60%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 222 35% 22%;
+    --muted-foreground: 215 20% 70%;
 
     --accent: 189 94% 55%;
     --accent-foreground: 222 47% 5%;
@@ -36,8 +39,8 @@ Color theme: Blue (#209ee8), Yellow (#ffff68), White
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
+    --border: 222 35% 25%;
+    --input: 222 35% 22%;
     --ring: 189 94% 55%;
 
     --radius: 0.75rem;
@@ -57,5 +60,11 @@ Color theme: Blue (#209ee8), Yellow (#ffff68), White
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .bg-yellow-content {
+    background-color: #fffd7e;
   }
 }

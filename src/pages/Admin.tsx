@@ -15,7 +15,7 @@ import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAccount } from 'wagmi';
 import { TOKEN_SYMBOL } from '@/config/contract';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
 // Authorized admin wallet addresses (lowercase for comparison)
 const ADMIN_WALLETS = [

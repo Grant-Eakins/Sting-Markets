@@ -63,7 +63,7 @@ export default function Markets() {
   const totalBets = stats.totalBets;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Navigation Bar */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -121,11 +121,13 @@ export default function Markets() {
         )}
       </div>
       
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Crypto Prediction Markets</h1>
-        </div>
+      {/* Main Content Area with Yellow Background */}
+      <div className="flex-1 bg-yellow-content">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold italic tracking-tight mb-2" style={{ color: 'hsl(222, 40%, 14%)' }}>Crypto Prediction Markets</h1>
+          </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
@@ -244,6 +246,7 @@ export default function Markets() {
             ))}
           </div>
         )}
+        </div>
       </div>
       
       <Footer />
