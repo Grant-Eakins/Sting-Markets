@@ -2,25 +2,39 @@ import { createMarket, getAllMarkets } from './marketService';
 import { createOnChainMarket } from './blockchainSync';
 import { getBatchQuotes, POPULAR_CRYPTOS, CryptoQuote } from './cryptoApi';
 import { MarketStatus } from '../types/market';
-import { updateBlockchainMarketId } from './database';
+import { updateBlockchainMarketId, savePausedSymbol, removePausedSymbol, loadPausedSymbols } from './database';
 import { sendOpeningTweets } from './marketSettlement';
 
 // Track symbols that have been manually settled and should NOT auto-recreate
+// This Set is populated from database on startup
 const disabledSymbols: Set<string> = new Set();
+
+/**
+ * Initialize paused symbols from database
+ */
+export async function initializePausedSymbols(): Promise<void> {
+  const symbols = await loadPausedSymbols();
+  symbols.forEach(symbol => disabledSymbols.add(symbol));
+  if (symbols.length > 0) {
+    console.log(`🚫 Loaded ${symbols.length} paused symbols from database:`, symbols.join(', '));
+  }
+}
 
 /**
  * Disable auto-creation for a symbol (called when manually settled)
  */
-export function disableSymbolAutoCreation(symbol: string): void {
+export async function disableSymbolAutoCreation(symbol: string): Promise<void> {
   disabledSymbols.add(symbol.toUpperCase());
+  await savePausedSymbol(symbol);
   console.log(`🚫 Disabled auto-creation for ${symbol.toUpperCase()}`);
 }
 
 /**
  * Re-enable auto-creation for a symbol
  */
-export function enableSymbolAutoCreation(symbol: string): void {
+export async function enableSymbolAutoCreation(symbol: string): Promise<void> {
   disabledSymbols.delete(symbol.toUpperCase());
+  await removePausedSymbol(symbol);
   console.log(`✅ Re-enabled auto-creation for ${symbol.toUpperCase()}`);
 }
 

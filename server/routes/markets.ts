@@ -890,9 +890,9 @@ router.post('/admin/test-market', async (req, res) => {
  * POST /api/markets/symbol/:symbol/pause
  * Pause auto-creation for a symbol
  */
-router.post('/symbol/:symbol/pause', (req, res) => {
+router.post('/symbol/:symbol/pause', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  disableSymbolAutoCreation(symbol);
+  await disableSymbolAutoCreation(symbol);
   res.json({
     success: true,
     message: `Paused auto-creation for ${symbol}`,
@@ -904,9 +904,9 @@ router.post('/symbol/:symbol/pause', (req, res) => {
  * POST /api/markets/symbol/:symbol/resume
  * Resume auto-creation for a symbol
  */
-router.post('/symbol/:symbol/resume', (req, res) => {
+router.post('/symbol/:symbol/resume', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  enableSymbolAutoCreation(symbol);
+  await enableSymbolAutoCreation(symbol);
   res.json({
     success: true,
     message: `Resumed auto-creation for ${symbol}`,

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import marketsRouter from './routes/markets';
-import { syncCryptoMarkets } from './services/cryptoSync';
+import { syncCryptoMarkets, initializePausedSymbols } from './services/cryptoSync';
 import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/marketSettlement';
 import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain } from './services/blockchainSync';
 import { getAllMarkets, updateMarketPools, initializeMarketsFromDb } from './services/marketService';
@@ -22,6 +22,9 @@ dotenv.config();
 
 // Initialize database connection for persistent storage
 initializeDatabase();
+
+// Initialize paused symbols from database
+initializePausedSymbols();
 
 // Initialize blockchain connection for on-chain market creation
 initializeBlockchain();

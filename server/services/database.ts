@@ -559,3 +559,78 @@ function dbBetToBet(row: any): Bet {
     claimed: row.claimed,
   };
 }
+
+// ============================================
+// PAUSED SYMBOLS OPERATIONS
+// ============================================
+
+/**
+ * Save a paused symbol to the database
+ */
+export async function savePausedSymbol(symbol: string): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('paused_symbols')
+      .upsert({
+        symbol: symbol.toUpperCase(),
+        paused_at: new Date().toISOString(),
+      }, { onConflict: 'symbol' });
+
+    if (error) {
+      console.error('❌ Error saving paused symbol:', error.message);
+      return false;
+    }
+    return true;
+  } catch (error: any) {
+    console.error('❌ Error saving paused symbol:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Remove a paused symbol from the database
+ */
+export async function removePausedSymbol(symbol: string): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('paused_symbols')
+      .delete()
+      .eq('symbol', symbol.toUpperCase());
+
+    if (error) {
+      console.error('❌ Error removing paused symbol:', error.message);
+      return false;
+    }
+    return true;
+  } catch (error: any) {
+    console.error('❌ Error removing paused symbol:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Load all paused symbols from the database
+ */
+export async function loadPausedSymbols(): Promise<string[]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('paused_symbols')
+      .select('symbol');
+
+    if (error) {
+      console.error('❌ Error loading paused symbols:', error.message);
+      return [];
+    }
+
+    return (data || []).map((row: any) => row.symbol);
+  } catch (error: any) {
+    console.error('❌ Error loading paused symbols:', error.message);
+    return [];
+  }
+}
