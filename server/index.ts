@@ -29,6 +29,16 @@ initializeBlockchain();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Redirect Railway URL to custom domain in production
+app.use((req, res, next) => {
+  const host = req.get('host') || '';
+  // Redirect Railway URL to custom domain
+  if (host.includes('railway.app') && process.env.NODE_ENV === 'production') {
+    return res.redirect(301, `https://stingmarkets.com${req.originalUrl}`);
+  }
+  next();
+});
+
 /**
  * CRYPTO MARKET SCHEDULE
  * ======================
