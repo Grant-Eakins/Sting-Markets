@@ -5,20 +5,25 @@ import { formatCryptoPrice } from '@/lib/utils';
 
 interface StockChartProps {
   stockSymbol: string;
-  currentPrice: number; // in cents
-  openingPrice: number; // in cents
+  currentPrice: number; // in cents (or micro-units for meme coins)
+  openingPrice: number; // in cents (or micro-units for meme coins)
   isAfterHours: boolean;
   contractAddress?: string; // For meme coins - uses DexScreener API
+  category?: string; // 'meme' for meme coins with tiny prices
 }
 
-export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHours, contractAddress }: StockChartProps) {
+export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHours, contractAddress, category }: StockChartProps) {
   const [priceHistory, setPriceHistory] = useState<Array<{ time: string; price: number; volume?: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; price: number; time: string } | null>(null);
   
-  // Convert cents to dollars for display
-  const currentPriceUSD = currentPrice / 100;
-  const openingPriceUSD = openingPrice / 100;
+  // Detect if this is a meme coin with tiny prices stored in micro-units
+  const isTinyPriceMeme = category === 'meme' || (openingPrice > 100000 && openingPrice / 100 > 1000);
+  const priceDivisor = isTinyPriceMeme ? 100_000_000 : 100;
+  
+  // Convert to dollars for display
+  const currentPriceUSD = currentPrice / priceDivisor;
+  const openingPriceUSD = openingPrice / priceDivisor;
   
   // Calculate change from chart data if available, otherwise from props
   const firstPrice = priceHistory.length > 0 ? priceHistory[0].price : openingPriceUSD;

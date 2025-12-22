@@ -343,16 +343,36 @@ router.post('/create-by-contract', async (req, res) => {
     }
     
     // Convert price to cents (handle very small meme coin prices)
-    // For prices under $0.01, we'll use more decimal precision
+    // For meme coins with tiny prices, we store in "micro-cents" (USD * 100,000,000)
+    // The frontend will need to detect this based on price magnitude
     const priceUsd = tokenInfo.price;
     let openingPriceInCents: number;
     let priceDisplay: string;
     
+    // Always store as cents (USD * 100) - for tiny prices this gives us precision to $0.01
+    // For meme coins, the actual price display will use the raw value
+    openingPriceInCents = Math.round(priceUsd * 100);
+    
+    // If price is too small for cents (< $0.01), store raw USD * 100000000 and mark it
+    // Actually, let's just store raw price in a way that works with frontend
+    // The frontend divides by 100, so if we want $0.000898 to display correctly,
+    // we need to store 0.0898 (so 0.0898 / 100 = 0.000898... wait that's wrong)
+    // 
+    // Current system: store cents, frontend divides by 100
+    // For $0.000898: cents = 0.0898 cents, rounds to 0
+    // 
+    // New approach: Store raw USD price * 100 (as "centi-dollars")
+    // For display, we'll use a special format function that handles tiny prices
+    
     if (priceUsd < 0.01) {
-      // For tiny prices, store in micro-cents (1 cent = 100 micro-cents)
-      // This allows precision down to $0.000001
-      openingPriceInCents = Math.round(priceUsd * 100_000_000); // Store as 8 decimal places
+      // For tiny prices under 1 cent, store in "nano-dollars" units
+      // Store as integer: USD * 100,000,000 (8 decimal precision)
+      // Frontend needs to know to divide by 100,000,000 instead of 100
+      // We'll use negative sign as a flag (hacky but works without schema change)
+      // Actually, let's just store raw cents and handle tiny display in frontend
+      openingPriceInCents = Math.round(priceUsd * 100_000_000);
       priceDisplay = `$${priceUsd.toFixed(8)}`;
+      console.log(`   ⚠️ Tiny price detected - storing as micro-units: ${openingPriceInCents}`);
     } else {
       openingPriceInCents = Math.round(priceUsd * 100);
       priceDisplay = `$${(openingPriceInCents / 100).toFixed(2)}`;

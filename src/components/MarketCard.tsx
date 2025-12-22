@@ -161,6 +161,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               openingPrice={market.openingPrice}
               isAfterHours={market.isAfterHours}
               contractAddress={market.contractAddress}
+              category={market.category}
             />
           )}
 
@@ -194,6 +195,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               probabilities={liveProbabilities}
               blockchainMarketId={market.blockchainMarketId}
               symbol={market.stockSymbol}
+              category={market.category}
               onBet={handleBet}
               onBetPlaced={() => {
                 refetchProbabilities();

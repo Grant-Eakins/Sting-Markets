@@ -20,14 +20,15 @@ interface PriceLevel {
 }
 
 interface PriceSpinnerProps {
-  currentPrice: number; // in cents
-  openingPrice: number; // in cents
+  currentPrice: number; // in cents (or micro-units for meme coins)
+  openingPrice: number; // in cents (or micro-units for meme coins)
   upPool: number;
   downPool: number;
   isAfterHours: boolean;
   probabilities?: number[]; // Probabilities from blockchain (0-100% per bucket)
   blockchainMarketId?: number;
   symbol?: string; // Market symbol for sharing (e.g. "BTC", "ETH")
+  category?: string; // 'meme' for meme coins with tiny prices
   onBetPlaced?: () => void;
   onBet: (bucketIndex: number, percentChange: number, targetPrice: number, amount: number) => void;
 }
@@ -41,6 +42,7 @@ export function PriceSpinner({
   probabilities,
   blockchainMarketId,
   symbol,
+  category,
   onBetPlaced,
   onBet 
 }: PriceSpinnerProps) {
@@ -166,8 +168,14 @@ export function PriceSpinner({
     }
   }, [isConfirmed, onBetPlaced]);
 
-  const currentPriceUSD = currentPrice / 100;
-  const openingPriceUSD = openingPrice / 100;
+  // Detect if this is a meme coin with tiny prices stored in micro-units
+  // Meme coins store price as USD * 100,000,000 instead of cents (USD * 100)
+  // We detect this if category is 'meme' or if the "cents" value seems way too high
+  const isTinyPriceMeme = category === 'meme' || (openingPrice > 100000 && openingPrice / 100 > 1000);
+  const priceDivisor = isTinyPriceMeme ? 100_000_000 : 100;
+  
+  const currentPriceUSD = currentPrice / priceDivisor;
+  const openingPriceUSD = openingPrice / priceDivisor;
   const totalPool = upPool + downPool;
   
   // Price levels should be centered on opening price (base price for percent changes)
