@@ -124,10 +124,6 @@ export default function Markets() {
       {/* Main Content Area with Yellow Background */}
       <div className="flex-1 bg-yellow-content">
         <div className="container mx-auto px-4 py-8">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold italic tracking-tight mb-2" style={{ color: 'hsl(222, 40%, 14%)' }}>Crypto Prediction Markets</h1>
-          </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">

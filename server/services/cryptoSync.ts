@@ -21,7 +21,7 @@ function getUTCTimeInfo(): { hour: number; minute: number } {
  * Markets lock at 00:00 UTC and 12:00 UTC
  * Settlement is 3 seconds AFTER lock (gives time for final price capture)
  */
-function getNext12HourSettlement(): { lockTime: Date; settleTime: Date; sessionLabel: string } {
+export function getNext12HourSettlement(): { lockTime: Date; settleTime: Date; sessionLabel: string } {
   const now = new Date();
   const { hour } = getUTCTimeInfo();
   

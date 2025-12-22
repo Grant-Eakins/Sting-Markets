@@ -178,17 +178,35 @@ export function PriceSpinner({
   // Loss buckets (5-9): 0 to -5%, -5 to -10%, -10 to -15%, -15 to -20%, -20%+
   
   const totalBuckets = 10;
+  
+  // Helper to format price range labels
+  const formatPriceRange = (lowPercent: number, highPercent: number | null, isPlus: boolean = false, isMinus: boolean = false) => {
+    const price = basePriceUSD * (1 + lowPercent / 100);
+    if (isPlus) {
+      return `$${formatCryptoPrice(price)}+`;
+    }
+    if (isMinus) {
+      return `<$${formatCryptoPrice(price)}`;
+    }
+    const highPrice = basePriceUSD * (1 + highPercent! / 100);
+    // Show lower price first, higher price second
+    if (price < highPrice) {
+      return `$${formatCryptoPrice(price)}-$${formatCryptoPrice(highPrice)}`;
+    }
+    return `$${formatCryptoPrice(highPrice)}-$${formatCryptoPrice(price)}`;
+  };
+  
   const bucketLabels = [
-    { label: '+20%+', percentChange: 25, bucketIndex: 0 },
-    { label: '+15-20%', percentChange: 17.5, bucketIndex: 1 },
-    { label: '+10-15%', percentChange: 12.5, bucketIndex: 2 },
-    { label: '+5-10%', percentChange: 7.5, bucketIndex: 3 },
-    { label: '0-5%', percentChange: 2.5, bucketIndex: 4 },
-    { label: '0 to -5%', percentChange: -2.5, bucketIndex: 5 },
-    { label: '-5 to -10%', percentChange: -7.5, bucketIndex: 6 },
-    { label: '-10 to -15%', percentChange: -12.5, bucketIndex: 7 },
-    { label: '-15 to -20%', percentChange: -17.5, bucketIndex: 8 },
-    { label: '-20%+', percentChange: -25, bucketIndex: 9 },
+    { label: formatPriceRange(20, null, true), percentChange: 25, bucketIndex: 0 },
+    { label: formatPriceRange(15, 20), percentChange: 17.5, bucketIndex: 1 },
+    { label: formatPriceRange(10, 15), percentChange: 12.5, bucketIndex: 2 },
+    { label: formatPriceRange(5, 10), percentChange: 7.5, bucketIndex: 3 },
+    { label: formatPriceRange(0, 5), percentChange: 2.5, bucketIndex: 4 },
+    { label: formatPriceRange(-5, 0), percentChange: -2.5, bucketIndex: 5 },
+    { label: formatPriceRange(-10, -5), percentChange: -7.5, bucketIndex: 6 },
+    { label: formatPriceRange(-15, -10), percentChange: -12.5, bucketIndex: 7 },
+    { label: formatPriceRange(-20, -15), percentChange: -17.5, bucketIndex: 8 },
+    { label: formatPriceRange(-20, null, false, true), percentChange: -25, bucketIndex: 9 },
   ];
   
   // Log probabilities for debugging
@@ -379,17 +397,15 @@ export function PriceSpinner({
                 <>
                   <div className={cn(
                     'text-lg font-bold',
-                    highestProbBucket.bucketIndex <= 4 && highestProbBucket.bucketIndex !== 4 && 'text-green-500',
-                    highestProbBucket.bucketIndex >= 5 && highestProbBucket.bucketIndex !== 5 && 'text-red-500',
-                    (highestProbBucket.bucketIndex === 4 || highestProbBucket.bucketIndex === 5) && 'text-primary'
+                    highestProbBucket.bucketIndex <= 4 && 'text-green-500',
+                    highestProbBucket.bucketIndex >= 5 && 'text-red-500'
                   )}>
                     ${formatCryptoPrice(highestProbBucket.price)}
                   </div>
                   <div className={cn(
                     'text-xs',
-                    highestProbBucket.bucketIndex <= 4 && highestProbBucket.bucketIndex !== 4 && 'text-green-500',
-                    highestProbBucket.bucketIndex >= 5 && highestProbBucket.bucketIndex !== 5 && 'text-red-500',
-                    (highestProbBucket.bucketIndex === 4 || highestProbBucket.bucketIndex === 5) && 'text-muted-foreground'
+                    highestProbBucket.bucketIndex <= 4 && 'text-green-500',
+                    highestProbBucket.bucketIndex >= 5 && 'text-red-500'
                   )}>
                     {bucketLabels.find(b => b.bucketIndex === highestProbBucket.bucketIndex)?.label || '0%'} ({highestProbBucket.probability.toFixed(1)}% prob)
                   </div>
@@ -534,11 +550,10 @@ export function PriceSpinner({
               <span className="text-sm font-medium">Selected Bucket</span>
               <span className={cn(
                 'text-sm font-bold',
-                priceLevels[selectedLevel].bucketIndex <= 4 && priceLevels[selectedLevel].bucketIndex !== 4 && 'text-green-500',
-                priceLevels[selectedLevel].bucketIndex >= 5 && priceLevels[selectedLevel].bucketIndex !== 5 && 'text-red-500',
-                (priceLevels[selectedLevel].bucketIndex === 4 || priceLevels[selectedLevel].bucketIndex === 5) && 'text-primary'
+                priceLevels[selectedLevel].bucketIndex <= 4 && 'text-green-500',
+                priceLevels[selectedLevel].bucketIndex >= 5 && 'text-red-500'
               )}>
-                ${formatCryptoPrice(priceLevels[selectedLevel].price)} ({bucketLabels[selectedLevel]?.label || '0%'})
+                ${formatCryptoPrice(priceLevels[selectedLevel].price)} ({bucketLabels[selectedLevel]?.label || ''})
               </span>
             </div>
             {(() => {

@@ -15,7 +15,7 @@ import {
 } from '../services/marketService';
 import { createOnChainMarket, syncAllMarketPools, getMarketProbabilities } from '../services/blockchainSync';
 import { getCryptoHistory } from '../services/cryptoApi';
-import { syncCryptoMarkets } from '../services/cryptoSync';
+import { syncCryptoMarkets, getNext12HourSettlement } from '../services/cryptoSync';
 import { Position, MarketStatus } from '../types/market';
 import { testDiscordWebhook } from '../services/discordBot';
 import { getCryptoQuote } from '../services/cryptoApi';
@@ -306,7 +306,7 @@ router.get('/search-token', async (req, res) => {
  */
 router.post('/create-by-contract', async (req, res) => {
   try {
-    const { contractAddress, lockMinutes = 720, settleMinutes = 720.05 } = req.body;
+    const { contractAddress } = req.body;
     
     if (!contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
       return res.status(400).json({
@@ -314,6 +314,9 @@ router.post('/create-by-contract', async (req, res) => {
         error: 'Invalid contract address format',
       });
     }
+    
+    // Use same timing as XRP/crypto markets (12-hour sessions at 00:00/12:00 UTC)
+    const { lockTime, settleTime, sessionLabel } = getNext12HourSettlement();
     
     // Fetch token info from DexScreener
     const tokenInfo = await getTokenByAddress(contractAddress);
@@ -355,16 +358,13 @@ router.post('/create-by-contract', async (req, res) => {
       priceDisplay = `$${(openingPriceInCents / 100).toFixed(2)}`;
     }
     
-    // Calculate lock/settle times (default: 12 hour session)
-    const now = new Date();
-    const lockTime = new Date(now.getTime() + lockMinutes * 60 * 1000);
-    const settleTime = new Date(now.getTime() + settleMinutes * 60 * 1000);
-    
     console.log(`\n🪙 Creating market for Base meme coin: ${tokenInfo.symbol}`);
     console.log(`   Name: ${tokenInfo.name}`);
     console.log(`   Contract: ${contractAddress}`);
     console.log(`   Price: ${priceDisplay}`);
     console.log(`   Liquidity: $${tokenInfo.liquidity.toLocaleString()}`);
+    console.log(`   Session: ${sessionLabel}`);
+    console.log(`   Locks at: ${lockTime.toISOString()}`);
     
     // Create the market
     const market = createMarket({
