@@ -21,6 +21,15 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
   const [showBetDialog, setShowBetDialog] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<'UP' | 'DOWN'>('UP');
 
+  // Helper to convert stored price to USD based on market category
+  // - Regular cryptos: stored as cents (USD * 100)
+  // - Meme coins with tiny prices: stored as micro-units (USD * 100,000,000)
+  const convertPriceToUSD = (storedPrice: number): number => {
+    const isMicroUnits = market.category === 'meme' && market.openingPrice > 1000;
+    const divisor = isMicroUnits ? 100_000_000 : 100;
+    return storedPrice / divisor;
+  };
+
   // Read real-time probabilities from blockchain
   const { probabilities, refetch: refetchProbabilities } = useMarketProbabilities(market.blockchainMarketId);
   const contractData = useContractMarketData(market.blockchainMarketId);
@@ -216,7 +225,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
             <div className="grid grid-cols-2 gap-3 pt-2">
               {/* UP Button */}
               <button
-                onClick={() => handleBet(0, 5, (market.openingPrice / 100) * 1.05, 0.01)}
+                onClick={() => handleBet(0, 5, convertPriceToUSD(market.openingPrice) * 1.05, 0.01)}
                 disabled={market.status !== 'ACTIVE'}
                 className="group relative overflow-hidden rounded-lg border-2 border-green-500 bg-green-500/10 p-4 transition-all hover:bg-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -236,7 +245,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
 
               {/* DOWN Button */}
               <button
-                onClick={() => handleBet(22, -5, (market.openingPrice / 100) * 0.95, 0.01)}
+                onClick={() => handleBet(22, -5, convertPriceToUSD(market.openingPrice) * 0.95, 0.01)}
                 disabled={market.status !== 'ACTIVE'}
                 className="group relative overflow-hidden rounded-lg border-2 border-red-500 bg-red-500/10 p-4 transition-all hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -262,10 +271,10 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Current Price:</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg">${(market.currentPrice / 100).toFixed(3)}</span>
+                  <span className="font-bold text-lg">${formatCryptoPrice(convertPriceToUSD(market.currentPrice))}</span>
                   {market.priceChange != null && market.priceChangePercent != null && (
                     <span className={market.priceChange >= 0 ? 'text-green-500 text-sm' : 'text-red-500 text-sm'}>
-                      ({market.priceChange >= 0 ? '+' : ''}${(market.priceChange / 100).toFixed(3)} / {market.priceChangePercent.toFixed(2)}%)
+                      ({market.priceChange >= 0 ? '+' : ''}${formatCryptoPrice(convertPriceToUSD(market.priceChange))} / {market.priceChangePercent.toFixed(2)}%)
                     </span>
                   )}
                 </div>
@@ -279,10 +288,10 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               <div className="flex justify-between">
                 <span>Settlement Result:</span>
                 <div className="text-right">
-                  <div className="font-bold">${(market.closingPrice / 100).toFixed(3)}</div>
+                  <div className="font-bold">${formatCryptoPrice(convertPriceToUSD(market.closingPrice))}</div>
                   {market.priceChange != null && market.priceChangePercent != null && (
                     <div className={market.priceChange >= 0 ? 'text-green-500 text-xs' : 'text-red-500 text-xs'}>
-                      {market.priceChange >= 0 ? '+' : ''}${(market.priceChange / 100).toFixed(3)} ({market.priceChangePercent.toFixed(2)}%)
+                      {market.priceChange >= 0 ? '+' : ''}${formatCryptoPrice(convertPriceToUSD(market.priceChange))} ({market.priceChangePercent.toFixed(2)}%)
                     </div>
                   )}
                 </div>
@@ -294,7 +303,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
         <CardFooter className="text-xs text-muted-foreground">
           <div className="flex justify-between w-full">
             {market.openingPrice !== undefined && (
-              <span>Opening: ${formatCryptoPrice(market.openingPrice / 100)}</span>
+              <span>Opening: ${formatCryptoPrice(convertPriceToUSD(market.openingPrice))}</span>
             )}
             {market.status === 'ACTIVE' && (
               <span>Settles in {hoursUntilSettle}h {minutesUntilSettle}m</span>
