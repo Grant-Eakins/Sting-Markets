@@ -61,6 +61,21 @@ export default function AdminPage() {
     closingPrice: 17500,
   });
 
+  // Contract address market creation state
+  const [contractData, setContractData] = useState({
+    contractAddress: '',
+    lockMinutes: 720,  // 12 hours default
+    settleMinutes: 720.05,
+  });
+  const [tokenPreview, setTokenPreview] = useState<{
+    symbol: string;
+    name: string;
+    price: number;
+    liquidity: number;
+    chainId: string;
+  } | null>(null);
+  const [tokenLoading, setTokenLoading] = useState(false);
+
   // Check if the connected wallet is an admin
   const addressLower = address?.toLowerCase();
   const isAdmin = isConnected && addressLower && ADMIN_WALLETS.includes(addressLower);
@@ -118,6 +133,64 @@ export default function AdminPage() {
       alert(`❌ Error: ${error.response?.data?.error || error.message}`);
     },
   });
+
+  // Create market by contract address mutation
+  const createByContract = useMutation({
+    mutationFn: async (data: typeof contractData) => {
+      const response = await axios.post(`${API_BASE}/markets/create-by-contract`, data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-markets'] });
+      setContractData({
+        contractAddress: '',
+        lockMinutes: 720,
+        settleMinutes: 720.05,
+      });
+      setTokenPreview(null);
+      alert(`✅ Market created for ${data.tokenInfo.symbol}! On-chain pool ID: ${data.blockchainMarketId}`);
+    },
+    onError: (error: any) => {
+      alert(`❌ Error: ${error.response?.data?.error || error.message}`);
+    },
+  });
+
+  // Lookup token by contract address
+  const handleContractLookup = async () => {
+    if (!contractData.contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(contractData.contractAddress)) {
+      alert('Please enter a valid contract address (0x...)');
+      return;
+    }
+    
+    setTokenLoading(true);
+    setTokenPreview(null);
+    
+    try {
+      const response = await axios.get(`${API_BASE}/markets/token/${contractData.contractAddress}`);
+      if (response.data.success && response.data.token) {
+        setTokenPreview({
+          symbol: response.data.token.symbol,
+          name: response.data.token.name,
+          price: response.data.token.price,
+          liquidity: response.data.token.liquidity,
+          chainId: response.data.token.chainId,
+        });
+      }
+    } catch (error: any) {
+      alert(`❌ Token not found: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setTokenLoading(false);
+    }
+  };
+
+  const handleContractCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tokenPreview) {
+      alert('Please look up the token first');
+      return;
+    }
+    createByContract.mutate(contractData);
+  };
 
   // Handler functions
   const handleNumberChange = (field: keyof typeof formData, value: string) => {
@@ -329,6 +402,118 @@ export default function AdminPage() {
             </CardContent>
           </Card>
 
+          {/* Create Market by Contract Address Card */}
+          <Card className="border-purple-500/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🪙 Create Meme Coin Market
+              </CardTitle>
+              <CardDescription>
+                Paste a Base token contract address to create a market
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleContractCreate} className="space-y-4">
+                <div>
+                  <Label htmlFor="contractAddress">Contract Address *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="contractAddress"
+                      value={contractData.contractAddress}
+                      onChange={(e) => {
+                        setContractData({ ...contractData, contractAddress: e.target.value });
+                        setTokenPreview(null);
+                      }}
+                      placeholder="0x..."
+                      className="font-mono"
+                      required
+                    />
+                    <Button 
+                      type="button" 
+                      variant="secondary"
+                      onClick={handleContractLookup}
+                      disabled={tokenLoading}
+                    >
+                      {tokenLoading ? '...' : 'Lookup'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Token Preview */}
+                {tokenPreview && (
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold">{tokenPreview.symbol}</span>
+                      <span className="text-muted-foreground">{tokenPreview.name}</span>
+                      {tokenPreview.chainId === 'base' && (
+                        <span className="text-xs bg-blue-500/20 text-blue-500 px-2 py-0.5 rounded">Base</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Price:</span>{' '}
+                        ${tokenPreview.price < 0.01 
+                          ? tokenPreview.price.toFixed(8) 
+                          : tokenPreview.price.toFixed(4)}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Liquidity:</span>{' '}
+                        ${tokenPreview.liquidity.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="contractLockMinutes">Lock After (minutes)</Label>
+                    <Input
+                      id="contractLockMinutes"
+                      type="number"
+                      min="1"
+                      value={contractData.lockMinutes}
+                      onChange={(e) => setContractData({ 
+                        ...contractData, 
+                        lockMinutes: parseFloat(e.target.value) || 720 
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="contractSettleMinutes">Settle After (minutes)</Label>
+                    <Input
+                      id="contractSettleMinutes"
+                      type="number"
+                      min="1"
+                      value={contractData.settleMinutes}
+                      onChange={(e) => setContractData({ 
+                        ...contractData, 
+                        settleMinutes: parseFloat(e.target.value) || 720.05 
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  ⏱️ Default: 12 hour session. Lock in {Math.floor(contractData.lockMinutes / 60)}h {Math.round(contractData.lockMinutes % 60)}m
+                </p>
+
+                <Button 
+                  type="submit" 
+                  className="w-full bg-purple-600 hover:bg-purple-700" 
+                  disabled={!tokenPreview || createByContract.isPending}
+                >
+                  {createByContract.isPending 
+                    ? 'Creating...' 
+                    : tokenPreview 
+                      ? `Create ${tokenPreview.symbol} Market` 
+                      : 'Look up token first'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Settle Market Card */}
           <Card>
             <CardHeader>

@@ -19,6 +19,7 @@ import { syncCryptoMarkets } from '../services/cryptoSync';
 import { Position, MarketStatus } from '../types/market';
 import { testDiscordWebhook } from '../services/discordBot';
 import { getCryptoQuote } from '../services/cryptoApi';
+import { getTokenByAddress, searchTokens, getTokenHistory } from '../services/dexScreenerApi';
 
 const router = express.Router();
 
@@ -109,6 +110,64 @@ router.get('/chart/:symbol', async (req, res) => {
 });
 
 /**
+ * GET /api/markets/chart-by-contract/:address
+ * Get historical price data for a meme coin by contract address
+ * Uses DexScreener for price data
+ */
+router.get('/chart-by-contract/:address', async (req, res) => {
+  try {
+    const { address } = req.params;
+    const { timeframe = '15m' } = req.query;
+    
+    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid contract address format',
+      });
+    }
+    
+    // Validate timeframe
+    const validTimeframes = ['5m', '15m', '1h', '4h', '1d'];
+    const tf = validTimeframes.includes(timeframe as string) 
+      ? (timeframe as '5m' | '15m' | '1h' | '4h' | '1d') 
+      : '15m';
+    
+    // Check cache
+    const cacheKey = `contract-${address}-${tf}`;
+    const cached = chartCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < CHART_CACHE_TTL) {
+      return res.json({
+        success: true,
+        address,
+        timeframe: tf,
+        data: cached.data,
+        cached: true,
+      });
+    }
+    
+    const data = await getTokenHistory(address, tf);
+    
+    // Store in cache
+    if (data.length > 0) {
+      chartCache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+    
+    res.json({
+      success: true,
+      address,
+      timeframe: tf,
+      data,
+      cached: false,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * POST /api/markets/create
  * Manually create a new market with on-chain liquidity pool
  * Accepts lockMinutes/settleMinutes for test markets
@@ -160,6 +219,186 @@ router.post('/create', async (req, res) => {
         market,
         blockchainMarketId,
         message: `Market created with on-chain pool ID ${blockchainMarketId}`,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: `Failed to create on-chain market: ${error.message}`,
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/markets/token/:address
+ * Look up token info by contract address (for Base meme coins)
+ */
+router.get('/token/:address', async (req, res) => {
+  try {
+    const { address } = req.params;
+    
+    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid contract address format',
+      });
+    }
+    
+    const tokenInfo = await getTokenByAddress(address);
+    
+    if (!tokenInfo) {
+      return res.status(404).json({
+        success: false,
+        error: 'Token not found on DexScreener',
+      });
+    }
+    
+    res.json({
+      success: true,
+      token: tokenInfo,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/markets/search-token
+ * Search for tokens by name or symbol on Base chain
+ */
+router.get('/search-token', async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || typeof q !== 'string' || q.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query must be at least 2 characters',
+      });
+    }
+    
+    const tokens = await searchTokens(q);
+    
+    res.json({
+      success: true,
+      tokens,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/markets/create-by-contract
+ * Create a market for a Base meme coin by contract address
+ * Automatically fetches token info from DexScreener
+ */
+router.post('/create-by-contract', async (req, res) => {
+  try {
+    const { contractAddress, lockMinutes = 720, settleMinutes = 720.05 } = req.body;
+    
+    if (!contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid contract address format',
+      });
+    }
+    
+    // Fetch token info from DexScreener
+    const tokenInfo = await getTokenByAddress(contractAddress);
+    
+    if (!tokenInfo) {
+      return res.status(404).json({
+        success: false,
+        error: 'Token not found on DexScreener. Make sure it has liquidity on a Base DEX.',
+      });
+    }
+    
+    // Check if there's already an active market for this token
+    const existingMarkets = getAllMarkets();
+    const existingActive = existingMarkets.find(
+      m => m.stockSymbol === tokenInfo.symbol && 
+           (m.status === MarketStatus.ACTIVE || m.status === MarketStatus.LOCKED)
+    );
+    
+    if (existingActive) {
+      return res.status(400).json({
+        success: false,
+        error: `Active market already exists for ${tokenInfo.symbol}`,
+      });
+    }
+    
+    // Convert price to cents (handle very small meme coin prices)
+    // For prices under $0.01, we'll use more decimal precision
+    const priceUsd = tokenInfo.price;
+    let openingPriceInCents: number;
+    let priceDisplay: string;
+    
+    if (priceUsd < 0.01) {
+      // For tiny prices, store in micro-cents (1 cent = 100 micro-cents)
+      // This allows precision down to $0.000001
+      openingPriceInCents = Math.round(priceUsd * 100_000_000); // Store as 8 decimal places
+      priceDisplay = `$${priceUsd.toFixed(8)}`;
+    } else {
+      openingPriceInCents = Math.round(priceUsd * 100);
+      priceDisplay = `$${(openingPriceInCents / 100).toFixed(2)}`;
+    }
+    
+    // Calculate lock/settle times (default: 12 hour session)
+    const now = new Date();
+    const lockTime = new Date(now.getTime() + lockMinutes * 60 * 1000);
+    const settleTime = new Date(now.getTime() + settleMinutes * 60 * 1000);
+    
+    console.log(`\n🪙 Creating market for Base meme coin: ${tokenInfo.symbol}`);
+    console.log(`   Name: ${tokenInfo.name}`);
+    console.log(`   Contract: ${contractAddress}`);
+    console.log(`   Price: ${priceDisplay}`);
+    console.log(`   Liquidity: $${tokenInfo.liquidity.toLocaleString()}`);
+    
+    // Create the market
+    const market = createMarket({
+      stockSymbol: tokenInfo.symbol,
+      stockName: tokenInfo.name,
+      description: `Predict ${tokenInfo.symbol} price movement. Contract: ${contractAddress.slice(0, 10)}...`,
+      openingPrice: openingPriceInCents,
+      isAfterHours: false,
+      lockTime,
+      settleTime,
+      category: 'meme',
+      contractAddress, // Store the contract address for future price lookups
+    });
+    
+    // Create on-chain market
+    try {
+      const blockchainMarketId = await createOnChainMarket(
+        tokenInfo.symbol,
+        openingPriceInCents,
+        market.lockTime,
+        market.settleTime,
+        false
+      );
+      
+      if (blockchainMarketId !== null) {
+        market.blockchainMarketId = blockchainMarketId;
+      }
+      
+      res.json({
+        success: true,
+        market,
+        tokenInfo,
+        blockchainMarketId,
+        message: `Market created for ${tokenInfo.symbol} with on-chain pool ID ${blockchainMarketId}`,
       });
     } catch (error: any) {
       res.status(500).json({

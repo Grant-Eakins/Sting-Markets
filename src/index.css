@@ -9,8 +9,8 @@ Color theme: Blue (#209ee8), Yellow (#ffff68), White
 
 @layer base {
   :root {
-    --background: 222 47% 5%;
-    --foreground: 210 40% 98%;
+    --background: 55 98% 76%;
+    --foreground: 222 47% 11%;
 
     --card: 222 47% 8%;
     --card-foreground: 210 40% 98%;

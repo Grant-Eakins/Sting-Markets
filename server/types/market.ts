@@ -50,6 +50,7 @@ export interface Market {
   // Metadata
   imageUrl?: string;
   category?: string;
+  contractAddress?: string;       // Contract address for meme coins
   
   // Blockchain integration
   blockchainMarketId?: number;  // On-chain market ID (if created on blockchain)
@@ -99,6 +100,7 @@ export interface CreateMarketRequest {
   settleTime?: Date;          // Direct settle time (overrides settleHours if provided)
   imageUrl?: string;
   category?: string;
+  contractAddress?: string;     // Contract address for meme coins (for price lookups)
   blockchainMarketId?: number;  // Optional: on-chain market ID if already created
 }
 

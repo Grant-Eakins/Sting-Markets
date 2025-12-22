@@ -168,15 +168,14 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
           return;
         }
         
-        // Use actual bucket index from PriceSpinner, or fallback to middle bucket +/- 1
+        // Use actual bucket index from PriceSpinner, or fallback to 0% bucket +/- 1
         let outcomeIndex: number;
         if (bucketIndex !== undefined) {
           outcomeIndex = bucketIndex;
         } else {
-          // Fallback: 23 buckets for intraday (index 10 = 0%), 42 for overnight (index 20 = 0%)
-          const isAfterHours = market.isAfterHours;
-          const middleBucket = isAfterHours ? 20 : 10;
-          outcomeIndex = position === 'UP' ? middleBucket - 1 : middleBucket + 1;
+          // Meme coin buckets: 10 total, bucket 4 = 0-5% gain, bucket 5 = 0 to -5% loss
+          // UP bet: small gain bucket (4), DOWN bet: small loss bucket (5)
+          outcomeIndex = position === 'UP' ? 4 : 5;
         }
         
         // Check if approval is needed first

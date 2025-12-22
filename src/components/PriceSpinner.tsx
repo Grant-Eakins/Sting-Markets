@@ -173,13 +173,23 @@ export function PriceSpinner({
   // Price levels should be centered on opening price (base price for percent changes)
   const basePriceUSD = openingPriceUSD;
   
-  // Contract bucket ordering (from ProportionalMarket.sol):
-  // INTRADAY (23 buckets): 0 = >+10%, 10 = +0% to +1%, 11 = 0% to -1%, 21 = <-10%
-  // OVERNIGHT (42 buckets): 0 = >+10%, 20 = +0% to +0.5%, 21 = 0% to -0.5%, 41 = <-10%
+  // Meme coin bucket structure (10 buckets total):
+  // Gain buckets (0-4): 20%+, 15-20%, 10-15%, 5-10%, 0-5%
+  // Loss buckets (5-9): 0 to -5%, -5 to -10%, -10 to -15%, -15 to -20%, -20%+
   
-  const totalBuckets = isAfterHours ? 42 : 23;
-  const increment = isAfterHours ? 0.5 : 1; // 0.5% or 1% increments
-  const numLevelsPerSide = isAfterHours ? 20 : 10; // Levels on each side of 0%
+  const totalBuckets = 10;
+  const bucketLabels = [
+    { label: '+20%+', percentChange: 25, bucketIndex: 0 },
+    { label: '+15%', percentChange: 17.5, bucketIndex: 1 },
+    { label: '+10%', percentChange: 12.5, bucketIndex: 2 },
+    { label: '+5%', percentChange: 7.5, bucketIndex: 3 },
+    { label: '0%', percentChange: 2.5, bucketIndex: 4 },
+    { label: '-5%', percentChange: -2.5, bucketIndex: 5 },
+    { label: '-10%', percentChange: -7.5, bucketIndex: 6 },
+    { label: '-15%', percentChange: -12.5, bucketIndex: 7 },
+    { label: '-20%', percentChange: -17.5, bucketIndex: 8 },
+    { label: '-20%+', percentChange: -25, bucketIndex: 9 },
+  ];
   
   // Log probabilities for debugging
   useEffect(() => {
@@ -196,68 +206,17 @@ export function PriceSpinner({
   
   const priceLevels: PriceLevel[] = [];
   
-  // Build simplified price levels: +10%, +9%, ..., +1%, 0%, -1%, ..., -9%, -10%
-  // That's 21 display buckets for intraday (41 for overnight)
-  // Contract has 23/42 buckets - we combine the extreme >+10% with +10% and <-10% with -10%
-  
+  // Build price levels from bucket labels
   // All percent changes are relative to OPENING PRICE (basePriceUSD)
-  
-  // Positive buckets: +10% down to +1%
-  for (let pct = numLevelsPerSide; pct >= 1; pct--) {
-    const percentChange = pct * increment; // 10%, 9%, 8%, ..., 1%
-    const price = basePriceUSD * (1 + percentChange / 100);
-    
-    // Map to contract bucket index:
-    // +10% (pct=10) -> combine buckets 0 and 1
-    // +9% (pct=9) -> bucket 2
-    // +8% (pct=8) -> bucket 3
-    // etc.
-    const isTop = pct === numLevelsPerSide;
-    const contractBucket = isTop ? 0 : (numLevelsPerSide - pct + 2);
+  for (const bucket of bucketLabels) {
+    const price = basePriceUSD * (1 + bucket.percentChange / 100);
     
     priceLevels.push({
       price,
-      percentChange,
+      percentChange: bucket.percentChange,
       liquidity: 0,
-      probability: isTop 
-        ? (probabilities?.[0] ?? uniformProbability) + (probabilities?.[1] ?? uniformProbability)
-        : (probabilities?.[contractBucket] ?? uniformProbability),
-      bucketIndex: contractBucket,
-    });
-  }
-  
-  // Middle bucket: 0%
-  const middleContractBucket = numLevelsPerSide + 1; // bucket 11 for intraday
-  priceLevels.push({
-    price: basePriceUSD,
-    percentChange: 0,
-    liquidity: 0,
-    probability: probabilities?.[middleContractBucket] ?? uniformProbability,
-    bucketIndex: middleContractBucket,
-  });
-  
-  // Negative buckets: -1% down to -10%
-  for (let pct = 1; pct <= numLevelsPerSide; pct++) {
-    const percentChange = -pct * increment; // -1%, -2%, ..., -10%
-    const price = basePriceUSD * (1 + percentChange / 100);
-    
-    // Map to contract bucket index:
-    // -1% (pct=1) -> bucket 12
-    // -2% (pct=2) -> bucket 13
-    // ...
-    // -10% (pct=10) -> combine buckets 21 and 22
-    const isBottom = pct === numLevelsPerSide;
-    const contractBucket = middleContractBucket + pct;
-    const lastBucket = totalBuckets - 1;
-    
-    priceLevels.push({
-      price,
-      percentChange,
-      liquidity: 0,
-      probability: isBottom
-        ? (probabilities?.[contractBucket] ?? uniformProbability) + (probabilities?.[lastBucket] ?? uniformProbability)
-        : (probabilities?.[contractBucket] ?? uniformProbability),
-      bucketIndex: isBottom ? lastBucket : contractBucket,
+      probability: probabilities?.[bucket.bucketIndex] ?? uniformProbability,
+      bucketIndex: bucket.bucketIndex,
     });
   }
   
@@ -343,17 +302,16 @@ export function PriceSpinner({
     }
   };
 
-  // Find the index of the 0% change bucket for scrolling
-  const middleLevelIndex = priceLevels.findIndex(l => l.percentChange === 0);
+  // Find the index of the 0% bucket for scrolling (bucket with label '0%')
+  const middleLevelIndex = priceLevels.findIndex((_, idx) => bucketLabels[idx]?.label === '0%');
   
   // Debug: log the bucket structure
   useEffect(() => {
     console.log(`📊 PriceSpinner bucket structure:`, {
       totalBuckets,
-      numLevelsPerSide,
       priceLevelsCount: priceLevels.length,
       middleLevelIndex,
-      buckets: priceLevels.map(l => `${l.percentChange}%`).join(', ')
+      buckets: bucketLabels.map(l => l.label).join(', ')
     });
   }, [priceLevels.length, middleLevelIndex]);
 
@@ -421,20 +379,19 @@ export function PriceSpinner({
                 <>
                   <div className={cn(
                     'text-lg font-bold',
-                    highestProbBucket.percentChange > 0 && 'text-green-500',
-                    highestProbBucket.percentChange < 0 && 'text-red-500',
-                    highestProbBucket.percentChange === 0 && 'text-primary'
+                    highestProbBucket.bucketIndex <= 4 && highestProbBucket.bucketIndex !== 4 && 'text-green-500',
+                    highestProbBucket.bucketIndex >= 5 && highestProbBucket.bucketIndex !== 5 && 'text-red-500',
+                    (highestProbBucket.bucketIndex === 4 || highestProbBucket.bucketIndex === 5) && 'text-primary'
                   )}>
                     ${formatCryptoPrice(highestProbBucket.price)}
                   </div>
                   <div className={cn(
                     'text-xs',
-                    highestProbBucket.percentChange > 0 && 'text-green-500',
-                    highestProbBucket.percentChange < 0 && 'text-red-500',
-                    highestProbBucket.percentChange === 0 && 'text-muted-foreground'
+                    highestProbBucket.bucketIndex <= 4 && highestProbBucket.bucketIndex !== 4 && 'text-green-500',
+                    highestProbBucket.bucketIndex >= 5 && highestProbBucket.bucketIndex !== 5 && 'text-red-500',
+                    (highestProbBucket.bucketIndex === 4 || highestProbBucket.bucketIndex === 5) && 'text-muted-foreground'
                   )}>
-                    {highestProbBucket.percentChange > 0 && '+'}
-                    {highestProbBucket.percentChange.toFixed(1)}% ({highestProbBucket.probability.toFixed(1)}% prob)
+                    {bucketLabels.find(b => b.bucketIndex === highestProbBucket.bucketIndex)?.label || '0%'} ({highestProbBucket.probability.toFixed(1)}% prob)
                   </div>
                 </>
               ) : (
@@ -498,8 +455,12 @@ export function PriceSpinner({
           className="space-y-1 max-h-[400px] overflow-y-auto"
         >
           {priceLevels.map((level, idx) => {
-            const isCurrent = level.percentChange === 0;
-            const isUp = level.percentChange > 0;
+            // Use bucket index to determine gain/loss: 0-4 are gain buckets, 5-9 are loss buckets
+            // Bucket 4 is "0%" gain (0-5%), Bucket 5 is "0%" loss (0 to -5%)
+            const isGainBucket = level.bucketIndex <= 4;
+            const isLossBucket = level.bucketIndex >= 5;
+            const isNeutral = level.bucketIndex === 4 || level.bucketIndex === 5; // The two "near 0%" buckets
+            const bucketLabel = bucketLabels[idx]?.label || '';
             const probabilityPercent = level.probability;
             
             // Calculate bar width as relative to max probability
@@ -513,30 +474,28 @@ export function PriceSpinner({
                 key={idx}
                 className={cn(
                   'relative rounded p-2 border transition-all cursor-pointer',
-                  isCurrent && 'bg-primary/10 border-primary font-bold',
-                  !isCurrent && isUp && 'hover:bg-green-500/5 border-green-500/20',
-                  !isCurrent && !isUp && 'hover:bg-red-500/5 border-red-500/20',
+                  isNeutral && 'bg-primary/10 border-primary font-bold',
+                  !isNeutral && isGainBucket && 'hover:bg-green-500/5 border-green-500/20',
+                  !isNeutral && isLossBucket && 'hover:bg-red-500/5 border-red-500/20',
                   selectedLevel === idx && 'ring-2 ring-primary'
                 )}
                 onClick={() => setSelectedLevel(idx)}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    {isUp && <TrendingUp className="w-3 h-3 text-green-500" />}
-                    {!isUp && !isCurrent && <TrendingDown className="w-3 h-3 text-red-500" />}
-                    <span className={cn('text-sm', isCurrent && 'text-primary')}>
+                    {isGainBucket && !isNeutral && <TrendingUp className="w-3 h-3 text-green-500" />}
+                    {isLossBucket && !isNeutral && <TrendingDown className="w-3 h-3 text-red-500" />}
+                    <span className={cn('text-sm', isNeutral && 'text-primary')}>
                       ${formatCryptoPrice(level.price)}
                     </span>
                   </div>
                   <span className={cn(
                     'text-xs font-medium',
-                    isUp && 'text-green-500',
-                    !isUp && !isCurrent && 'text-red-500',
-                    isCurrent && 'text-muted-foreground'
+                    isGainBucket && !isNeutral && 'text-green-500',
+                    isLossBucket && !isNeutral && 'text-red-500',
+                    isNeutral && 'text-muted-foreground'
                   )}>
-                    {level.percentChange > 0 ? `+${level.percentChange.toFixed(isAfterHours ? 1 : 0)}%` :
-                     level.percentChange === 0 ? '0%' :
-                     `${level.percentChange.toFixed(isAfterHours ? 1 : 0)}%`}
+                    {bucketLabel}
                   </span>
                 </div>
 
@@ -545,8 +504,8 @@ export function PriceSpinner({
                   <div 
                     className={cn(
                       'absolute left-0 top-0 h-full transition-all duration-300',
-                      isUp ? 'bg-green-500/60' : 'bg-red-500/60',
-                      isCurrent && 'bg-primary/60'
+                      isGainBucket ? 'bg-green-500/60' : 'bg-red-500/60',
+                      isNeutral && 'bg-primary/60'
                     )}
                     style={{ width: `${barWidth}%` }}
                   />
@@ -575,14 +534,11 @@ export function PriceSpinner({
               <span className="text-sm font-medium">Selected Bucket</span>
               <span className={cn(
                 'text-sm font-bold',
-                priceLevels[selectedLevel].percentChange > 0 && 'text-green-500',
-                priceLevels[selectedLevel].percentChange < 0 && 'text-red-500',
-                priceLevels[selectedLevel].percentChange === 0 && 'text-primary'
+                priceLevels[selectedLevel].bucketIndex <= 4 && priceLevels[selectedLevel].bucketIndex !== 4 && 'text-green-500',
+                priceLevels[selectedLevel].bucketIndex >= 5 && priceLevels[selectedLevel].bucketIndex !== 5 && 'text-red-500',
+                (priceLevels[selectedLevel].bucketIndex === 4 || priceLevels[selectedLevel].bucketIndex === 5) && 'text-primary'
               )}>
-                ${formatCryptoPrice(priceLevels[selectedLevel].price)} (
-                {priceLevels[selectedLevel].percentChange > 0 ? `+${priceLevels[selectedLevel].percentChange.toFixed(isAfterHours ? 1 : 0)}%` :
-                 priceLevels[selectedLevel].percentChange === 0 ? '0%' :
-                 `${priceLevels[selectedLevel].percentChange.toFixed(isAfterHours ? 1 : 0)}%`})
+                ${formatCryptoPrice(priceLevels[selectedLevel].price)} ({bucketLabels[selectedLevel]?.label || '0%'})
               </span>
             </div>
             {(() => {
@@ -691,9 +647,9 @@ export function PriceSpinner({
           onClick={handleBet}
           className={cn(
             'w-full',
-            selectedLevel !== null && priceLevels[selectedLevel].percentChange > 0 && 'bg-green-600 hover:bg-green-700',
-            selectedLevel !== null && priceLevels[selectedLevel].percentChange < 0 && 'bg-red-600 hover:bg-red-700',
-            (selectedLevel === null || priceLevels[selectedLevel].percentChange === 0) && 'bg-primary hover:bg-primary/90'
+            selectedLevel !== null && priceLevels[selectedLevel].bucketIndex <= 3 && 'bg-green-600 hover:bg-green-700',
+            selectedLevel !== null && priceLevels[selectedLevel].bucketIndex >= 6 && 'bg-red-600 hover:bg-red-700',
+            (selectedLevel === null || (priceLevels[selectedLevel].bucketIndex >= 4 && priceLevels[selectedLevel].bucketIndex <= 5)) && 'bg-primary hover:bg-primary/90'
           )}
           disabled={selectedLevel === null || !betAmount || parseFloat(betAmount) < 1 || !isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming || chainId !== 84532}
           size="sm"
@@ -732,7 +688,7 @@ export function PriceSpinner({
           ) : (
             <>
               <DollarSign className="w-4 h-4 mr-1" />
-              Bet {parseFloat(betAmount || '0').toFixed(0)} {TOKEN_SYMBOL} on {priceLevels[selectedLevel].percentChange > 0 ? '+' : ''}{priceLevels[selectedLevel].percentChange.toFixed(1)}%
+              Bet {parseFloat(betAmount || '0').toFixed(0)} {TOKEN_SYMBOL} on {bucketLabels[selectedLevel]?.label || '0%'}
             </>
           )}
         </Button>

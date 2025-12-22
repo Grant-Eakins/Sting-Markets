@@ -95,6 +95,7 @@ export function createMarket(request: CreateMarketRequest): Market {
     totalBets: 0,
     imageUrl: request.imageUrl,
     category: request.category,
+    contractAddress: request.contractAddress,
   };
 
   markets.set(id, market);

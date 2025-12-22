@@ -166,7 +166,7 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         market.marketId = marketId;
         market.sessionType = sessionType;
         market.status = MarketStatus.ACTIVE;
-        market.numOutcomes = sessionType == SessionType.INTRADAY ? 22 : 42;
+        market.numOutcomes = 10; // Meme coin buckets: 5 gain + 5 loss buckets (5% increments up to 20%+)
         market.referencePrice = referencePrice;
         market.lockTime = lockTime;
         market.settleTime = settleTime;
@@ -510,75 +510,26 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         );
     }
     
-    function getBucketIndex(int256 priceChangePercent, SessionType sessionType) public pure returns (uint8) {
-        if (sessionType == SessionType.INTRADAY) {
-            // 22 buckets: 1% increments from -10% to +10%
-            if (priceChangePercent >= 1000) return 0;      // >+10%
-            if (priceChangePercent >= 900) return 1;
-            if (priceChangePercent >= 800) return 2;
-            if (priceChangePercent >= 700) return 3;
-            if (priceChangePercent >= 600) return 4;
-            if (priceChangePercent >= 500) return 5;
-            if (priceChangePercent >= 400) return 6;
-            if (priceChangePercent >= 300) return 7;
-            if (priceChangePercent >= 200) return 8;
-            if (priceChangePercent >= 100) return 9;
-            if (priceChangePercent >= 0) return 10;
-            if (priceChangePercent >= -100) return 11;
-            if (priceChangePercent >= -200) return 12;
-            if (priceChangePercent >= -300) return 13;
-            if (priceChangePercent >= -400) return 14;
-            if (priceChangePercent >= -500) return 15;
-            if (priceChangePercent >= -600) return 16;
-            if (priceChangePercent >= -700) return 17;
-            if (priceChangePercent >= -800) return 18;
-            if (priceChangePercent >= -900) return 19;
-            if (priceChangePercent >= -1000) return 20;
-            return 21; // <-10%
+    function getBucketIndex(int256 priceChangePercent, SessionType /* sessionType */) public pure returns (uint8) {
+        // Meme coin buckets: 10 total buckets (5% increments up to 20%+)
+        // Gain buckets (0-4): 20%+, 15-20%, 10-15%, 5-10%, 0-5%
+        // Loss buckets (5-9): 0 to -5%, -5 to -10%, -10 to -15%, -15 to -20%, -20%+
+        // priceChangePercent is in basis points (100 = 1%)
+        
+        if (priceChangePercent >= 0) {
+            // Gain buckets
+            if (priceChangePercent >= 2000) return 0;      // +20%+
+            if (priceChangePercent >= 1500) return 1;      // +15% to +20%
+            if (priceChangePercent >= 1000) return 2;      // +10% to +15%
+            if (priceChangePercent >= 500) return 3;       // +5% to +10%
+            return 4;                                       // 0% to +5%
         } else {
-            // 42 buckets: 0.5% increments from -10% to +10%
-            if (priceChangePercent >= 1000) return 0;
-            if (priceChangePercent >= 950) return 1;
-            if (priceChangePercent >= 900) return 2;
-            if (priceChangePercent >= 850) return 3;
-            if (priceChangePercent >= 800) return 4;
-            if (priceChangePercent >= 750) return 5;
-            if (priceChangePercent >= 700) return 6;
-            if (priceChangePercent >= 650) return 7;
-            if (priceChangePercent >= 600) return 8;
-            if (priceChangePercent >= 550) return 9;
-            if (priceChangePercent >= 500) return 10;
-            if (priceChangePercent >= 450) return 11;
-            if (priceChangePercent >= 400) return 12;
-            if (priceChangePercent >= 350) return 13;
-            if (priceChangePercent >= 300) return 14;
-            if (priceChangePercent >= 250) return 15;
-            if (priceChangePercent >= 200) return 16;
-            if (priceChangePercent >= 150) return 17;
-            if (priceChangePercent >= 100) return 18;
-            if (priceChangePercent >= 50) return 19;
-            if (priceChangePercent >= 0) return 20;
-            if (priceChangePercent >= -50) return 21;
-            if (priceChangePercent >= -100) return 22;
-            if (priceChangePercent >= -150) return 23;
-            if (priceChangePercent >= -200) return 24;
-            if (priceChangePercent >= -250) return 25;
-            if (priceChangePercent >= -300) return 26;
-            if (priceChangePercent >= -350) return 27;
-            if (priceChangePercent >= -400) return 28;
-            if (priceChangePercent >= -450) return 29;
-            if (priceChangePercent >= -500) return 30;
-            if (priceChangePercent >= -550) return 31;
-            if (priceChangePercent >= -600) return 32;
-            if (priceChangePercent >= -650) return 33;
-            if (priceChangePercent >= -700) return 34;
-            if (priceChangePercent >= -750) return 35;
-            if (priceChangePercent >= -800) return 36;
-            if (priceChangePercent >= -850) return 37;
-            if (priceChangePercent >= -900) return 38;
-            if (priceChangePercent >= -950) return 39;
-            if (priceChangePercent >= -1000) return 40;
-            return 41; // <-10%
+            // Loss buckets (priceChangePercent is negative)
+            if (priceChangePercent <= -2000) return 9;     // -20%+
+            if (priceChangePercent <= -1500) return 8;     // -15% to -20%
+            if (priceChangePercent <= -1000) return 7;     // -10% to -15%
+            if (priceChangePercent <= -500) return 6;      // -5% to -10%
+            return 5;                                       // 0% to -5%
         }
     }
     
