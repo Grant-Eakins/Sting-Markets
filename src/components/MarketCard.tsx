@@ -121,13 +121,25 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
       <Card className="overflow-hidden hover:shadow-lg transition-shadow">
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start mb-2">
-            {getStatusBadge()}
-            {market.status === 'ACTIVE' && (
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Clock className="w-4 h-4 mr-1" />
-                {hoursUntilSettle}h {minutesUntilSettle}m
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {getStatusBadge()}
+            </div>
+            <div className="flex items-center gap-2">
+              {market.status === 'ACTIVE' && (
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <Clock className="w-4 h-4 mr-1" />
+                  {hoursUntilSettle}h {minutesUntilSettle}m
+                </div>
+              )}
+              {market.imageUrl && (
+                <img 
+                  src={market.imageUrl} 
+                  alt={market.stockSymbol}
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              )}
+            </div>
           </div>
           <CardTitle className="text-xl flex items-center gap-2">
             {market.stockSymbol || market.stockName}

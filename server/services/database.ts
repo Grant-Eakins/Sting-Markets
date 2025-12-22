@@ -76,6 +76,7 @@ export async function saveMarket(market: Market): Promise<boolean> {
         total_bets: market.totalBets,
         category: market.category,
         contract_address: market.contractAddress,
+        image_url: market.imageUrl,
         created_at: market.createdAt.toISOString(),
       }, { onConflict: 'id' });
 
@@ -536,6 +537,7 @@ function dbMarketToMarket(row: any): Market {
     priceChangePercent: row.price_change_percent,
     category: row.category,
     contractAddress: row.contract_address,
+    imageUrl: row.image_url,
   };
 }
 

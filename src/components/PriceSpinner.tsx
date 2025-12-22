@@ -181,32 +181,57 @@ export function PriceSpinner({
   
   // Helper to format price range labels
   const formatPriceRange = (lowPercent: number, highPercent: number | null, isPlus: boolean = false, isMinus: boolean = false) => {
-    const price = basePriceUSD * (1 + lowPercent / 100);
+    const lowPrice = basePriceUSD * (1 + lowPercent / 100);
     if (isPlus) {
-      return `$${formatCryptoPrice(price)}+`;
+      return `$${formatCryptoPrice(lowPrice)}+`;
     }
     if (isMinus) {
-      return `<$${formatCryptoPrice(price)}`;
+      return `<$${formatCryptoPrice(lowPrice)}`;
     }
     const highPrice = basePriceUSD * (1 + highPercent! / 100);
-    // Show lower price first, higher price second
-    if (price < highPrice) {
-      return `$${formatCryptoPrice(price)}-$${formatCryptoPrice(highPrice)}`;
+    // For gains (positive percent), show lower price first (e.g., $1.00-$1.05)
+    // For losses (negative percent), show higher price first (e.g., $0.95-$0.90)
+    if (lowPercent >= 0) {
+      // Gain bucket - lower to higher
+      return `$${formatCryptoPrice(Math.min(lowPrice, highPrice))}-$${formatCryptoPrice(Math.max(lowPrice, highPrice))}`;
+    } else {
+      // Loss bucket - higher to lower
+      return `$${formatCryptoPrice(Math.max(lowPrice, highPrice))}-$${formatCryptoPrice(Math.min(lowPrice, highPrice))}`;
     }
-    return `$${formatCryptoPrice(highPrice)}-$${formatCryptoPrice(price)}`;
+  };
+  
+  // Helper to format percent range labels
+  const formatPercentRange = (lowPercent: number, highPercent: number | null, isPlus: boolean = false, isMinus: boolean = false) => {
+    if (isPlus) {
+      return `${lowPercent}%+`;
+    }
+    if (isMinus) {
+      return `${lowPercent}%-`;
+    }
+    // Always show lower percent first for positive, higher first for negative
+    if (lowPercent >= 0 && highPercent !== null && highPercent >= 0) {
+      return `${lowPercent}% to ${highPercent}%`;
+    }
+    // For negative ranges, show less negative first (e.g., "0% to -5%")
+    if (lowPercent <= 0 && highPercent !== null) {
+      const min = Math.min(lowPercent, highPercent);
+      const max = Math.max(lowPercent, highPercent);
+      return `${max}% to ${min}%`;
+    }
+    return `${lowPercent}% to ${highPercent}%`;
   };
   
   const bucketLabels = [
-    { label: formatPriceRange(20, null, true), percentChange: 25, bucketIndex: 0 },
-    { label: formatPriceRange(15, 20), percentChange: 17.5, bucketIndex: 1 },
-    { label: formatPriceRange(10, 15), percentChange: 12.5, bucketIndex: 2 },
-    { label: formatPriceRange(5, 10), percentChange: 7.5, bucketIndex: 3 },
-    { label: formatPriceRange(0, 5), percentChange: 2.5, bucketIndex: 4 },
-    { label: formatPriceRange(-5, 0), percentChange: -2.5, bucketIndex: 5 },
-    { label: formatPriceRange(-10, -5), percentChange: -7.5, bucketIndex: 6 },
-    { label: formatPriceRange(-15, -10), percentChange: -12.5, bucketIndex: 7 },
-    { label: formatPriceRange(-20, -15), percentChange: -17.5, bucketIndex: 8 },
-    { label: formatPriceRange(-20, null, false, true), percentChange: -25, bucketIndex: 9 },
+    { priceLabel: formatPriceRange(20, null, true), percentLabel: formatPercentRange(20, null, true), percentChange: 25, bucketIndex: 0 },
+    { priceLabel: formatPriceRange(15, 20), percentLabel: formatPercentRange(15, 20), percentChange: 17.5, bucketIndex: 1 },
+    { priceLabel: formatPriceRange(10, 15), percentLabel: formatPercentRange(10, 15), percentChange: 12.5, bucketIndex: 2 },
+    { priceLabel: formatPriceRange(5, 10), percentLabel: formatPercentRange(5, 10), percentChange: 7.5, bucketIndex: 3 },
+    { priceLabel: formatPriceRange(0, 5), percentLabel: formatPercentRange(0, 5), percentChange: 2.5, bucketIndex: 4 },
+    { priceLabel: formatPriceRange(-5, 0), percentLabel: formatPercentRange(-5, 0), percentChange: -2.5, bucketIndex: 5 },
+    { priceLabel: formatPriceRange(-10, -5), percentLabel: formatPercentRange(-10, -5), percentChange: -7.5, bucketIndex: 6 },
+    { priceLabel: formatPriceRange(-15, -10), percentLabel: formatPercentRange(-15, -10), percentChange: -12.5, bucketIndex: 7 },
+    { priceLabel: formatPriceRange(-20, -15), percentLabel: formatPercentRange(-20, -15), percentChange: -17.5, bucketIndex: 8 },
+    { priceLabel: formatPriceRange(-20, null, false, true), percentLabel: formatPercentRange(-20, null, false, true), percentChange: -25, bucketIndex: 9 },
   ];
   
   // Log probabilities for debugging
@@ -320,8 +345,8 @@ export function PriceSpinner({
     }
   };
 
-  // Find the index of the 0% bucket for scrolling (bucket with label '0%')
-  const middleLevelIndex = priceLevels.findIndex((_, idx) => bucketLabels[idx]?.label === '0%');
+  // Find the index of the 0-5% bucket for scrolling (bucket index 4)
+  const middleLevelIndex = priceLevels.findIndex((_, idx) => bucketLabels[idx]?.bucketIndex === 4);
   
   // Debug: log the bucket structure
   useEffect(() => {
@@ -329,7 +354,7 @@ export function PriceSpinner({
       totalBuckets,
       priceLevelsCount: priceLevels.length,
       middleLevelIndex,
-      buckets: bucketLabels.map(l => l.label).join(', ')
+      buckets: bucketLabels.map(l => l.percentLabel).join(', ')
     });
   }, [priceLevels.length, middleLevelIndex]);
 
@@ -407,7 +432,7 @@ export function PriceSpinner({
                     highestProbBucket.bucketIndex <= 4 && 'text-green-500',
                     highestProbBucket.bucketIndex >= 5 && 'text-red-500'
                   )}>
-                    {bucketLabels.find(b => b.bucketIndex === highestProbBucket.bucketIndex)?.label || '0%'} ({highestProbBucket.probability.toFixed(1)}% prob)
+                    {bucketLabels.find(b => b.bucketIndex === highestProbBucket.bucketIndex)?.percentLabel || '0%'} ({highestProbBucket.probability.toFixed(1)}% prob)
                   </div>
                 </>
               ) : (
@@ -476,7 +501,8 @@ export function PriceSpinner({
             const isGainBucket = level.bucketIndex <= 4;
             const isLossBucket = level.bucketIndex >= 5;
             const isNeutral = false; // No neutral buckets in meme coin markets
-            const bucketLabel = bucketLabels[idx]?.label || '';
+            const priceLabel = bucketLabels[idx]?.priceLabel || '';
+            const percentLabel = bucketLabels[idx]?.percentLabel || '';
             const probabilityPercent = level.probability;
             
             // Calculate bar width as relative to max probability
@@ -502,7 +528,7 @@ export function PriceSpinner({
                     {isGainBucket && !isNeutral && <TrendingUp className="w-3 h-3 text-green-500" />}
                     {isLossBucket && !isNeutral && <TrendingDown className="w-3 h-3 text-red-500" />}
                     <span className={cn('text-sm', isNeutral && 'text-primary')}>
-                      ${formatCryptoPrice(level.price)}
+                      {priceLabel}
                     </span>
                   </div>
                   <span className={cn(
@@ -511,7 +537,7 @@ export function PriceSpinner({
                     isLossBucket && !isNeutral && 'text-red-500',
                     isNeutral && 'text-muted-foreground'
                   )}>
-                    {bucketLabel}
+                    {percentLabel}
                   </span>
                 </div>
 
@@ -553,7 +579,7 @@ export function PriceSpinner({
                 priceLevels[selectedLevel].bucketIndex <= 4 && 'text-green-500',
                 priceLevels[selectedLevel].bucketIndex >= 5 && 'text-red-500'
               )}>
-                ${formatCryptoPrice(priceLevels[selectedLevel].price)} ({bucketLabels[selectedLevel]?.label || ''})
+                {bucketLabels[selectedLevel]?.priceLabel || ''} ({bucketLabels[selectedLevel]?.percentLabel || ''})
               </span>
             </div>
             {(() => {
@@ -703,7 +729,7 @@ export function PriceSpinner({
           ) : (
             <>
               <DollarSign className="w-4 h-4 mr-1" />
-              Bet {parseFloat(betAmount || '0').toFixed(0)} {TOKEN_SYMBOL} on {bucketLabels[selectedLevel]?.label || '0%'}
+              Bet {parseFloat(betAmount || '0').toFixed(0)} {TOKEN_SYMBOL} on {bucketLabels[selectedLevel]?.percentLabel || '0%'}
             </>
           )}
         </Button>

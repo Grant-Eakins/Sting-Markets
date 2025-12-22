@@ -365,6 +365,7 @@ router.post('/create-by-contract', async (req, res) => {
     console.log(`   Liquidity: $${tokenInfo.liquidity.toLocaleString()}`);
     console.log(`   Session: ${sessionLabel}`);
     console.log(`   Locks at: ${lockTime.toISOString()}`);
+    if (tokenInfo.imageUrl) console.log(`   Image: ${tokenInfo.imageUrl}`);
     
     // Create the market
     const market = createMarket({
@@ -377,6 +378,7 @@ router.post('/create-by-contract', async (req, res) => {
       settleTime,
       category: 'meme',
       contractAddress, // Store the contract address for future price lookups
+      imageUrl: tokenInfo.imageUrl, // Token logo from DexScreener
     });
     
     // Create on-chain market

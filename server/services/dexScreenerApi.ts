@@ -19,6 +19,7 @@ export interface TokenInfo {
   volume24h: number;
   liquidity: number;
   marketCap?: number;
+  imageUrl?: string;      // Token logo from DexScreener
   chainId: string;
   dexId: string;
   pairAddress: string;
@@ -127,12 +128,14 @@ function extractTokenInfo(pair: any, requestedAddress: string): TokenInfo {
   const volume24h = pair.volume?.h24 || 0;
   const liquidity = pair.liquidity?.usd || 0;
   const fdv = pair.fdv || undefined; // Fully diluted valuation as market cap proxy
+  const imageUrl = pair.info?.imageUrl || undefined; // Token logo from DexScreener
 
   console.log(`   Token: ${token.symbol} (${token.name})`);
   console.log(`   Price: $${priceUsd.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 })}`);
   console.log(`   24h Change: ${priceChange24h >= 0 ? '+' : ''}${priceChange24h}%`);
   console.log(`   Liquidity: $${liquidity.toLocaleString()}`);
   console.log(`   Chain: ${pair.chainId}`);
+  if (imageUrl) console.log(`   Image: ${imageUrl}`);
 
   return {
     address: token.address,
@@ -143,6 +146,7 @@ function extractTokenInfo(pair: any, requestedAddress: string): TokenInfo {
     volume24h,
     liquidity,
     marketCap: fdv,
+    imageUrl,
     chainId: pair.chainId,
     dexId: pair.dexId,
     pairAddress: pair.pairAddress,
