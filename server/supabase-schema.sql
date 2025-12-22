@@ -23,8 +23,20 @@ CREATE TABLE IF NOT EXISTS markets (
   total_pool DECIMAL(18, 8) DEFAULT 0,
   total_bets INTEGER DEFAULT 0,
   category VARCHAR(50),
+  contract_address VARCHAR(66),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: Add contract_address column if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'markets' AND column_name = 'contract_address'
+  ) THEN
+    ALTER TABLE markets ADD COLUMN contract_address VARCHAR(66);
+  END IF;
+END $$;
 
 -- Bets table (for analytics - actual bets are on-chain)
 CREATE TABLE IF NOT EXISTS bets (

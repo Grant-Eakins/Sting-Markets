@@ -8,9 +8,10 @@ interface StockChartProps {
   currentPrice: number; // in cents
   openingPrice: number; // in cents
   isAfterHours: boolean;
+  contractAddress?: string; // For meme coins - uses DexScreener API
 }
 
-export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHours }: StockChartProps) {
+export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHours, contractAddress }: StockChartProps) {
   const [priceHistory, setPriceHistory] = useState<Array<{ time: string; price: number; volume?: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; price: number; time: string } | null>(null);
@@ -34,12 +35,26 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
       try {
         // Use relative URL for production compatibility
         const baseUrl = import.meta.env.PROD ? '' : 'http://localhost:3001';
-        const response = await axios.get(`${baseUrl}/api/markets/chart/${stockSymbol}`, {
-          params: { days: 1 } // Get last 24 hours of data
-        });
+        
+        console.log(`📊 StockChart fetching data for ${stockSymbol}, contractAddress:`, contractAddress);
+        
+        let response;
+        if (contractAddress) {
+          // Use DexScreener API for meme coins with contract address
+          console.log(`📊 Using DexScreener chart-by-contract for ${stockSymbol}`);
+          response = await axios.get(`${baseUrl}/api/markets/chart-by-contract/${contractAddress}`, {
+            params: { timeframe: '15m' }
+          });
+        } else {
+          // Use CoinGecko API for known cryptos
+          console.log(`📊 Using CoinGecko chart for ${stockSymbol}`);
+          response = await axios.get(`${baseUrl}/api/markets/chart/${stockSymbol}`, {
+            params: { days: 1 }
+          });
+        }
         
         if (response.data.success && response.data.data && response.data.data.length > 0) {
-          // CoinGecko returns {timestamp: Date, price: number} - data is already oldest first
+          // Both APIs return {timestamp: Date, price: number}
           const formattedData = response.data.data
             .map((point: any) => ({
               time: new Date(point.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
@@ -103,10 +118,10 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
 
     fetchChartData();
     
-    // Refresh chart data every 60 seconds (CoinGecko has rate limits)
+    // Refresh chart data every 60 seconds
     const interval = setInterval(fetchChartData, 60000);
     return () => clearInterval(interval);
-  }, [stockSymbol, currentPriceUSD, openingPriceUSD]);
+  }, [stockSymbol, currentPriceUSD, openingPriceUSD, contractAddress]);
 
   // Calculate chart dimensions - balanced for readability
   const width = 320;

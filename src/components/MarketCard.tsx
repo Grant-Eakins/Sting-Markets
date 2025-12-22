@@ -144,6 +144,7 @@ export function MarketCard({ market, onBetPlaced }: MarketCardProps) {
               currentPrice={market.currentPrice}
               openingPrice={market.openingPrice}
               isAfterHours={market.isAfterHours}
+              contractAddress={market.contractAddress}
             />
           )}
 

@@ -29,6 +29,7 @@ export interface Market {
   totalBets?: number;
   imageUrl?: string;
   category?: string;
+  contractAddress?: string;     // Contract address for meme coins (for price lookups)
   blockchainMarketId?: number;  // On-chain market ID
   probabilities?: number[];     // LMSR probabilities for each outcome (0-100%)
 }

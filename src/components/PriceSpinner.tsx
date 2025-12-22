@@ -180,14 +180,14 @@ export function PriceSpinner({
   const totalBuckets = 10;
   const bucketLabels = [
     { label: '+20%+', percentChange: 25, bucketIndex: 0 },
-    { label: '+15%', percentChange: 17.5, bucketIndex: 1 },
-    { label: '+10%', percentChange: 12.5, bucketIndex: 2 },
-    { label: '+5%', percentChange: 7.5, bucketIndex: 3 },
-    { label: '0%', percentChange: 2.5, bucketIndex: 4 },
-    { label: '-5%', percentChange: -2.5, bucketIndex: 5 },
-    { label: '-10%', percentChange: -7.5, bucketIndex: 6 },
-    { label: '-15%', percentChange: -12.5, bucketIndex: 7 },
-    { label: '-20%', percentChange: -17.5, bucketIndex: 8 },
+    { label: '+15-20%', percentChange: 17.5, bucketIndex: 1 },
+    { label: '+10-15%', percentChange: 12.5, bucketIndex: 2 },
+    { label: '+5-10%', percentChange: 7.5, bucketIndex: 3 },
+    { label: '0-5%', percentChange: 2.5, bucketIndex: 4 },
+    { label: '0 to -5%', percentChange: -2.5, bucketIndex: 5 },
+    { label: '-5 to -10%', percentChange: -7.5, bucketIndex: 6 },
+    { label: '-10 to -15%', percentChange: -12.5, bucketIndex: 7 },
+    { label: '-15 to -20%', percentChange: -17.5, bucketIndex: 8 },
     { label: '-20%+', percentChange: -25, bucketIndex: 9 },
   ];
   
@@ -456,10 +456,10 @@ export function PriceSpinner({
         >
           {priceLevels.map((level, idx) => {
             // Use bucket index to determine gain/loss: 0-4 are gain buckets, 5-9 are loss buckets
-            // Bucket 4 is "0%" gain (0-5%), Bucket 5 is "0%" loss (0 to -5%)
+            // Bucket 4 is "0-5% gain", Bucket 5 is "0 to -5% loss" - both have color (not neutral)
             const isGainBucket = level.bucketIndex <= 4;
             const isLossBucket = level.bucketIndex >= 5;
-            const isNeutral = level.bucketIndex === 4 || level.bucketIndex === 5; // The two "near 0%" buckets
+            const isNeutral = false; // No neutral buckets in meme coin markets
             const bucketLabel = bucketLabels[idx]?.label || '';
             const probabilityPercent = level.probability;
             

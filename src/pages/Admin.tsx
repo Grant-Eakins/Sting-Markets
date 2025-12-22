@@ -194,7 +194,9 @@ export default function AdminPage() {
 
   // Handler functions
   const handleNumberChange = (field: keyof typeof formData, value: string) => {
-    const numValue = value === '' ? 0 : parseInt(value);
+    // Use parseFloat for lockMinutes/settleMinutes to allow decimal values (e.g., 1.1 = 1 min 6 sec)
+    const isMinutesField = field === 'lockMinutes' || field === 'settleMinutes';
+    const numValue = value === '' ? 0 : (isMinutesField ? parseFloat(value) : parseInt(value));
     setFormData({ ...formData, [field]: isNaN(numValue) ? 0 : numValue });
   };
 
@@ -369,7 +371,8 @@ export default function AdminPage() {
                     <Input
                       id="lockMinutes"
                       type="number"
-                      min="1"
+                      min="0.1"
+                      step="0.1"
                       value={formData.lockMinutes}
                       onChange={(e) => handleNumberChange('lockMinutes', e.target.value)}
                     />
@@ -380,7 +383,8 @@ export default function AdminPage() {
                     <Input
                       id="settleMinutes"
                       type="number"
-                      min="1"
+                      min="0.1"
+                      step="0.1"
                       value={formData.settleMinutes}
                       onChange={(e) => handleNumberChange('settleMinutes', e.target.value)}
                     />
@@ -388,7 +392,7 @@ export default function AdminPage() {
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  ⏱️ Lock in {formData.lockMinutes} min, Settle in {formData.settleMinutes} min
+                  ⏱️ Lock in {formData.lockMinutes} min, Settle in {formData.settleMinutes} min (settle must be after lock)
                 </p>
 
                 <Button 
