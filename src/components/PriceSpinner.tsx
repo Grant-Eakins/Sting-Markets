@@ -168,11 +168,24 @@ export function PriceSpinner({
     }
   }, [isConfirmed, onBetPlaced]);
 
-  // Detect if this is a meme coin with tiny prices stored in micro-units
-  // Meme coins store price as USD * 100,000,000 instead of cents (USD * 100)
-  // We detect this if category is 'meme' or if the "cents" value seems way too high
-  const isTinyPriceMeme = category === 'meme' || (openingPrice > 100000 && openingPrice / 100 > 1000);
-  const priceDivisor = isTinyPriceMeme ? 100_000_000 : 100;
+  // Price handling:
+  // - Regular cryptos (BTC, ETH, XRP): stored as cents (USD * 100)
+  // - Meme coins with tiny prices (< $0.01): stored as micro-units (USD * 100,000,000)
+  // 
+  // Detection: if category is 'meme' AND openingPrice > 1000, it's micro-units
+  // (A $0.001 coin = 100,000 micro-units; a $0.01 coin = 1 cent is fine with normal cents)
+  const isMicroUnits = category === 'meme' && openingPrice > 1000;
+  const priceDivisor = isMicroUnits ? 100_000_000 : 100;
+  
+  // Debug log
+  console.log('🎰 PriceSpinner price detection:', { 
+    openingPrice, 
+    currentPrice,
+    category, 
+    isMicroUnits, 
+    priceDivisor,
+    resultUSD: openingPrice / priceDivisor 
+  });
   
   const currentPriceUSD = currentPrice / priceDivisor;
   const openingPriceUSD = openingPrice / priceDivisor;

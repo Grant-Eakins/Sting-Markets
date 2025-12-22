@@ -15,7 +15,7 @@ import {
 } from '../services/marketService';
 import { createOnChainMarket, syncAllMarketPools, getMarketProbabilities } from '../services/blockchainSync';
 import { getCryptoHistory } from '../services/cryptoApi';
-import { syncCryptoMarkets, getNext12HourSettlement } from '../services/cryptoSync';
+import { syncCryptoMarkets, getNext12HourSettlement, disableSymbolAutoCreation, enableSymbolAutoCreation, isSymbolDisabled, getDisabledSymbols } from '../services/cryptoSync';
 import { Position, MarketStatus } from '../types/market';
 import { testDiscordWebhook } from '../services/discordBot';
 import { getCryptoQuote } from '../services/cryptoApi';
@@ -884,6 +884,45 @@ router.post('/admin/test-market', async (req, res) => {
       error: error.message,
     });
   }
+});
+
+/**
+ * POST /api/markets/symbol/:symbol/pause
+ * Pause auto-creation for a symbol
+ */
+router.post('/symbol/:symbol/pause', (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+  disableSymbolAutoCreation(symbol);
+  res.json({
+    success: true,
+    message: `Paused auto-creation for ${symbol}`,
+    pausedSymbols: getDisabledSymbols(),
+  });
+});
+
+/**
+ * POST /api/markets/symbol/:symbol/resume
+ * Resume auto-creation for a symbol
+ */
+router.post('/symbol/:symbol/resume', (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+  enableSymbolAutoCreation(symbol);
+  res.json({
+    success: true,
+    message: `Resumed auto-creation for ${symbol}`,
+    pausedSymbols: getDisabledSymbols(),
+  });
+});
+
+/**
+ * GET /api/markets/paused-symbols
+ * Get list of all paused symbols
+ */
+router.get('/paused-symbols', (req, res) => {
+  res.json({
+    success: true,
+    pausedSymbols: getDisabledSymbols(),
+  });
 });
 
 export default router;

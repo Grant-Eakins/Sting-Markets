@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CheckCircle, AlertCircle, Plus, Lock, ShieldX } from 'lucide-react';
+import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Pause, Play } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
@@ -93,6 +93,45 @@ export default function AdminPage() {
     },
     refetchInterval: 10000,
     enabled: isAdmin, // Only fetch if admin
+  });
+
+  // Fetch paused symbols
+  const { data: pausedSymbols = [] } = useQuery({
+    queryKey: ['paused-symbols'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_BASE}/markets/paused`);
+      return response.data.pausedSymbols as string[];
+    },
+    refetchInterval: 10000,
+    enabled: isAdmin,
+  });
+
+  // Pause market mutation
+  const pauseMarket = useMutation({
+    mutationFn: async (symbol: string) => {
+      const response = await axios.post(`${API_BASE}/markets/pause/${symbol}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paused-symbols'] });
+    },
+    onError: (error: any) => {
+      alert(`❌ Error pausing: ${error.response?.data?.error || error.message}`);
+    },
+  });
+
+  // Resume market mutation
+  const resumeMarket = useMutation({
+    mutationFn: async (symbol: string) => {
+      const response = await axios.post(`${API_BASE}/markets/resume/${symbol}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paused-symbols'] });
+    },
+    onError: (error: any) => {
+      alert(`❌ Error resuming: ${error.response?.data?.error || error.message}`);
+    },
   });
 
   // Create market mutation
@@ -596,7 +635,9 @@ export default function AdminPage() {
                 {markets.map((market) => (
                   <div
                     key={market.id}
-                    className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                    className={`border rounded-lg p-4 hover:bg-muted/50 transition-colors ${
+                      pausedSymbols.includes(market.stockSymbol) ? 'border-yellow-500/50 bg-yellow-500/5' : ''
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
@@ -610,6 +651,12 @@ export default function AdminPage() {
                           }`}>
                             {market.status}
                           </span>
+                          {pausedSymbols.includes(market.stockSymbol) && (
+                            <span className="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-500 flex items-center gap-1">
+                              <Pause className="w-3 h-3" />
+                              PAUSED
+                            </span>
+                          )}
                           {market.isAfterHours && (
                             <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-500">
                               After Hours
@@ -644,9 +691,35 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </div>
-                      {market.blockchainMarketId && (
-                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                      )}
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        {market.blockchainMarketId && (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        )}
+                        {/* Pause/Resume Auto-Creation Button */}
+                        {pausedSymbols.includes(market.stockSymbol) ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => resumeMarket.mutate(market.stockSymbol)}
+                            disabled={resumeMarket.isPending}
+                            className="flex items-center gap-1 text-green-600 border-green-600 hover:bg-green-600/10"
+                          >
+                            <Play className="w-4 h-4" />
+                            Resume
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => pauseMarket.mutate(market.stockSymbol)}
+                            disabled={pauseMarket.isPending}
+                            className="flex items-center gap-1 text-yellow-600 border-yellow-600 hover:bg-yellow-600/10"
+                          >
+                            <Pause className="w-4 h-4" />
+                            Pause
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

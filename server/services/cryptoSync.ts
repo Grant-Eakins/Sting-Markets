@@ -5,6 +5,39 @@ import { MarketStatus } from '../types/market';
 import { updateBlockchainMarketId } from './database';
 import { sendOpeningTweets } from './marketSettlement';
 
+// Track symbols that have been manually settled and should NOT auto-recreate
+const disabledSymbols: Set<string> = new Set();
+
+/**
+ * Disable auto-creation for a symbol (called when manually settled)
+ */
+export function disableSymbolAutoCreation(symbol: string): void {
+  disabledSymbols.add(symbol.toUpperCase());
+  console.log(`🚫 Disabled auto-creation for ${symbol.toUpperCase()}`);
+}
+
+/**
+ * Re-enable auto-creation for a symbol
+ */
+export function enableSymbolAutoCreation(symbol: string): void {
+  disabledSymbols.delete(symbol.toUpperCase());
+  console.log(`✅ Re-enabled auto-creation for ${symbol.toUpperCase()}`);
+}
+
+/**
+ * Check if a symbol is disabled from auto-creation
+ */
+export function isSymbolDisabled(symbol: string): boolean {
+  return disabledSymbols.has(symbol.toUpperCase());
+}
+
+/**
+ * Get all disabled symbols
+ */
+export function getDisabledSymbols(): string[] {
+  return Array.from(disabledSymbols);
+}
+
 /**
  * Get current UTC time info
  */
@@ -133,6 +166,7 @@ function sleep(ms: number): Promise<void> {
  * 1. Creates prediction markets for top 6 cryptos
  * 2. Markets run on 12-hour cycles (00:00 UTC and 12:00 UTC settlements)
  * 3. Runs 24/7 - crypto never sleeps!
+ * 4. Skips symbols that were manually settled (disabled)
  */
 export async function syncCryptoMarkets(): Promise<void> {
   console.log('🔄 Starting crypto market sync process...');
@@ -143,6 +177,11 @@ export async function syncCryptoMarkets(): Promise<void> {
     console.log(`📊 Session: ${sessionLabel}`);
     console.log(`⏰ Locks at: ${lockTime.toISOString()}`);
     console.log(`⏰ Settles at: ${settleTime.toISOString()}`);
+    
+    // Log disabled symbols
+    if (disabledSymbols.size > 0) {
+      console.log(`🚫 Disabled symbols (manually settled): ${Array.from(disabledSymbols).join(', ')}`);
+    }
 
     // Get existing markets - only skip symbols that have an ACTIVE or LOCKED market
     const existingMarkets = getAllMarkets();
@@ -152,13 +191,14 @@ export async function syncCryptoMarkets(): Promise<void> {
         .map(m => m.stockSymbol.toUpperCase())
     );
 
-    // Only create markets for symbols without an active/locked market
+    // Only create markets for symbols without an active/locked market AND not disabled
     const cryptosToProcess = POPULAR_CRYPTOS.filter(
-      crypto => !activeSymbols.has(crypto.symbol.toUpperCase())
+      crypto => !activeSymbols.has(crypto.symbol.toUpperCase()) && 
+                !disabledSymbols.has(crypto.symbol.toUpperCase())
     );
     
     if (cryptosToProcess.length === 0) {
-      console.log('ℹ️  All crypto markets already exist, skipping creation\n');
+      console.log('ℹ️  All crypto markets already exist or are disabled, skipping creation\n');
       return;
     }
     

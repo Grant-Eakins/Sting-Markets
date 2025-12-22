@@ -17,9 +17,9 @@ export function StockChart({ stockSymbol, currentPrice, openingPrice, isAfterHou
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; price: number; time: string } | null>(null);
   
-  // Detect if this is a meme coin with tiny prices stored in micro-units
-  const isTinyPriceMeme = category === 'meme' || (openingPrice > 100000 && openingPrice / 100 > 1000);
-  const priceDivisor = isTinyPriceMeme ? 100_000_000 : 100;
+  // Price handling: meme coins with tiny prices (< $0.01) are stored as micro-units
+  const isMicroUnits = category === 'meme' && openingPrice > 1000;
+  const priceDivisor = isMicroUnits ? 100_000_000 : 100;
   
   // Convert to dollars for display
   const currentPriceUSD = currentPrice / priceDivisor;
