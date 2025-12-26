@@ -388,7 +388,7 @@ router.post('/create-by-contract', async (req, res) => {
     console.log(`   Locks at: ${lockTime.toISOString()}`);
     if (tokenInfo.imageUrl) console.log(`   Image: ${tokenInfo.imageUrl}`);
     
-    // Create the market
+    // Create the market (but don't save to DB yet - wait for blockchain ID)
     const market = createMarket({
       stockSymbol: tokenInfo.symbol,
       stockName: tokenInfo.name,
@@ -403,7 +403,7 @@ router.post('/create-by-contract', async (req, res) => {
       autoRecreate, // Optional: Control whether this market auto-recreates
     });
     
-    // Create on-chain market
+    // Create on-chain market FIRST before saving to DB
     try {
       const blockchainMarketId = await createOnChainMarket(
         tokenInfo.symbol,
@@ -415,8 +415,10 @@ router.post('/create-by-contract', async (req, res) => {
       
       if (blockchainMarketId !== null) {
         market.blockchainMarketId = blockchainMarketId;
-        // Save the updated market with blockchain ID to database
+        // NOW save the market with blockchain ID to database
         await saveMarket(market);
+      } else {
+        throw new Error('Failed to get blockchain market ID');
       }
       
       res.json({
@@ -514,10 +516,7 @@ router.post('/create-dual-coin', async (req, res) => {
       autoRecreate, // Optional: Control whether this market auto-recreates
     });
     
-    // Save market to database first
-    await saveMarket(market);
-    
-    // Create on-chain market with 2 buckets (Coin A vs Coin B)
+    // Create on-chain market FIRST with 2 buckets (Coin A vs Coin B)
     try {
       const blockchainMarketId = await createOnChainMarket(
         `${tokenA.symbol}vs${tokenB.symbol}`,
@@ -530,7 +529,10 @@ router.post('/create-dual-coin', async (req, res) => {
       
       if (blockchainMarketId !== null) {
         market.blockchainMarketId = blockchainMarketId;
+        // NOW save market to database with blockchain ID
         await saveMarket(market);
+      } else {
+        throw new Error('Failed to get blockchain market ID');
       }
       
       res.json({

@@ -8,6 +8,7 @@ import { BetDialog } from './BetDialog';
 interface DualCoinMarketCardProps {
   market: {
     id: string;
+    blockchainMarketId?: number; // Add blockchain market ID for bonding curve
     coinASymbol: string;
     coinAName?: string;
     coinAImage?: string;
@@ -29,6 +30,7 @@ interface DualCoinMarketCardProps {
     upPool: number;
     downPool: number;
     totalBets: number;
+    probabilities?: number[]; // LMSR probabilities from blockchain
   };
   userBet?: {
     position: string;
@@ -258,15 +260,18 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
           onClose={() => setShowBetDialog(false)}
           market={{
             id: market.id,
+            blockchainMarketId: market.blockchainMarketId, // Pass blockchain ID for bonding curve
             stockSymbol: `${market.coinASymbol} vs ${market.coinBSymbol}`,
             stockName: 'Dual Coin Battle',
             currentPrice: 0,
             openingPrice: 0,
             upPool: market.upPool,
             downPool: market.downPool,
+            probabilities: market.probabilities, // Pass LMSR probabilities
           } as any}
           position={selectedPosition}
-          odds={2.0}
+          odds={2.0} // Placeholder - actual odds calculated from probabilities
+          bucketIndex={selectedPosition === 'UP' ? 0 : 1} // Dual-coin has 2 buckets: 0=Coin A, 1=Coin B
           onBetPlaced={() => {
             setShowBetDialog(false);
           }}
