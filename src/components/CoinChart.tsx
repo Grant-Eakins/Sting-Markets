@@ -60,7 +60,10 @@ export const CoinChart = ({ name, symbol, volume, growth, tokenAddress, contract
 
   const maxValue = Math.max(...chartData);
   const minValue = Math.min(...chartData);
-  const range = maxValue - minValue || 1; // Avoid division by zero
+  // Add 10% padding to top and bottom for better visibility
+  const paddedMin = minValue - (maxValue - minValue) * 0.1;
+  const paddedMax = maxValue + (maxValue - minValue) * 0.1;
+  const range = paddedMax - paddedMin || 1; // Avoid division by zero
 
   // Create SVG path for the chart
   const createPath = () => {
@@ -68,7 +71,7 @@ export const CoinChart = ({ name, symbol, volume, growth, tokenAddress, contract
     const height = 100;
     const points = chartData.map((value: number, index: number) => {
       const x = (index / (chartData.length - 1)) * width;
-      const y = height - ((value - minValue) / range) * height;
+      const y = height - ((value - paddedMin) / range) * height;
       return `${x},${y}`;
     });
     return `M ${points.join(' L ')}`;
@@ -80,7 +83,7 @@ export const CoinChart = ({ name, symbol, volume, growth, tokenAddress, contract
     const height = 100;
     const points = chartData.map((value: number, index: number) => {
       const x = (index / (chartData.length - 1)) * width;
-      const y = height - ((value - minValue) / range) * height;
+      const y = height - ((value - paddedMin) / range) * height;
       return `${x},${y}`;
     });
     return `M 0,${height} L ${points.join(' L ')} L ${width},${height} Z`;

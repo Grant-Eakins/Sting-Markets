@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, Clock, Lock, CheckCircle2 } from 'lucide-reac
 import { useState } from 'react';
 import { BetDialog } from './BetDialog';
 import { CoinChart } from './CoinChart';
+import { useLiveCoinPrice } from '@/hooks/useLiveCoinPrice';
 
 interface DualCoinMarketCardProps {
   market: {
@@ -55,35 +56,26 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   const [showBetDialog, setShowBetDialog] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<'UP' | 'DOWN'>('UP');
 
+  // Fetch live prices from DexScreener
+  const { data: coinAData } = useLiveCoinPrice(market.coinAAddress);
+  const { data: coinBData } = useLiveCoinPrice(market.coinBAddress);
+
   const isLocked = market.status === 'LOCKED';
   const isSettled = market.status === 'SETTLED';
   const isActive = market.status === 'ACTIVE';
 
-  const coinAPrice = isSettled && market.coinAClosingPrice 
-    ? convertPriceToUSD(market.coinAClosingPrice)
-    : market.coinACurrentPrice 
+  // Use live prices when available, fall back to market data
+  const coinAPrice = coinAData?.price ?? (market.coinACurrentPrice 
     ? convertPriceToUSD(market.coinACurrentPrice)
-    : market.coinAOpeningPrice 
-    ? convertPriceToUSD(market.coinAOpeningPrice)
-    : 0;
+    : convertPriceToUSD(market.coinAOpeningPrice));
 
-  const coinBPrice = isSettled && market.coinBClosingPrice 
-    ? convertPriceToUSD(market.coinBClosingPrice)
-    : market.coinBCurrentPrice 
+  const coinBPrice = coinBData?.price ?? (market.coinBCurrentPrice 
     ? convertPriceToUSD(market.coinBCurrentPrice)
-    : market.coinBOpeningPrice
-    ? convertPriceToUSD(market.coinBOpeningPrice)
-    : 0;
+    : convertPriceToUSD(market.coinBOpeningPrice));
 
-  const coinAChange = market.coinAChangePercent ?? 
-    ((market.coinACurrentPrice && market.coinAOpeningPrice
-      ? ((market.coinACurrentPrice - market.coinAOpeningPrice) / market.coinAOpeningPrice) * 100 
-      : 0) || 0);
-
-  const coinBChange = market.coinBChangePercent ?? 
-    ((market.coinBCurrentPrice && market.coinBOpeningPrice
-      ? ((market.coinBCurrentPrice - market.coinBOpeningPrice) / market.coinBOpeningPrice) * 100 
-      : 0) || 0);
+  // Use live 24h price change from DexScreener
+  const coinAChange = coinAData?.priceChange24h ?? (market.coinAChangePercent ?? 0);
+  const coinBChange = coinBData?.priceChange24h ?? (market.coinBChangePercent ?? 0);
 
   const handleBet = (position: 'UP' | 'DOWN') => {
     setSelectedPosition(position);
@@ -123,7 +115,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
       <Card className="hover:shadow-lg transition-shadow max-w-7xl mx-auto">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-bold italic">
+            <CardTitle className="text-xl font-bold italic" style={{ color: '#fffd7e' }}>
               Coin Battles
             </CardTitle>
             {isActive && (
@@ -148,8 +140,8 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
         </CardHeader>
 
         <CardContent className="p-6 sm:p-8">
-          {/* Horizontal Layout on desktop, Vertical on mobile: Coin A | VS | Coin B */}
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 md:gap-8 items-stretch">
+          {/* Horizontal Layout on all screen sizes: Coin A | VS | Coin B */}
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-4 sm:gap-6 md:gap-8 items-stretch">
             
             {/* Coin A - Left Side (Top on mobile) */}
             <div className={`relative rounded-lg border transition-all min-h-[350px] sm:min-h-[400px] flex flex-col ${
@@ -219,19 +211,44 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
               </div>
             </div>
 
-            {/* VS Divider - Center (Hidden on mobile, shown as text between cards) */}
-            <div className="hidden md:flex flex-col items-center justify-center px-4">
-              <div className="rounded-lg border border-muted bg-muted/30 px-4 py-6">
-                <div className="text-2xl font-bold text-foreground">
-                  VS
+            {/* VS Divider - Center (always visible in horizontal layout) */}
+            <div className="flex flex-col items-center justify-center px-2 sm:px-4 gap-4">
+              {/* Winning indicator - only show during active betting or after settlement */}
+              {(coinAChange !== 0 || coinBChange !== 0) && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="text-sm sm:text-base font-bold" style={{ color: '#fffd7e' }}>
+                    Winning:
+                  </div>
+                  {coinAChange > coinBChange ? (
+                    market.coinAImage ? (
+                      <img 
+                        src={market.coinAImage} 
+                        alt={market.coinASymbol} 
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-3 border-green-500 shadow-lg" 
+                      />
+                    ) : (
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-3 border-green-500 shadow-lg flex items-center justify-center text-xl font-bold">
+                        {market.coinASymbol.charAt(0)}
+                      </div>
+                    )
+                  ) : (
+                    market.coinBImage ? (
+                      <img 
+                        src={market.coinBImage} 
+                        alt={market.coinBSymbol} 
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-3 border-green-500 shadow-lg" 
+                      />
+                    ) : (
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-3 border-green-500 shadow-lg flex items-center justify-center text-xl font-bold">
+                        {market.coinBSymbol.charAt(0)}
+                      </div>
+                    )
+                  )}
                 </div>
-              </div>
-            </div>
-
-            {/* VS Divider for Mobile - Between cards */}
-            <div className="md:hidden flex items-center justify-center py-3">
-              <div className="border border-muted bg-muted/30 rounded-lg px-6 py-2">
-                <div className="text-lg font-bold text-foreground">
+              )}
+              
+              <div className="rounded-lg border border-muted bg-muted/30 px-3 py-4 sm:px-4 sm:py-6">
+                <div className="text-xl sm:text-2xl font-bold text-foreground">
                   VS
                 </div>
               </div>

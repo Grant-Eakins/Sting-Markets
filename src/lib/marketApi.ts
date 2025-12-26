@@ -37,7 +37,8 @@ export interface Market {
   isDualCoin?: boolean;
   coinASymbol?: string;
   coinAName?: string;
-  coinAImage?: string;
+  coinAImage?: string;          // Maps from backend coinAImageUrl
+  coinAImageUrl?: string;       // Backend field name
   coinAAddress?: string;
   coinAOpeningPrice?: number;
   coinACurrentPrice?: number;
@@ -45,7 +46,8 @@ export interface Market {
   coinAChangePercent?: number;
   coinBSymbol?: string;
   coinBName?: string;
-  coinBImage?: string;
+  coinBImage?: string;          // Maps from backend coinBImageUrl
+  coinBImageUrl?: string;       // Backend field name
   coinBAddress?: string;
   coinBOpeningPrice?: number;
   coinBCurrentPrice?: number;
@@ -91,7 +93,15 @@ export async function fetchMarkets(status: 'active' | 'all' = 'active'): Promise
     });
     console.log('API Response:', response.data);
     console.log('Markets count:', response.data.markets?.length || 0);
-    return response.data.markets || [];
+    
+    // Map backend field names to frontend expected names
+    const markets = (response.data.markets || []).map((market: any) => ({
+      ...market,
+      coinAImage: market.coinAImageUrl || market.coinAImage,
+      coinBImage: market.coinBImageUrl || market.coinBImage,
+    }));
+    
+    return markets;
   } catch (error) {
     console.error('Error fetching markets:', error);
     // Return empty array instead of mock data
