@@ -237,16 +237,31 @@ export default function Markets() {
             </CardDescription>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {filteredMarkets.map((market) => {
-              // Check if this is a dual-coin market
-              console.log('Market:', market.stockSymbol, 'isDualCoin:', (market as any).isDualCoin);
-              if ((market as any).isDualCoin) {
-                return <DualCoinMarketCard key={market.id} market={market as any} />;
-              }
-              return <MarketCard key={market.id} market={market} onBetPlaced={() => refetch()} />;
-            })}
-          </div>
+          <>
+            {/* Dual-coin markets - centered full width */}
+            {filteredMarkets.filter(m => (m as any).isDualCoin).length > 0 && (
+              <div className="mb-6 flex justify-center">
+                <div className="w-full max-w-7xl">
+                  {filteredMarkets
+                    .filter(m => (m as any).isDualCoin)
+                    .map((market) => (
+                      <DualCoinMarketCard key={market.id} market={market as any} />
+                    ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Regular markets grid */}
+            {filteredMarkets.filter(m => !(m as any).isDualCoin).length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {filteredMarkets
+                  .filter(m => !(m as any).isDualCoin)
+                  .map((market) => (
+                    <MarketCard key={market.id} market={market} onBetPlaced={() => refetch()} />
+                  ))}
+              </div>
+            )}
+          </>
         )}
         </div>
       </div>
