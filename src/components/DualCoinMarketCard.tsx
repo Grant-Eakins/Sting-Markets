@@ -133,9 +133,9 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   return (
     <>
       <Card className="hover:shadow-lg transition-shadow max-w-7xl mx-auto">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2 sm:pb-3 px-2 sm:px-6 pt-2 sm:pt-6">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-bold italic" style={{ color: '#fffd7e' }}>
+            <CardTitle className="text-base sm:text-xl font-bold italic" style={{ color: '#fffd7e' }}>
               Coin Battles
             </CardTitle>
             {isActive && (
@@ -159,12 +159,12 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
           </div>
         </CardHeader>
 
-        <CardContent className="p-2 sm:p-4 md:p-6 lg:p-8">
+        <CardContent className="p-1 sm:p-4 md:p-6 lg:p-8">
           {/* Horizontal Layout on all screen sizes: Coin A | VS | Coin B */}
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-2 sm:gap-4 md:gap-6 lg:gap-8 items-stretch">
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-1 sm:gap-4 md:gap-6 lg:gap-8 items-stretch">
             
             {/* Coin A - Left Side (Top on mobile) */}
-            <div className={`relative rounded-lg border transition-all min-h-[280px] sm:min-h-[350px] md:min-h-[400px] flex flex-col ${
+            <div className={`relative rounded-lg border transition-all min-h-[260px] sm:min-h-[350px] md:min-h-[400px] flex flex-col ${
               isSettled && market.winningPosition === 'UP' 
                 ? 'border-green-500 bg-green-500/5' 
                 : 'border-muted hover:border-blue-500/40 bg-card'

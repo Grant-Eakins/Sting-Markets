@@ -655,6 +655,10 @@ export default function MyBets() {
                               <span className="font-bold sm:ml-2">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</span>
                             </div>
                             <div className="flex justify-between sm:block">
+                              <span className="text-muted-foreground">Shares:</span>
+                              <span className="font-bold text-blue-500 sm:ml-2">{bet.sharesNum.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Bucket Odds:</span>
                               <span className="font-bold sm:ml-2">{bet.probability}%</span>
                             </div>
@@ -733,6 +737,10 @@ export default function MyBets() {
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Staked:</span>
                               <span className="font-bold sm:ml-2">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</span>
+                            </div>
+                            <div className="flex justify-between sm:block">
+                              <span className="text-muted-foreground">Shares:</span>
+                              <span className="font-bold text-blue-500 sm:ml-2">{bet.sharesNum.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Result:</span>
