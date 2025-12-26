@@ -58,21 +58,25 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     ? convertPriceToUSD(market.coinAClosingPrice)
     : market.coinACurrentPrice 
     ? convertPriceToUSD(market.coinACurrentPrice)
-    : convertPriceToUSD(market.coinAOpeningPrice);
+    : market.coinAOpeningPrice 
+    ? convertPriceToUSD(market.coinAOpeningPrice)
+    : 0;
 
   const coinBPrice = isSettled && market.coinBClosingPrice 
     ? convertPriceToUSD(market.coinBClosingPrice)
     : market.coinBCurrentPrice 
     ? convertPriceToUSD(market.coinBCurrentPrice)
-    : convertPriceToUSD(market.coinBOpeningPrice);
+    : market.coinBOpeningPrice
+    ? convertPriceToUSD(market.coinBOpeningPrice)
+    : 0;
 
   const coinAChange = market.coinAChangePercent ?? 
-    (market.coinACurrentPrice 
+    (market.coinACurrentPrice && market.coinAOpeningPrice
       ? ((market.coinACurrentPrice - market.coinAOpeningPrice) / market.coinAOpeningPrice) * 100 
       : 0);
 
   const coinBChange = market.coinBChangePercent ?? 
-    (market.coinBCurrentPrice 
+    (market.coinBCurrentPrice && market.coinBOpeningPrice
       ? ((market.coinBCurrentPrice - market.coinBOpeningPrice) / market.coinBOpeningPrice) * 100 
       : 0);
 
@@ -81,7 +85,8 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     setShowBetDialog(true);
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | undefined) => {
+    if (!price || price === 0) return '$0.00';
     if (price < 0.01) {
       return `$${price.toFixed(8)}`;
     }
