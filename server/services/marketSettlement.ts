@@ -231,7 +231,15 @@ async function settleDualCoinMarket(market: Market): Promise<any> {
     
     if (market.blockchainMarketId !== undefined) {
       try {
-        await settleOnChainMarket(market.blockchainMarketId, coinAClosing);
+        // For dual-coin markets, pass a synthetic price that maps to the winning outcome
+        // Outcome 0 (UP/Coin A wins) = reference price * 1.20 (>+10% triggers bucket 0)
+        // Outcome 1 (DOWN/Coin B wins) = reference price * 0.80 (<-10% triggers bucket 1)
+        const syntheticPrice = winningPosition === Position.UP 
+          ? Math.round(market.coinAOpeningPrice! * 1.20)  // +20% -> bucket 0
+          : Math.round(market.coinAOpeningPrice! * 0.80); // -20% -> bucket 1
+        
+        console.log(`   Settling on-chain with synthetic price: ${syntheticPrice} (maps to outcome ${winningPosition === Position.UP ? 0 : 1})`);
+        await settleOnChainMarket(market.blockchainMarketId, syntheticPrice);
       } catch (error) {
         console.error('❌ Failed to settle on-chain:', error);
       }

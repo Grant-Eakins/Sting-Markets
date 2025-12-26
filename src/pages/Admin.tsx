@@ -49,6 +49,10 @@ interface Market {
   totalBets: number;
   upBettors?: number;
   downBettors?: number;
+  winningPosition?: string;
+  isDualCoin?: boolean;
+  coinASymbol?: string;
+  coinBSymbol?: string;
 }
 
 export default function AdminPage() {
@@ -1066,6 +1070,19 @@ export default function AdminPage() {
                             <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-500 flex items-center gap-1">
                               <CheckCircle className="w-3 h-3" />
                               On-Chain
+                            </span>
+                          )}
+                          {market.status === 'SETTLED' && market.winningPosition && (
+                            <span className={`text-xs px-2 py-1 rounded font-semibold flex items-center gap-1 ${
+                              market.winningPosition === 'UP' 
+                                ? 'bg-green-500/20 text-green-500' 
+                                : 'bg-red-500/20 text-red-500'
+                            }`}>
+                              <TrendingUp className={`w-3 h-3 ${market.winningPosition === 'DOWN' ? 'rotate-180' : ''}`} />
+                              {market.isDualCoin && market.coinASymbol && market.coinBSymbol
+                                ? `Winner: ${market.winningPosition === 'UP' ? market.coinASymbol : market.coinBSymbol}`
+                                : `Winner: ${market.winningPosition}`
+                              }
                             </span>
                           )}
                         </div>

@@ -52,6 +52,8 @@ interface EnrichedBet extends BlockchainBet {
   referencePrice: number | null;
   priceChangePercent: number | null;
   winningBucketLabel: string | null;
+  // Market reference for dual-coin display
+  market: Market | undefined;
 }
 
 export default function MyBets() {
@@ -414,7 +416,7 @@ export default function MyBets() {
     // Win if the user's bet bucket matches the winning outcome
     const won = isSettled && marketData?.winningOutcome === bet.outcomeIndex;
     
-    console.log(`📊 Bet ${index} result: isSettled=${isSettled}, won=${won}, outcomeIndex=${bet.outcomeIndex}`);
+    console.log(`📊 Bet ${index} result: isSettled=${isSettled}, won=${won}, outcomeIndex=${bet.outcomeIndex}, winningOutcome=${marketData?.winningOutcome}, isDualCoin=${market?.isDualCoin}`);
     
     // Get live sell value from contract
     let liveSellValue: number | null = null;
@@ -504,7 +506,13 @@ export default function MyBets() {
         priceChangePercent = ((settlementPrice - referencePrice) / referencePrice) * 100;
       }
       if (marketData.winningOutcome !== undefined) {
-        winningBucketLabel = getBucketLabel(marketData.winningOutcome, marketData.numOutcomes);
+        // For dual-coin markets, store the winningPosition (UP/DOWN) to use for coin symbol lookup later
+        // For regular markets, use bucket label
+        if (market?.isDualCoin) {
+          winningBucketLabel = marketData.winningOutcome === 0 ? 'UP' : 'DOWN';
+        } else {
+          winningBucketLabel = getBucketLabel(marketData.winningOutcome, marketData.numOutcomes);
+        }
       }
     }
     
@@ -527,6 +535,7 @@ export default function MyBets() {
       referencePrice,
       priceChangePercent,
       winningBucketLabel,
+      market, // Include market reference for dual-coin display
     };
   });
 
@@ -642,7 +651,10 @@ export default function MyBets() {
                               <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
                             )}
                             <Badge variant="secondary" className="font-mono text-xs">
-                              {bet.bucketLabel}
+                              {bet.market?.isDualCoin 
+                                ? (bet.isUpBet ? bet.market.coinASymbol : bet.market.coinBSymbol)
+                                : bet.bucketLabel
+                              }
                             </Badge>
                             <span className="font-semibold text-sm sm:text-base truncate">{bet.marketName}</span>
                             {/* Mobile: Show Active badge inline */}
@@ -722,7 +734,10 @@ export default function MyBets() {
                               <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
                             )}
                             <Badge variant="secondary" className="font-mono text-xs">
-                              {bet.bucketLabel}
+                              {bet.market?.isDualCoin 
+                                ? (bet.isUpBet ? bet.market.coinASymbol : bet.market.coinBSymbol)
+                                : bet.bucketLabel
+                              }
                             </Badge>
                             <span className="font-semibold text-sm sm:text-base truncate">{bet.marketName}</span>
                             {/* Mobile: Show Won/Lost badge inline */}
@@ -749,12 +764,6 @@ export default function MyBets() {
                               </span>
                             </div>
                             {/* Settlement Info */}
-                            {bet.settlementPrice !== null && (
-                              <div className="flex justify-between sm:block">
-                                <span className="text-muted-foreground">Settle Price:</span>
-                                <span className="font-bold sm:ml-2">${bet.settlementPrice.toFixed(2)}</span>
-                              </div>
-                            )}
                             {bet.priceChangePercent !== null && (
                               <div className="flex justify-between sm:block">
                                 <span className="text-muted-foreground">Price Change:</span>
@@ -765,9 +774,16 @@ export default function MyBets() {
                             )}
                             {bet.winningBucketLabel && (
                               <div className="flex justify-between sm:block sm:col-span-2">
-                                <span className="text-muted-foreground">Winning Bucket:</span>
+                                <span className="text-muted-foreground">
+                                  {bet.market?.isDualCoin ? 'Winning Coin:' : 'Winning Bucket:'}
+                                </span>
                                 <Badge variant="outline" className="font-mono text-xs sm:ml-2">
-                                  {bet.winningBucketLabel}
+                                  {bet.market?.isDualCoin 
+                                    ? (bet.winningBucketLabel === 'UP' || bet.outcomeIndex === 0 
+                                        ? bet.market.coinASymbol 
+                                        : bet.market.coinBSymbol)
+                                    : bet.winningBucketLabel
+                                  }
                                 </Badge>
                               </div>
                             )}

@@ -1,4 +1,5 @@
 export enum MarketStatus {
+  SCHEDULED = 'SCHEDULED',  // Market scheduled but not yet active
   ACTIVE = 'ACTIVE',
   LOCKED = 'LOCKED',
   SETTLED = 'SETTLED',
@@ -19,6 +20,7 @@ export interface Market {
   
   // Timing
   createdAt: Date;
+  startTime?: Date;           // When market should activate (for SCHEDULED markets)
   lockTime: Date;             // When betting closes
   settleTime: Date;           // When market settles
   
