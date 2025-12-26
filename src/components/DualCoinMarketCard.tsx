@@ -206,7 +206,6 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                     <CoinChart
                       name={market.coinAName || market.coinASymbol}
                       symbol={market.coinASymbol}
-                      volume="N/A"
                       growth={`${coinAChange >= 0 ? '+' : ''}${coinAChange.toFixed(2)}%`}
                       contractAddress={market.coinAAddress}
                     />
@@ -334,7 +333,6 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                     <CoinChart
                       name={market.coinBName || market.coinBSymbol}
                       symbol={market.coinBSymbol}
-                      volume="N/A"
                       growth={`${coinBChange >= 0 ? '+' : ''}${coinBChange.toFixed(2)}%`}
                       contractAddress={market.coinBAddress}
                     />

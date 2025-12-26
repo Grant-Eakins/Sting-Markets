@@ -9,7 +9,6 @@ const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 interface CoinChartProps {
   name: string;
   symbol: string;
-  volume: string;
   growth: string;
   tokenAddress?: string;
   contractAddress?: string; // For meme coins - fetches real chart data
@@ -20,7 +19,7 @@ interface ChartDataPoint {
   price: number;
 }
 
-export const CoinChart = ({ name, symbol, volume, growth, tokenAddress, contractAddress }: CoinChartProps) => {
+export const CoinChart = ({ name, symbol, growth, tokenAddress, contractAddress }: CoinChartProps) => {
   const growthValue = parseInt(growth.replace(/[^0-9]/g, '')) || 0;
   const isPositive = growth.includes('+');
 
@@ -113,7 +112,6 @@ export const CoinChart = ({ name, symbol, volume, growth, tokenAddress, contract
               {chartIsPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
               {growth}
             </p>
-            <p className="text-sm text-muted-foreground">{volume}</p>
           </div>
         </div>
 
