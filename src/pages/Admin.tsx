@@ -219,6 +219,7 @@ export default function AdminPage() {
         contractAddressB: data.coinBAddress,
         lockMinutes: data.lockMinutes,
         settleMinutes: data.settleMinutes,
+        autoRecreate: data.autoRecreate,
       };
       const response = await axios.post(`${API_BASE}/markets/create-dual-coin`, payload);
       return response.data;
@@ -233,7 +234,9 @@ export default function AdminPage() {
         autoRecreate: true,
       });
       setDualCoinPreview({ coinA: null, coinB: null });
-      alert(`✅ Dual-coin market created: ${data.market.coinASymbol} vs ${data.market.coinBSymbol}! ID: ${data.blockchainMarketId}`);
+      const coinASymbol = data.tokenA?.symbol || data.market?.coinASymbol || 'Coin A';
+      const coinBSymbol = data.tokenB?.symbol || data.market?.coinBSymbol || 'Coin B';
+      alert(`✅ Dual-coin market created: ${coinASymbol} vs ${coinBSymbol}! ID: ${data.blockchainMarketId}`);
     },
     onError: (error: any) => {
       alert(`❌ Error: ${error.response?.data?.error || error.message}`);

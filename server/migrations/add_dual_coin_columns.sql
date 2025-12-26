@@ -1,6 +1,9 @@
 -- Migration: Add dual-coin market support and autoRecreate control
 -- Run this in your Supabase SQL editor
 
+-- Extend stock_symbol column to support dual-coin symbols like "TOKEN1-TOKEN2"
+ALTER TABLE markets ALTER COLUMN stock_symbol TYPE VARCHAR(50);
+
 -- Add dual-coin flag
 ALTER TABLE markets ADD COLUMN IF NOT EXISTS is_dual_coin BOOLEAN DEFAULT FALSE;
 

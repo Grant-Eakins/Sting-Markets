@@ -461,16 +461,22 @@ router.post('/create-dual-coin', async (req, res) => {
     const { lockTime, settleTime, sessionLabel } = getNext12HourSettlement();
     
     // Fetch both tokens from DexScreener
+    console.log('   Fetching token A:', contractAddressA);
+    console.log('   Fetching token B:', contractAddressB);
+    
     const [tokenA, tokenB] = await Promise.all([
       getTokenByAddress(contractAddressA),
       getTokenByAddress(contractAddressB)
     ]);
     
+    console.log('   Token A result:', tokenA ? `${tokenA.symbol} (${tokenA.name})` : 'NOT FOUND');
+    console.log('   Token B result:', tokenB ? `${tokenB.symbol} (${tokenB.name})` : 'NOT FOUND');
+    
     if (!tokenA) {
-      return res.status(404).json({ success: false, error: 'Token A not found on DexScreener' });
+      return res.status(404).json({ success: false, error: 'Token A not found on DexScreener. Make sure it has liquidity on a Base DEX.' });
     }
     if (!tokenB) {
-      return res.status(404).json({ success: false, error: 'Token B not found on DexScreener' });
+      return res.status(404).json({ success: false, error: 'Token B not found on DexScreener. Make sure it has liquidity on a Base DEX.' });
     }
     
     // Store prices as micro-units for tiny prices
