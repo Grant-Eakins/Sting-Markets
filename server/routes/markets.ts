@@ -1048,7 +1048,7 @@ router.delete('/settled', async (req, res) => {
     for (const market of settledMarkets) {
       await deleteMarketFromDb(market.id);
       const { deleteMarketById } = await import('../services/marketService');
-      const deleted = deleteMarketById(market.id);
+      const deleted = await deleteMarketById(market.id);
       if (deleted) deleteCount++;
     }
     
@@ -1090,7 +1090,7 @@ router.delete('/:id', async (req, res) => {
     
     // Delete from memory using the service function
     const { deleteMarketById } = await import('../services/marketService');
-    const memoryDeleted = deleteMarketById(id);
+    const memoryDeleted = await deleteMarketById(id);
     
     if (!memoryDeleted && !dbDeleted) {
       return res.status(404).json({

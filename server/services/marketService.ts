@@ -1,5 +1,5 @@
 import { Market, Bet, MarketStatus, Position, MarketOdds, CreateMarketRequest, PlaceBetRequest, SettlementResult } from '../types/market';
-import { saveMarket, saveBet, loadAllMarkets, settleMarketInDb, updateMarketPriceInDb, updateMarketStatus, isDatabaseConnected, deleteAllMarketsFromDb } from './database';
+import { saveMarket, saveBet, loadAllMarkets, settleMarketInDb, updateMarketPriceInDb, updateMarketStatus, isDatabaseConnected, deleteAllMarketsFromDb, deleteMarketFromDb } from './database';
 
 // In-memory storage (synced with database for persistence)
 const markets = new Map<string, Market>();
@@ -454,10 +454,14 @@ export async function clearAllMarkets(): Promise<number> {
 /**
  * Deletes a market by stock symbol
  */
-export function deleteMarketBySymbol(symbol: string): boolean {
+export async function deleteMarketBySymbol(symbol: string): Promise<boolean> {
   for (const [id, market] of markets) {
     if (market.stockSymbol === symbol && market.status === MarketStatus.ACTIVE) {
       markets.delete(id);
+      // Persist deletion to database
+      await deleteMarketFromDb(id).catch(err => 
+        console.error('Failed to delete market from DB:', err)
+      );
       console.log(`🗑️ Deleted market for ${symbol}`);
       return true;
     }
@@ -468,7 +472,7 @@ export function deleteMarketBySymbol(symbol: string): boolean {
 /**
  * Deletes a market by ID
  */
-export function deleteMarketById(marketId: string): boolean {
+export async function deleteMarketById(marketId: string): Promise<boolean> {
   const market = markets.get(marketId);
   if (market) {
     markets.delete(marketId);
@@ -477,6 +481,10 @@ export function deleteMarketById(marketId: string): boolean {
     if (marketUserBets) {
       userBetsByMarket.delete(marketId);
     }
+    // Persist deletion to database
+    await deleteMarketFromDb(marketId).catch(err => 
+      console.error('Failed to delete market from DB:', err)
+    );
     console.log(`🗑️ Deleted market: ${market.stockSymbol} (${marketId})`);
     return true;
   }
