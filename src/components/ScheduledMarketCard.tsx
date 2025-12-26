@@ -25,8 +25,8 @@ export function ScheduledMarketCard({
         {/* Header */}
         <div className="text-center mb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500/20 rounded-full border border-yellow-500/50">
-            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'rgb(41, 55, 86)' }} />
-            <span className="text-xs sm:text-sm font-semibold" style={{ color: 'rgb(41, 55, 86)' }}>
+            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+            <span className="text-xs sm:text-sm font-semibold text-yellow-500">
               UPCOMING BATTLE
             </span>
           </div>
@@ -59,8 +59,8 @@ export function ScheduledMarketCard({
 
           {/* VS Symbol */}
           <div className="flex flex-col items-center">
-            <Swords className="w-8 h-8 sm:w-10 sm:h-10 animate-pulse" style={{ color: 'rgb(41, 55, 86)' }} />
-            <span className="text-lg sm:text-xl font-bold mt-1" style={{ color: 'rgb(41, 55, 86)' }}>
+            <Swords className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-500 animate-pulse" />
+            <span className="text-lg sm:text-xl font-bold text-yellow-500 mt-1">
               VS
             </span>
           </div>
