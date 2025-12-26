@@ -96,6 +96,18 @@ export function createMarket(request: CreateMarketRequest): Market {
     imageUrl: request.imageUrl,
     category: request.category,
     contractAddress: request.contractAddress,
+    isDualCoin: request.isDualCoin,
+    coinASymbol: request.coinASymbol,
+    coinAName: request.coinAName,
+    coinAAddress: request.coinAAddress,
+    coinAImageUrl: request.coinAImageUrl,
+    coinAOpeningPrice: request.coinAOpeningPrice,
+    coinBSymbol: request.coinBSymbol,
+    coinBName: request.coinBName,
+    coinBAddress: request.coinBAddress,
+    coinBImageUrl: request.coinBImageUrl,
+    coinBOpeningPrice: request.coinBOpeningPrice,
+    autoRecreate: request.autoRecreate,
   };
 
   markets.set(id, market);
