@@ -71,14 +71,14 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     : 0;
 
   const coinAChange = market.coinAChangePercent ?? 
-    (market.coinACurrentPrice && market.coinAOpeningPrice
+    ((market.coinACurrentPrice && market.coinAOpeningPrice
       ? ((market.coinACurrentPrice - market.coinAOpeningPrice) / market.coinAOpeningPrice) * 100 
-      : 0) || 0;
+      : 0) || 0);
 
   const coinBChange = market.coinBChangePercent ?? 
-    (market.coinBCurrentPrice && market.coinBOpeningPrice
+    ((market.coinBCurrentPrice && market.coinBOpeningPrice
       ? ((market.coinBCurrentPrice - market.coinBOpeningPrice) / market.coinBOpeningPrice) * 100 
-      : 0) || 0;
+      : 0) || 0);
 
   const handleBet = (position: 'UP' | 'DOWN') => {
     setSelectedPosition(position);
