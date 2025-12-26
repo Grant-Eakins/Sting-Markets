@@ -400,7 +400,7 @@ router.post('/create-by-contract', async (req, res) => {
       category: 'meme',
       contractAddress, // Store the contract address for future price lookups
       imageUrl: tokenInfo.imageUrl, // Token logo from DexScreener
-      autoRecreate, // Control whether this market auto-recreates
+      autoRecreate, // Optional: Control whether this market auto-recreates
     });
     
     // Create on-chain market
@@ -511,7 +511,7 @@ router.post('/create-dual-coin', async (req, res) => {
       coinBAddress: contractAddressB,
       coinBImageUrl: tokenB.imageUrl,
       coinBOpeningPrice: coinBPrice,
-      autoRecreate, // Control whether this market auto-recreates
+      autoRecreate, // Optional: Control whether this market auto-recreates
     });
     
     // Save market to database first

@@ -73,12 +73,12 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   const coinAChange = market.coinAChangePercent ?? 
     (market.coinACurrentPrice && market.coinAOpeningPrice
       ? ((market.coinACurrentPrice - market.coinAOpeningPrice) / market.coinAOpeningPrice) * 100 
-      : 0);
+      : 0) || 0;
 
   const coinBChange = market.coinBChangePercent ?? 
     (market.coinBCurrentPrice && market.coinBOpeningPrice
       ? ((market.coinBCurrentPrice - market.coinBOpeningPrice) / market.coinBOpeningPrice) * 100 
-      : 0);
+      : 0) || 0;
 
   const handleBet = (position: 'UP' | 'DOWN') => {
     setSelectedPosition(position);
@@ -253,20 +253,25 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
         </CardContent>
       </Card>
 
-      <BetDialog
-        isOpen={showBetDialog}
-        onClose={() => setShowBetDialog(false)}
-        market={{
-          id: market.id,
-          stockSymbol: `${market.coinASymbol} vs ${market.coinBSymbol}`,
-          stockName: 'Dual Coin Battle',
-          currentPrice: 0,
-          openingPrice: 0,
-          upPool: market.upPool,
-          downPool: market.downPool,
-        }}
-        position={selectedPosition}
-      />
+      {showBetDialog && (
+        <BetDialog
+          onClose={() => setShowBetDialog(false)}
+          market={{
+            id: market.id,
+            stockSymbol: `${market.coinASymbol} vs ${market.coinBSymbol}`,
+            stockName: 'Dual Coin Battle',
+            currentPrice: 0,
+            openingPrice: 0,
+            upPool: market.upPool,
+            downPool: market.downPool,
+          } as any}
+          position={selectedPosition}
+          odds={2.0}
+          onBetPlaced={() => {
+            setShowBetDialog(false);
+          }}
+        />
+      )}
     </>
   );
 }

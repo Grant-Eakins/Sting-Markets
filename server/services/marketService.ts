@@ -107,7 +107,7 @@ export function createMarket(request: CreateMarketRequest): Market {
     coinBAddress: request.coinBAddress,
     coinBImageUrl: request.coinBImageUrl,
     coinBOpeningPrice: request.coinBOpeningPrice,
-    autoRecreate: request.autoRecreate,
+    autoRecreate: request.autoRecreate ?? true, // Default to true if not specified
   };
 
   markets.set(id, market);
