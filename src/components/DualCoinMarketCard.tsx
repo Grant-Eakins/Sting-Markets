@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Clock, Lock, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 import { BetDialog } from './BetDialog';
+import { CoinChart } from './CoinChart';
 
 interface DualCoinMarketCardProps {
   market: {
@@ -12,6 +13,7 @@ interface DualCoinMarketCardProps {
     coinASymbol: string;
     coinAName?: string;
     coinAImage?: string;
+    coinAAddress?: string;
     coinAOpeningPrice: number;
     coinACurrentPrice?: number;
     coinAClosingPrice?: number;
@@ -19,6 +21,7 @@ interface DualCoinMarketCardProps {
     coinBSymbol: string;
     coinBName?: string;
     coinBImage?: string;
+    coinBAddress?: string;
     coinBOpeningPrice: number;
     coinBCurrentPrice?: number;
     coinBClosingPrice?: number;
@@ -169,6 +172,19 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
               </div>
             </div>
             
+            {/* Coin A Chart */}
+            {market.coinAAddress && (
+              <div className="mb-2">
+                <CoinChart
+                  name={market.coinAName || market.coinASymbol}
+                  symbol={market.coinASymbol}
+                  volume="N/A"
+                  growth={`${coinAChange >= 0 ? '+' : ''}${coinAChange.toFixed(2)}%`}
+                  contractAddress={market.coinAAddress}
+                />
+              </div>
+            )}
+            
             {isActive && !userBet && (
               <Button 
                 onClick={() => handleBet('UP')}
@@ -213,6 +229,19 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 </div>
               </div>
             </div>
+            
+            {/* Coin B Chart */}
+            {market.coinBAddress && (
+              <div className="mb-2">
+                <CoinChart
+                  name={market.coinBName || market.coinBSymbol}
+                  symbol={market.coinBSymbol}
+                  volume="N/A"
+                  growth={`${coinBChange >= 0 ? '+' : ''}${coinBChange.toFixed(2)}%`}
+                  contractAddress={market.coinBAddress}
+                />
+              </div>
+            )}
             
             {isActive && !userBet && (
               <Button 
