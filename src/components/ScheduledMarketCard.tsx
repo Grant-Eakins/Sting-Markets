@@ -20,13 +20,13 @@ export function ScheduledMarketCard({
   onComplete,
 }: ScheduledMarketCardProps) {
   return (
-    <Card className="w-full bg-card/90 backdrop-blur-sm border-2 border-purple-500/50 shadow-lg hover:shadow-purple-500/20 transition-all duration-300">
+    <Card className="w-full bg-card/90 backdrop-blur-sm border-2 border-yellow-500/50 shadow-lg hover:shadow-yellow-500/20 transition-all duration-300">
       <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="text-center mb-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/20 rounded-full border border-purple-500/50">
-            <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-            <span className="text-xs sm:text-sm font-semibold text-purple-400">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500/20 rounded-full border border-yellow-500/50">
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'rgb(41, 55, 86)' }} />
+            <span className="text-xs sm:text-sm font-semibold" style={{ color: 'rgb(41, 55, 86)' }}>
               UPCOMING BATTLE
             </span>
           </div>
@@ -59,8 +59,8 @@ export function ScheduledMarketCard({
 
           {/* VS Symbol */}
           <div className="flex flex-col items-center">
-            <Swords className="w-8 h-8 sm:w-10 sm:h-10 text-purple-500 animate-pulse" />
-            <span className="text-lg sm:text-xl font-bold text-purple-400 mt-1">
+            <Swords className="w-8 h-8 sm:w-10 sm:h-10 animate-pulse" style={{ color: 'rgb(41, 55, 86)' }} />
+            <span className="text-lg sm:text-xl font-bold mt-1" style={{ color: 'rgb(41, 55, 86)' }}>
               VS
             </span>
           </div>

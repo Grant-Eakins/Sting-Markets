@@ -2,20 +2,20 @@ import { Link } from 'react-router-dom';
 
 export function Footer() {
   return (
-    <footer className="border-t bg-muted/30 mt-12">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+    <footer className="border-t bg-muted/30 mt-6 sm:mt-12">
+      <div className="container mx-auto px-4 py-4 sm:py-8">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-3 sm:gap-6">
           {/* Logo and tagline */}
           <div className="flex items-center gap-2">
-            <img src="/Copilot_20251128_175824-removebg-preview.png" alt="Sting Markets" className="h-8" />
+            <img src="/Copilot_20251128_175824-removebg-preview.png" alt="Sting Markets" className="h-6 sm:h-8" />
             <div>
-              <span className="font-bold italic">Sting Markets</span>
-              <p className="text-xs text-muted-foreground">Crypto Prediction Markets on Base</p>
+              <span className="font-bold italic text-sm sm:text-base">Sting Markets</span>
+              <p className="text-xs text-muted-foreground hidden sm:block">Crypto Prediction Markets on Base</p>
             </div>
           </div>
 
           {/* Links */}
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-6 text-xs sm:text-sm">
             <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
               Markets
             </Link>
@@ -28,7 +28,7 @@ export function Footer() {
           </div>
 
           {/* Legal Links */}
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-6 text-xs sm:text-sm">
             <Link to="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
               Terms
             </Link>
@@ -42,8 +42,8 @@ export function Footer() {
         </div>
 
         {/* Bottom row */}
-        <div className="mt-6 pt-6 border-t text-center text-xs text-muted-foreground">
-          <p className="mb-2">
+        <div className="mt-3 pt-3 sm:mt-6 sm:pt-6 border-t text-center text-xs text-muted-foreground">
+          <p className="mb-1 sm:mb-2">
             ⚠️ <strong>Risk Warning:</strong> Prediction markets involve financial risk. You may lose your entire stake. 
             <Link to="/risk-disclaimer" className="ml-1 underline hover:text-foreground">Learn more</Link>
           </p>
