@@ -107,11 +107,11 @@ export default function SingleMarkets() {
 
         {/* Page Title */}
         <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-2">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-2" style={{ color: 'hsl(222 35% 25%)' }}>
             <TrendingUp className="w-8 h-8" />
             Single Coin Markets
           </h1>
-          <p className="text-muted-foreground">Bet on whether a single coin will go up or down</p>
+          <p className="text-muted-foreground" style={{ color: 'hsl(222 35% 25%)' }}>Bet on whether a single coin will go up or down</p>
         </div>
 
         {/* Markets Grid */}

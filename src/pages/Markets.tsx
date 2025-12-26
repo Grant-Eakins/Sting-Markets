@@ -112,12 +112,12 @@ export default function Markets() {
       
       {/* Main Content Area with Yellow Background */}
       <div className="flex-1 bg-yellow-content">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
 
         {/* Page Title */}
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'hsl(222 35% 25%)' }}>⚔️ Coin Battles</h1>
-          <p className="text-muted-foreground" style={{ color: 'hsl(222 35% 25%)' }}>Bet on which coin gains more percentage in head-to-head battles</p>
+        <div className="mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2" style={{ color: 'hsl(222 35% 25%)' }}>⚔️ Coin Battles</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground" style={{ color: 'hsl(222 35% 25%)' }}>Bet on which coin gains more percentage in head-to-head battles</p>
         </div>
 
         {/* Coin Battles Grid */}
@@ -135,7 +135,7 @@ export default function Markets() {
             </CardDescription>
           </Card>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-3 sm:space-y-6">
             {markets
               .filter(m => (m as any).isDualCoin)
               .map((market) => (
