@@ -20,7 +20,7 @@ export function ScheduledMarketCard({
   onComplete,
 }: ScheduledMarketCardProps) {
   return (
-    <Card className="w-full bg-card/90 backdrop-blur-sm border-2 border-yellow-500/50 shadow-lg hover:shadow-yellow-500/20 transition-all duration-300">
+    <Card className="w-full bg-card border-2 border-yellow-500/50 shadow-lg hover:shadow-yellow-500/20 transition-all duration-300">
       <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="text-center mb-4">
