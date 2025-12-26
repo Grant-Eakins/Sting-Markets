@@ -291,12 +291,6 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
 
           {/* Odds Display */}
           <div className="p-4 bg-muted rounded-lg space-y-2">
-            {bucketIndex !== undefined && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Bucket:</span>
-                <span className="font-bold">#{bucketIndex}</span>
-              </div>
-            )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Shares Received:</span>
               <span className="font-bold text-blue-500">

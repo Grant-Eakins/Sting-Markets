@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { BetDialog } from './BetDialog';
 import { CoinChart } from './CoinChart';
 import { useLiveCoinPrice } from '@/hooks/useLiveCoinPrice';
+import { useBucketLiquidity } from '@/hooks/useContract';
 
 interface DualCoinMarketCardProps {
   market: {
@@ -60,6 +61,10 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   const { data: coinAData } = useLiveCoinPrice(market.coinAAddress);
   const { data: coinBData } = useLiveCoinPrice(market.coinBAddress);
 
+  // Fetch real-time on-chain pool liquidity for dynamic percentages
+  const { liquidity: coinALiquidity } = useBucketLiquidity(market.blockchainMarketId, 0);
+  const { liquidity: coinBLiquidity } = useBucketLiquidity(market.blockchainMarketId, 1);
+
   const isLocked = market.status === 'LOCKED';
   const isSettled = market.status === 'SETTLED';
   const isActive = market.status === 'ACTIVE';
@@ -106,9 +111,24 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     return `${minutes}m`;
   };
 
-  const totalPool = market.upPool + market.downPool;
-  const coinAPoolPercent = totalPool > 0 ? (market.upPool / totalPool) * 100 : 50;
-  const coinBPoolPercent = totalPool > 0 ? (market.downPool / totalPool) * 100 : 50;
+  // Calculate pool percentages from real-time on-chain liquidity
+  let coinAPoolPercent = 50;
+  let coinBPoolPercent = 50;
+  
+  if (coinALiquidity !== undefined && coinBLiquidity !== undefined) {
+    const totalLiquidity = Number(coinALiquidity) + Number(coinBLiquidity);
+    if (totalLiquidity > 0) {
+      coinAPoolPercent = (Number(coinALiquidity) / totalLiquidity) * 100;
+      coinBPoolPercent = (Number(coinBLiquidity) / totalLiquidity) * 100;
+    }
+  } else {
+    // Fallback to backend data if on-chain data not available
+    const totalPool = market.upPool + market.downPool;
+    if (totalPool > 0) {
+      coinAPoolPercent = (market.upPool / totalPool) * 100;
+      coinBPoolPercent = (market.downPool / totalPool) * 100;
+    }
+  }
 
   return (
     <>
@@ -362,7 +382,12 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
           {/* Market Stats */}
           <div className="mt-3 sm:mt-4 grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm pt-2 sm:pt-3 border-t">
             <div>Total Bets: <span className="font-semibold">{market.totalBets}</span></div>
-            <div>Total Pool: <span className="font-semibold">{totalPool.toLocaleString()}</span></div>
+            <div>Total Pool: <span className="font-semibold">
+              {coinALiquidity !== undefined && coinBLiquidity !== undefined 
+                ? ((Number(coinALiquidity) + Number(coinBLiquidity)) / 1e18).toFixed(2)
+                : (market.upPool + market.downPool).toLocaleString()
+              } {coinALiquidity !== undefined && coinBLiquidity !== undefined ? 'MIND' : ''}
+            </span></div>
           </div>
         </CardContent>
       </Card>
