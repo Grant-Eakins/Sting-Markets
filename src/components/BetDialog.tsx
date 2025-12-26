@@ -183,9 +183,9 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
         console.log(`🔍 Checking approval: needsApproval=${needsApproval}, allowance=${allowance}, betAmount=${betAmountBigInt}`);
         
         if (needsApproval) {
-          console.log(`🔓 Requesting unlimited ${TOKEN_SYMBOL} approval...`);
-          // Request unlimited approval so user only has to approve once
-          approveToken();
+          console.log(`🔓 Requesting ${TOKEN_SYMBOL} approval for ${amount} tokens...`);
+          // Approve the exact amount needed
+          await approveToken(betAmountBigInt);
           return;
         }
         
