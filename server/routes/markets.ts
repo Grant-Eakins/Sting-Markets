@@ -21,6 +21,7 @@ import { testDiscordWebhook } from '../services/discordBot';
 import { getCryptoQuote } from '../services/cryptoApi';
 import { getTokenByAddress, searchTokens, getTokenHistory } from '../services/dexScreenerApi';
 import { saveMarket, deleteMarketFromDb } from '../services/database';
+import { getScheduledMarkets } from '../services/scheduledMarketActivation';
 
 const router = express.Router();
 
@@ -560,10 +561,23 @@ router.post('/create-dual-coin', async (req, res) => {
 /**
  * GET /api/markets
  * Get all active markets (with fresh blockchain pool data)
+ * Query params:
+ *   - status=all: Get all markets regardless of status
+ *   - status=scheduled: Get only scheduled markets (upcoming battles)
  */
 router.get('/', async (req, res) => {
   try {
     const { status } = req.query;
+    
+    // Handle scheduled markets request
+    if (status === 'scheduled') {
+      const scheduledMarkets = await getScheduledMarkets();
+      return res.json({
+        success: true,
+        markets: scheduledMarkets,
+        count: scheduledMarkets.length,
+      });
+    }
     
     const markets = status === 'all' 
       ? getAllMarkets()

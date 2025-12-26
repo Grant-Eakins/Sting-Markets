@@ -1,9 +1,6 @@
 -- Add support for scheduled markets with countdown timers
 -- Markets will start in SCHEDULED status and activate at startTime (noon or midnight)
 
--- Add SCHEDULED to status enum
-ALTER TYPE market_status ADD VALUE IF NOT EXISTS 'SCHEDULED';
-
 -- Add start_time column for scheduled market activation
 ALTER TABLE markets 
 ADD COLUMN IF NOT EXISTS start_time TIMESTAMPTZ;

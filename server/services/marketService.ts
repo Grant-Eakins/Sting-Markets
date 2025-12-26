@@ -1,5 +1,6 @@
 import { Market, Bet, MarketStatus, Position, MarketOdds, CreateMarketRequest, PlaceBetRequest, SettlementResult } from '../types/market';
 import { saveMarket, saveBet, loadAllMarkets, settleMarketInDb, updateMarketPriceInDb, updateMarketStatus, isDatabaseConnected, deleteAllMarketsFromDb, deleteMarketFromDb } from './database';
+import { getNextMarketStartTime, calculateLockTime, calculateSettleTime } from '../utils/scheduledMarkets';
 
 // In-memory storage (synced with database for persistence)
 const markets = new Map<string, Market>();
@@ -53,25 +54,41 @@ export async function initializeMarketsFromDb(): Promise<void> {
 
 /**
  * Creates a new prediction market for a stock
+ * Dual-coin markets are SCHEDULED and activate at next noon/midnight
+ * Single-coin markets are ACTIVE immediately (legacy behavior)
  */
 export function createMarket(request: CreateMarketRequest): Market {
   const id = `market-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const now = new Date();
   
-  // Use passed lockTime/settleTime if provided, otherwise calculate from hours
+  // Determine if this should be a scheduled market (dual-coin battles)
+  const isScheduled = request.isDualCoin === true;
+  
+  let startTime: Date | undefined;
   let lockTime: Date;
   let settleTime: Date;
+  let status: MarketStatus;
   
-  if (request.lockTime && request.settleTime) {
-    // Direct timestamps provided - use them
+  if (isScheduled) {
+    // SCHEDULED MARKET: Activate at next noon/midnight
+    startTime = getNextMarketStartTime();
+    lockTime = calculateLockTime(startTime);
+    settleTime = calculateSettleTime(startTime);
+    status = MarketStatus.SCHEDULED;
+    
+    console.log(`📅 Scheduling market for ${startTime.toLocaleString()}`);
+  } else if (request.lockTime && request.settleTime) {
+    // Direct timestamps provided - use them (legacy)
     lockTime = request.lockTime;
     settleTime = request.settleTime;
+    status = MarketStatus.ACTIVE;
   } else {
-    // Calculate from hours (default behavior)
+    // Calculate from hours (legacy behavior for single-coin markets)
     const lockHours = request.lockHours || (request.isAfterHours ? 8 : 2);
     const settleHours = request.settleHours || (request.isAfterHours ? 16 : 3);
     lockTime = new Date(now.getTime() + lockHours * 60 * 60 * 1000);
     settleTime = new Date(now.getTime() + settleHours * 60 * 60 * 1000);
+    status = MarketStatus.ACTIVE;
   }
 
   const market: Market = {
@@ -79,8 +96,9 @@ export function createMarket(request: CreateMarketRequest): Market {
     stockSymbol: request.stockSymbol,
     stockName: request.stockName,
     description: request.description,
-    status: MarketStatus.ACTIVE,
+    status,
     createdAt: now,
+    startTime,
     lockTime,
     settleTime,
     openingPrice: request.openingPrice,
@@ -115,7 +133,11 @@ export function createMarket(request: CreateMarketRequest): Market {
   // Save to database asynchronously
   saveMarket(market).catch(err => console.error('Failed to save market to DB:', err));
   
-  console.log(`✅ Market created: ${market.stockSymbol} @ $${(request.openingPrice / 100).toFixed(2)} (${request.isAfterHours ? 'After-Hours' : 'Trading Hours'})`);
+  if (isScheduled) {
+    console.log(`✅ Market scheduled: ${market.stockSymbol} - Starts at ${startTime?.toLocaleString()}`);
+  } else {
+    console.log(`✅ Market created: ${market.stockSymbol} @ $${(request.openingPrice / 100).toFixed(2)} (${request.isAfterHours ? 'After-Hours' : 'Trading Hours'})`);
+  }
   
   return market;
 }

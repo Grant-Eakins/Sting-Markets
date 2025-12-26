@@ -5,6 +5,7 @@ import { Market, fetchMarkets } from '@/lib/marketApi';
 import { TOKEN_SYMBOL } from '@/config/contract';
 import { MarketCard } from '@/components/MarketCard';
 import { DualCoinMarketCard } from '@/components/DualCoinMarketCard';
+import { ScheduledMarketCard } from '@/components/ScheduledMarketCard';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
@@ -30,11 +31,26 @@ export default function Markets() {
   // Check if connected wallet is admin
   const isAdmin = isConnected && address && ADMIN_WALLETS.includes(address.toLowerCase());
 
+  // Fetch active markets
   const { data: markets = [], isLoading, refetch } = useQuery({
     queryKey: ['markets', 'active'],
     queryFn: () => fetchMarkets('active'),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
+
+  // Fetch scheduled markets
+  const { data: scheduledMarkets = [], isLoading: isLoadingScheduled, refetch: refetchScheduled } = useQuery({
+    queryKey: ['markets', 'scheduled'],
+    queryFn: () => fetchMarkets('scheduled'),
+    refetchInterval: 5000, // Refetch every 5 seconds for countdown updates
+  });
+
+  // Callback when countdown completes - refetch both scheduled and active markets
+  const handleCountdownComplete = () => {
+    console.log('⏰ Countdown completed, refreshing markets...');
+    refetchScheduled();
+    refetch();
+  };
 
   // Debug: Log markets to see if blockchainMarketId is set
   if (markets.length > 0) {
@@ -120,7 +136,37 @@ export default function Markets() {
           <p className="text-xs sm:text-sm text-muted-foreground" style={{ color: 'hsl(222 35% 25%)' }}>Bet on which coin gains more percentage in head-to-head battles</p>
         </div>
 
-        {/* Coin Battles Grid */}
+        {/* Scheduled Battles Section */}
+        {!isLoadingScheduled && scheduledMarkets.length > 0 && (
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-lg sm:text-2xl font-bold mb-3 sm:mb-4 px-1" style={{ color: 'hsl(222 35% 25%)' }}>
+              🔮 Upcoming Battles
+            </h2>
+            <div className="space-y-2 sm:space-y-4">
+              {scheduledMarkets
+                .filter(m => (m as any).isDualCoin && (m as any).startTime)
+                .map((market: any) => (
+                  <ScheduledMarketCard
+                    key={market.id}
+                    coinASymbol={market.coinASymbol || 'COIN A'}
+                    coinBSymbol={market.coinBSymbol || 'COIN B'}
+                    coinAImage={market.coinAImage}
+                    coinBImage={market.coinBImage}
+                    startTime={market.startTime}
+                    onComplete={handleCountdownComplete}
+                  />
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Active Coin Battles Grid */}
+        <div className="mb-3 sm:mb-6 px-1">
+          <h2 className="text-lg sm:text-2xl font-bold" style={{ color: 'hsl(222 35% 25%)' }}>
+            🔥 Live Battles
+          </h2>
+        </div>
+        
         {isLoading ? (
           <div className="space-y-6">
             {[...Array(3)].map((_, i) => (
@@ -129,9 +175,11 @@ export default function Markets() {
           </div>
         ) : markets.filter(m => (m as any).isDualCoin).length === 0 ? (
           <Card className="p-8 sm:p-12 text-center">
-            <CardTitle className="mb-2">No Coin Battles Available</CardTitle>
+            <CardTitle className="mb-2">No Active Battles</CardTitle>
             <CardDescription>
-              Check back soon for exciting coin battles!
+              {scheduledMarkets.length > 0 
+                ? 'Check the upcoming battles above - they will start soon!'
+                : 'Check back soon for exciting coin battles!'}
             </CardDescription>
           </Card>
         ) : (

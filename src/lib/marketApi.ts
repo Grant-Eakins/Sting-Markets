@@ -10,7 +10,7 @@ export interface Market {
   stockSymbol: string;        // Stock ticker (e.g., "AAPL")
   stockName?: string;         // Full company name
   description: string;
-  status: 'ACTIVE' | 'LOCKED' | 'SETTLED' | 'CANCELLED';
+  status: 'ACTIVE' | 'LOCKED' | 'SETTLED' | 'CANCELLED' | 'SCHEDULED';
   createdAt: string;
   lockTime: string;
   settleTime: string;
@@ -32,6 +32,7 @@ export interface Market {
   contractAddress?: string;     // Contract address for meme coins (for price lookups)
   blockchainMarketId?: number;  // On-chain market ID
   probabilities?: number[];     // LMSR probabilities for each outcome (0-100%)
+  startTime?: string;           // ISO string for scheduled market start time
   
   // Dual-coin fields
   isDualCoin?: boolean;
@@ -86,7 +87,7 @@ export interface UserStats {
   winRate: number;
 }
 
-export async function fetchMarkets(status: 'active' | 'all' = 'active'): Promise<Market[]> {
+export async function fetchMarkets(status: 'active' | 'all' | 'scheduled' = 'active'): Promise<Market[]> {
   try {
     const response = await axios.get(`${API_BASE}/markets`, {
       params: { status },

@@ -11,6 +11,7 @@ import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/mark
 import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain } from './services/blockchainSync';
 import { getAllMarkets, updateMarketPools, initializeMarketsFromDb } from './services/marketService';
 import { initializeDatabase, cleanupOldSettledMarkets, cleanupDuplicateActiveMarkets } from './services/database';
+import { activateScheduledMarkets } from './services/scheduledMarketActivation';
 
 // ES Module dirname workaround
 const __filename = fileURLToPath(import.meta.url);
@@ -229,6 +230,18 @@ cron.schedule('*/15 * * * *', async () => {
     await checkAndSettleMarkets();
   } catch (error) {
     console.error('Error during market settlement:', error);
+  }
+});
+
+// Check for scheduled markets to activate every minute
+cron.schedule('* * * * *', async () => {
+  try {
+    const activated = await activateScheduledMarkets();
+    if (activated > 0) {
+      console.log(`🚀 Activated ${activated} scheduled market(s)`);
+    }
+  } catch (error) {
+    console.error('Error activating scheduled markets:', error);
   }
 });
 
