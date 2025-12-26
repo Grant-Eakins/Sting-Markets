@@ -210,7 +210,13 @@ export default function AdminPage() {
   // Create dual-coin market mutation
   const createDualCoin = useMutation({
     mutationFn: async (data: typeof dualCoinData) => {
-      const response = await axios.post(`${API_BASE}/markets/create-dual-coin`, data);
+      const payload = {
+        contractAddressA: data.coinAAddress,
+        contractAddressB: data.coinBAddress,
+        lockMinutes: data.lockMinutes,
+        settleMinutes: data.settleMinutes,
+      };
+      const response = await axios.post(`${API_BASE}/markets/create-dual-coin`, payload);
       return response.data;
     },
     onSuccess: (data) => {
