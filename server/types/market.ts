@@ -73,6 +73,7 @@ export interface Market {
   imageUrl?: string;          // LEGACY: Coin A image
   category?: string;
   contractAddress?: string;   // LEGACY: Coin A contract address
+  autoRecreate?: boolean;     // If true, automatically create new market when this settles
   
   // Blockchain integration
   blockchainMarketId?: number;  // On-chain market ID (if created on blockchain)

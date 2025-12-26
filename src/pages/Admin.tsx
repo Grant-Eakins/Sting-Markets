@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -66,6 +67,7 @@ export default function AdminPage() {
     contractAddress: '',
     lockMinutes: 720,  // 12 hours default
     settleMinutes: 720.05,
+    autoRecreate: true,
   });
   const [tokenPreview, setTokenPreview] = useState<{
     symbol: string;
@@ -82,6 +84,7 @@ export default function AdminPage() {
     coinBAddress: '',
     lockMinutes: 720,
     settleMinutes: 720.05,
+    autoRecreate: true,
   });
   const [dualCoinPreview, setDualCoinPreview] = useState<{
     coinA: { symbol: string; name: string; price: number; liquidity: number } | null;
@@ -198,6 +201,7 @@ export default function AdminPage() {
         contractAddress: '',
         lockMinutes: 720,
         settleMinutes: 720.05,
+        autoRecreate: true,
       });
       setTokenPreview(null);
       alert(`✅ Market created for ${data.tokenInfo.symbol}! On-chain pool ID: ${data.blockchainMarketId}`);
@@ -226,6 +230,7 @@ export default function AdminPage() {
         coinBAddress: '',
         lockMinutes: 720,
         settleMinutes: 720.05,
+        autoRecreate: true,
       });
       setDualCoinPreview({ coinA: null, coinB: null });
       alert(`✅ Dual-coin market created: ${data.market.coinASymbol} vs ${data.market.coinBSymbol}! ID: ${data.blockchainMarketId}`);
@@ -622,6 +627,20 @@ export default function AdminPage() {
                   ⏱️ Default: 12 hour session. Lock in {Math.floor(contractData.lockMinutes / 60)}h {Math.round(contractData.lockMinutes % 60)}m
                 </p>
 
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="contractAutoRecreate"
+                    checked={contractData.autoRecreate}
+                    onCheckedChange={(checked) => setContractData({ 
+                      ...contractData, 
+                      autoRecreate: checked === true 
+                    })}
+                  />
+                  <Label htmlFor="contractAutoRecreate" className="text-sm cursor-pointer">
+                    🔄 Auto-recreate market after settlement (loop forever)
+                  </Label>
+                </div>
+
                 <Button 
                   type="submit" 
                   className="w-full bg-purple-600 hover:bg-purple-700" 
@@ -756,6 +775,20 @@ export default function AdminPage() {
                       })}
                     />
                   </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="dualCoinAutoRecreate"
+                    checked={dualCoinData.autoRecreate}
+                    onCheckedChange={(checked) => setDualCoinData({ 
+                      ...dualCoinData, 
+                      autoRecreate: checked === true 
+                    })}
+                  />
+                  <Label htmlFor="dualCoinAutoRecreate" className="text-sm cursor-pointer">
+                    🔄 Auto-recreate market after settlement (loop forever)
+                  </Label>
                 </div>
 
                 <Button 

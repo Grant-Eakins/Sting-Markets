@@ -307,7 +307,7 @@ router.get('/search-token', async (req, res) => {
  */
 router.post('/create-by-contract', async (req, res) => {
   try {
-    const { contractAddress } = req.body;
+    const { contractAddress, autoRecreate = true } = req.body;
     
     if (!contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
       return res.status(400).json({
@@ -400,6 +400,7 @@ router.post('/create-by-contract', async (req, res) => {
       category: 'meme',
       contractAddress, // Store the contract address for future price lookups
       imageUrl: tokenInfo.imageUrl, // Token logo from DexScreener
+      autoRecreate, // Control whether this market auto-recreates
     });
     
     // Create on-chain market
@@ -445,7 +446,7 @@ router.post('/create-by-contract', async (req, res) => {
  */
 router.post('/create-dual-coin', async (req, res) => {
   try {
-    const { contractAddressA, contractAddressB, lockMinutes = 720, settleMinutes = 720.05 } = req.body;
+    const { contractAddressA, contractAddressB, lockMinutes = 720, settleMinutes = 720.05, autoRecreate = true } = req.body;
     
     if (!contractAddressA || !/^0x[a-fA-F0-9]{40}$/.test(contractAddressA)) {
       return res.status(400).json({ success: false, error: 'Invalid contract address A' });
@@ -501,6 +502,7 @@ router.post('/create-dual-coin', async (req, res) => {
       coinBAddress: contractAddressB,
       coinBImageUrl: tokenB.imageUrl,
       coinBOpeningPrice: coinBPrice,
+      autoRecreate, // Control whether this market auto-recreates
     });
     
     // Create on-chain market with 2 buckets (Coin A vs Coin B)

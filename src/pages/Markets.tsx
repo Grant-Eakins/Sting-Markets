@@ -240,6 +240,7 @@ export default function Markets() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredMarkets.map((market) => {
               // Check if this is a dual-coin market
+              console.log('Market:', market.stockSymbol, 'isDualCoin:', (market as any).isDualCoin);
               if ((market as any).isDualCoin) {
                 return <DualCoinMarketCard key={market.id} market={market as any} />;
               }

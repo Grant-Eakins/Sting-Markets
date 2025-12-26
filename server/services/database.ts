@@ -94,6 +94,7 @@ export async function saveMarket(market: Market): Promise<boolean> {
         coin_b_current_price: market.coinBCurrentPrice,
         coin_b_closing_price: market.coinBClosingPrice,
         coin_b_change_percent: market.coinBChangePercent,
+        auto_recreate: market.autoRecreate ?? false,
         created_at: market.createdAt.toISOString(),
       }, { onConflict: 'id' });
 
@@ -572,6 +573,7 @@ function dbMarketToMarket(row: any): Market {
     coinBCurrentPrice: row.coin_b_current_price,
     coinBClosingPrice: row.coin_b_closing_price,
     coinBChangePercent: row.coin_b_change_percent,
+    autoRecreate: row.auto_recreate ?? false,
   };
 }
 
