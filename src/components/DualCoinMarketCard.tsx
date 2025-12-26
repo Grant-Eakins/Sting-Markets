@@ -132,7 +132,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow max-w-7xl mx-auto">
+      <Card className="hover:shadow-lg transition-shadow max-w-7xl mx-auto bg-card/90">
         <CardHeader className="pb-2 sm:pb-3 px-2 sm:px-6 pt-2 sm:pt-6">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base sm:text-xl font-bold italic" style={{ color: '#fffd7e' }}>
@@ -167,7 +167,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
             <div className={`relative rounded-lg border transition-all min-h-[260px] sm:min-h-[350px] md:min-h-[400px] flex flex-col ${
               isSettled && market.winningPosition === 'UP' 
                 ? 'border-green-500 bg-green-500/5' 
-                : 'border-muted hover:border-blue-500/40 bg-card'
+                : 'border-muted hover:border-blue-500/40 bg-card/80'
             }`}>
               {/* Coin A Image - Top Left Corner */}
               <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10">
@@ -294,7 +294,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
             <div className={`relative rounded-lg border transition-all min-h-[280px] sm:min-h-[350px] md:min-h-[400px] flex flex-col ${
               isSettled && market.winningPosition === 'DOWN' 
                 ? 'border-green-500 bg-green-500/5' 
-                : 'border-muted hover:border-purple-500/40 bg-card'
+                : 'border-muted hover:border-purple-500/40 bg-card/80'
             }`}>
               {/* Price Info - Top Left */}
               <div className="absolute top-2 left-2 sm:top-3 sm:left-3 text-left z-10">
