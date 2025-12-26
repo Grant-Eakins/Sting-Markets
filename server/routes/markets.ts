@@ -446,6 +446,9 @@ router.post('/create-by-contract', async (req, res) => {
  */
 router.post('/create-dual-coin', async (req, res) => {
   try {
+    console.log('🆚 Dual-coin creation request received');
+    console.log('   Body:', JSON.stringify(req.body, null, 2));
+    
     const { contractAddressA, contractAddressB, lockMinutes = 720, settleMinutes = 720.05, autoRecreate = true } = req.body;
     
     if (!contractAddressA || !/^0x[a-fA-F0-9]{40}$/.test(contractAddressA)) {
@@ -504,6 +507,9 @@ router.post('/create-dual-coin', async (req, res) => {
       coinBOpeningPrice: coinBPrice,
       autoRecreate, // Control whether this market auto-recreates
     });
+    
+    // Save market to database first
+    await saveMarket(market);
     
     // Create on-chain market with 2 buckets (Coin A vs Coin B)
     try {

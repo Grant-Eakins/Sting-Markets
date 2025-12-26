@@ -100,8 +100,12 @@ export async function saveMarket(market: Market): Promise<boolean> {
 
     if (error) {
       console.error('❌ Error saving market:', error.message);
+      console.error('   Full error:', JSON.stringify(error, null, 2));
+      console.error('   Market ID:', market.id);
+      console.error('   isDualCoin:', market.isDualCoin);
       return false;
     }
+    console.log(`✅ Market saved to database: ${market.id} (isDualCoin: ${market.isDualCoin})`);
     return true;
   } catch (error: any) {
     console.error('❌ Error saving market:', error.message);
