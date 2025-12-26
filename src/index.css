@@ -58,8 +58,12 @@ Color theme: Blue (#209ee8), Yellow (#ffff68), White
     @apply border-border;
   }
 
-  body {
+  html, body {
     @apply bg-background text-foreground;
+    width: 100%;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
   }
 }
 
