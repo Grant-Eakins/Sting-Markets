@@ -72,18 +72,18 @@ export function ScheduledMarketCard({
                 <img
                   src={coinBImage}
                   alt={coinBSymbol}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-red-500/50 shadow-lg hover:scale-110 transition-transform"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-green-500/50 shadow-lg hover:scale-110 transition-transform"
                 />
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold">
-                  ↓
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold">
+                  ↑
                 </div>
               </div>
             ) : (
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-500/20 border-2 border-red-500/50 flex items-center justify-center text-2xl font-bold">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-2 border-green-500/50 flex items-center justify-center text-2xl font-bold">
                 {coinBSymbol.charAt(0)}
               </div>
             )}
-            <span className="text-sm sm:text-base font-bold text-red-400">
+            <span className="text-sm sm:text-base font-bold text-green-400">
               {coinBSymbol}
             </span>
           </div>

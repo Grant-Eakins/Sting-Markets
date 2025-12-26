@@ -425,6 +425,9 @@ export default function AdminPage() {
               </div>
               <nav className="flex gap-4">
                 <Link to="/">
+                  <Button variant="ghost" size="sm">Coin Battles</Button>
+                </Link>
+                <Link to="/single-markets">
                   <Button variant="ghost" size="sm">Markets</Button>
                 </Link>
                 <Link to="/my-bets">
@@ -466,6 +469,9 @@ export default function AdminPage() {
             </div>
             <nav className="flex gap-4">
               <Link to="/">
+                <Button variant="ghost" size="sm">Coin Battles</Button>
+              </Link>
+              <Link to="/single-markets">
                 <Button variant="ghost" size="sm">Markets</Button>
               </Link>
               <Link to="/my-bets">

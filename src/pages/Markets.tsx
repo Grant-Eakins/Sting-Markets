@@ -139,8 +139,8 @@ export default function Markets() {
         {/* Scheduled Battles Section */}
         {!isLoadingScheduled && scheduledMarkets.length > 0 && (
           <div className="mb-6 sm:mb-8">
-            <h2 className="text-lg sm:text-2xl font-bold mb-3 sm:mb-4 px-1" style={{ color: 'hsl(222 35% 25%)' }}>
-              🔮 Upcoming Battles
+            <h2 className="text-lg sm:text-2xl font-bold italic mb-3 sm:mb-4 px-1" style={{ color: 'hsl(222 35% 25%)' }}>
+              Upcoming Battles
             </h2>
             <div className="space-y-2 sm:space-y-4">
               {scheduledMarkets
@@ -160,36 +160,38 @@ export default function Markets() {
           </div>
         )}
 
-        {/* Active Coin Battles Grid */}
-        <div className="mb-3 sm:mb-6 px-1">
-          <h2 className="text-lg sm:text-2xl font-bold" style={{ color: 'hsl(222 35% 25%)' }}>
-            🔥 Live Battles
-          </h2>
-        </div>
-        
-        {isLoading ? (
-          <div className="space-y-6">
-            {[...Array(3)].map((_, i) => (
-              <MarketCardSkeleton key={i} />
-            ))}
-          </div>
-        ) : markets.filter(m => (m as any).isDualCoin).length === 0 ? (
-          <Card className="p-8 sm:p-12 text-center">
-            <CardTitle className="mb-2">No Active Battles</CardTitle>
-            <CardDescription>
-              {scheduledMarkets.length > 0 
-                ? 'Check the upcoming battles above - they will start soon!'
-                : 'Check back soon for exciting coin battles!'}
-            </CardDescription>
-          </Card>
-        ) : (
-          <div className="space-y-2 sm:space-y-6">
-            {markets
-              .filter(m => (m as any).isDualCoin)
-              .map((market) => (
-                <DualCoinMarketCard key={market.id} market={market as any} />
-              ))}
-          </div>
+        {/* Active Coin Battles Grid - Only show if no scheduled battles */}
+        {scheduledMarkets.length === 0 && (
+          <>
+            <div className="mb-3 sm:mb-6 px-1">
+              <h2 className="text-lg sm:text-2xl font-bold" style={{ color: 'hsl(222 35% 25%)' }}>
+                🔥 Live Battles
+              </h2>
+            </div>
+            
+            {isLoading ? (
+              <div className="space-y-6">
+                {[...Array(3)].map((_, i) => (
+                  <MarketCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : markets.filter(m => (m as any).isDualCoin).length === 0 ? (
+              <Card className="p-8 sm:p-12 text-center">
+                <CardTitle className="mb-2">No Active Battles</CardTitle>
+                <CardDescription>
+                  Check back soon for exciting coin battles!
+                </CardDescription>
+              </Card>
+            ) : (
+              <div className="space-y-2 sm:space-y-6">
+                {markets
+                  .filter(m => (m as any).isDualCoin)
+                  .map((market) => (
+                    <DualCoinMarketCard key={market.id} market={market as any} />
+                  ))}
+              </div>
+            )}
+          </>
         )}
         </div>
       </div>

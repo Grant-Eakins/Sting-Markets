@@ -333,6 +333,9 @@ export default function MyBets() {
               </Link>
               <nav className="hidden md:flex gap-4">
                 <Link to="/">
+                  <Button variant="ghost" size="sm">Coin Battles</Button>
+                </Link>
+                <Link to="/single-markets">
                   <Button variant="ghost" size="sm">Markets</Button>
                 </Link>
                 <Link to="/my-bets">
@@ -558,6 +561,9 @@ export default function MyBets() {
             {/* Desktop nav */}
             <nav className="hidden md:flex gap-4">
               <Link to="/">
+                <Button variant="ghost" size="sm">Coin Battles</Button>
+              </Link>
+              <Link to="/single-markets">
                 <Button variant="ghost" size="sm">Markets</Button>
               </Link>
               <Link to="/my-bets">
@@ -590,6 +596,9 @@ export default function MyBets() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" size="sm" className="w-full justify-start">Coin Battles</Button>
+            </Link>
+            <Link to="/single-markets" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Markets</Button>
             </Link>
             <Link to="/my-bets" onClick={() => setMobileMenuOpen(false)}>
