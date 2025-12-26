@@ -440,6 +440,108 @@ router.post('/create-by-contract', async (req, res) => {
 });
 
 /**
+ * POST /api/markets/create-dual-coin
+ * Create a head-to-head coin comparison market
+ */
+router.post('/create-dual-coin', async (req, res) => {
+  try {
+    const { contractAddressA, contractAddressB, lockMinutes = 720, settleMinutes = 720.05 } = req.body;
+    
+    if (!contractAddressA || !/^0x[a-fA-F0-9]{40}$/.test(contractAddressA)) {
+      return res.status(400).json({ success: false, error: 'Invalid contract address A' });
+    }
+    if (!contractAddressB || !/^0x[a-fA-F0-9]{40}$/.test(contractAddressB)) {
+      return res.status(400).json({ success: false, error: 'Invalid contract address B' });
+    }
+    
+    const { lockTime, settleTime, sessionLabel } = getNext12HourSettlement();
+    
+    // Fetch both tokens from DexScreener
+    const [tokenA, tokenB] = await Promise.all([
+      getTokenByAddress(contractAddressA),
+      getTokenByAddress(contractAddressB)
+    ]);
+    
+    if (!tokenA) {
+      return res.status(404).json({ success: false, error: 'Token A not found on DexScreener' });
+    }
+    if (!tokenB) {
+      return res.status(404).json({ success: false, error: 'Token B not found on DexScreener' });
+    }
+    
+    // Store prices as micro-units for tiny prices
+    const priceAUsd = tokenA.price;
+    const priceBUsd = tokenB.price;
+    const coinAPrice = priceAUsd < 0.01 ? Math.round(priceAUsd * 100_000_000) : Math.round(priceAUsd * 100);
+    const coinBPrice = priceBUsd < 0.01 ? Math.round(priceBUsd * 100_000_000) : Math.round(priceBUsd * 100);
+    
+    console.log(`\n🆚 Creating dual-coin market: ${tokenA.symbol} vs ${tokenB.symbol}`);
+    console.log(`   ${tokenA.symbol}: $${priceAUsd < 0.01 ? priceAUsd.toFixed(8) : priceAUsd.toFixed(4)}`);
+    console.log(`   ${tokenB.symbol}: $${priceBUsd < 0.01 ? priceBUsd.toFixed(8) : priceBUsd.toFixed(4)}`);
+    console.log(`   Session: ${sessionLabel}`);
+    
+    // Create market
+    const market = createMarket({
+      stockSymbol: `${tokenA.symbol}-${tokenB.symbol}`,
+      stockName: `${tokenA.name} vs ${tokenB.name}`,
+      description: `Which will perform better? ${tokenA.symbol} or ${tokenB.symbol}?`,
+      openingPrice: coinAPrice, // Legacy field
+      isAfterHours: false,
+      lockTime,
+      settleTime,
+      category: 'dual-coin',
+      isDualCoin: true,
+      coinASymbol: tokenA.symbol,
+      coinAName: tokenA.name,
+      coinAAddress: contractAddressA,
+      coinAImageUrl: tokenA.imageUrl,
+      coinAOpeningPrice: coinAPrice,
+      coinBSymbol: tokenB.symbol,
+      coinBName: tokenB.name,
+      coinBAddress: contractAddressB,
+      coinBImageUrl: tokenB.imageUrl,
+      coinBOpeningPrice: coinBPrice,
+    });
+    
+    // Create on-chain market with 2 buckets (Coin A vs Coin B)
+    try {
+      const blockchainMarketId = await createOnChainMarket(
+        `${tokenA.symbol}vs${tokenB.symbol}`,
+        coinAPrice,
+        market.lockTime,
+        market.settleTime,
+        false,
+        2 // Only 2 buckets for head-to-head
+      );
+      
+      if (blockchainMarketId !== null) {
+        market.blockchainMarketId = blockchainMarketId;
+        await saveMarket(market);
+      }
+      
+      res.json({
+        success: true,
+        market,
+        tokenA,
+        tokenB,
+        blockchainMarketId,
+        message: `Dual-coin market created: ${tokenA.symbol} vs ${tokenB.symbol}`,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: `Failed to create on-chain market: ${error.message}`,
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/markets
  * Get all active markets (with fresh blockchain pool data)
  */

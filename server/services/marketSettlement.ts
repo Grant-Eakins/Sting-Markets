@@ -2,7 +2,11 @@ import { getMarketsReadyToSettle, settleMarket, lockExpiredMarkets, getActiveMar
 import { getCryptoQuote, getBatchQuotes } from './cryptoApi';
 import { sendPriceUpdateTweets, sendClosingPriceTweets, sendOpeningPriceTweets } from './discordBot';
 import { syncCryptoMarkets } from './cryptoSync';
-import { syncSettlementStatusFromChain } from './blockchainSync';
+import { syncSettlementStatusFromChain, settleOnChainMarket } from './blockchainSync';
+import { getTokenByAddress } from './dexScreenerApi';
+import { saveMarket } from './database';
+import { MarketStatus, Position } from '../types/market';
+import type { Market } from '../types/market';
 
 // Track last Discord update time to send every 3 hours
 let lastDiscordUpdateTime: number = 0;
@@ -23,42 +27,67 @@ export async function updateActiveMarketPrices(): Promise<void> {
   console.log(`📊 Updating prices for ${activeMarkets.length} active markets (batch)...`);
   
   try {
-    // Get all unique symbols
-    const symbols = [...new Set(activeMarkets.map(m => m.stockSymbol))];
+    // Separate dual-coin markets from single-coin markets
+    const dualCoinMarkets = activeMarkets.filter(m => m.isDualCoin);
+    const singleCoinMarkets = activeMarkets.filter(m => !m.isDualCoin);
     
-    // Fetch all quotes in ONE API call
-    const quotes = await getBatchQuotes(symbols);
-    
-    // Update each market with its quote
-    const updatedMarkets = [];
-    for (const market of activeMarkets) {
-      const quote = quotes[market.stockSymbol];
-      if (quote) {
-        const currentPriceInCents = Math.round(quote.price * 100);
-        updateMarketPrice(market.id, currentPriceInCents);
+    // Update dual-coin markets
+    for (const market of dualCoinMarkets) {
+      if (!market.coinAAddress || !market.coinBAddress) continue;
+      
+      try {
+        const [tokenA, tokenB] = await Promise.all([
+          getTokenByAddress(market.coinAAddress),
+          getTokenByAddress(market.coinBAddress)
+        ]);
         
-        // Collect data for Discord tweet
-        const priceChange = currentPriceInCents - market.openingPrice;
-        const priceChangePercent = (priceChange / market.openingPrice) * 100;
-        updatedMarkets.push({
-          stockSymbol: market.stockSymbol,
-          stockName: market.stockName,
-          currentPrice: currentPriceInCents,
-          openingPrice: market.openingPrice,
-          priceChangePercent,
-        });
+        if (tokenA && tokenB) {
+          market.coinACurrentPrice = tokenA.price < 0.01 ? Math.round(tokenA.price * 100_000_000) : Math.round(tokenA.price * 100);
+          market.coinBCurrentPrice = tokenB.price < 0.01 ? Math.round(tokenB.price * 100_000_000) : Math.round(tokenB.price * 100);
+          await saveMarket(market);
+        }
+      } catch (error: any) {
+        console.error(`❌ Error updating dual-coin market ${market.id}:`, error.message);
       }
     }
     
-    // Send Discord tweets every 3 hours
-    const now = Date.now();
-    if (updatedMarkets.length > 0 && (now - lastDiscordUpdateTime) >= THREE_HOURS_MS) {
-      console.log('📢 Sending 3-hour price update tweets to Discord...');
-      await sendPriceUpdateTweets(updatedMarkets);
-      lastDiscordUpdateTime = now;
+    // Update single-coin markets in batch
+    if (singleCoinMarkets.length > 0) {
+      const symbols = [...new Set(singleCoinMarkets.map(m => m.stockSymbol))];
+      const quotes = await getBatchQuotes(symbols);
+      
+      const updatedMarkets = [];
+      for (const market of singleCoinMarkets) {
+        const quote = quotes[market.stockSymbol];
+        if (quote) {
+          const currentPriceInCents = Math.round(quote.price * 100);
+          updateMarketPrice(market.id, currentPriceInCents);
+          
+          const priceChange = currentPriceInCents - market.openingPrice;
+          const priceChangePercent = (priceChange / market.openingPrice) * 100;
+          updatedMarkets.push({
+            stockSymbol: market.stockSymbol,
+            stockName: market.stockName,
+            currentPrice: currentPriceInCents,
+            openingPrice: market.openingPrice,
+            priceChangePercent,
+          });
+        }
+      }
+      
+      const now = Date.now();
+      if (updatedMarkets.length > 0 && (now - lastDiscordUpdateTime) >= THREE_HOURS_MS) {
+        console.log('📢 Sending 3-hour price update tweets to Discord...');
+        await sendPriceUpdateTweets(updatedMarkets);
+        lastDiscordUpdateTime = now;
+      }
+      
+      console.log(`✅ Updated ${singleCoinMarkets.length} single-coin markets with batch API`);
     }
     
-    console.log(`✅ Updated ${activeMarkets.length} markets with 1 API call`);
+    if (dualCoinMarkets.length > 0) {
+      console.log(`✅ Updated ${dualCoinMarkets.length} dual-coin markets`);
+    }
   } catch (error: any) {
     console.error(`Error updating market prices:`, error.message);
   }
@@ -128,7 +157,12 @@ export async function checkAndSettleMarkets(): Promise<void> {
     
     // Settle each market
     for (const market of marketsToSettle) {
-      const result = await settleMarketWithData(market.id, market.stockSymbol, market.openingPrice);
+      let result;
+      if (market.isDualCoin) {
+        result = await settleDualCoinMarket(market);
+      } else {
+        result = await settleMarketWithData(market.id, market.stockSymbol, market.openingPrice);
+      }
       if (result) {
         settledMarkets.push(result);
       }
@@ -151,6 +185,70 @@ export async function checkAndSettleMarkets(): Promise<void> {
     console.log('✅ Market settlement check completed\n');
   } catch (error: any) {
     console.error('❌ Error during market settlement:', error.message);
+  }
+}
+
+/**
+ * Settle a dual-coin head-to-head market by comparing percentage changes
+ */
+async function settleDualCoinMarket(market: Market): Promise<any> {
+  if (!market.isDualCoin || !market.coinAAddress || !market.coinBAddress) {
+    throw new Error('Not a dual-coin market');
+  }
+  
+  console.log(`\n⚔️ Settling dual-coin market: ${market.coinASymbol} vs ${market.coinBSymbol}`);
+  
+  try {
+    const [tokenA, tokenB] = await Promise.all([
+      getTokenByAddress(market.coinAAddress),
+      getTokenByAddress(market.coinBAddress)
+    ]);
+    
+    if (!tokenA || !tokenB) {
+      console.error('❌ Could not fetch token prices');
+      return null;
+    }
+    
+    const coinAClosing = tokenA.price < 0.01 ? Math.round(tokenA.price * 100_000_000) : Math.round(tokenA.price * 100);
+    const coinBClosing = tokenB.price < 0.01 ? Math.round(tokenB.price * 100_000_000) : Math.round(tokenB.price * 100);
+    
+    const coinAChange = ((coinAClosing - market.coinAOpeningPrice!) / market.coinAOpeningPrice!) * 100;
+    const coinBChange = ((coinBClosing - market.coinBOpeningPrice!) / market.coinBOpeningPrice!) * 100;
+    
+    console.log(`   ${market.coinASymbol}: ${coinAChange > 0 ? '+' : ''}${coinAChange.toFixed(2)}%`);
+    console.log(`   ${market.coinBSymbol}: ${coinBChange > 0 ? '+' : ''}${coinBChange.toFixed(2)}%`);
+    
+    const winningPosition = coinAChange > coinBChange ? Position.UP : Position.DOWN;
+    const winner = winningPosition === Position.UP ? market.coinASymbol : market.coinBSymbol;
+    console.log(`   Winner: ${winner}`);
+    
+    market.coinAClosingPrice = coinAClosing;
+    market.coinBClosingPrice = coinBClosing;
+    market.coinAChangePercent = coinAChange;
+    market.coinBChangePercent = coinBChange;
+    market.winningPosition = winningPosition;
+    market.status = MarketStatus.SETTLED;
+    
+    if (market.blockchainMarketId !== undefined) {
+      try {
+        await settleOnChainMarket(market.blockchainMarketId, coinAClosing);
+      } catch (error) {
+        console.error('❌ Failed to settle on-chain:', error);
+      }
+    }
+    
+    await saveMarket(market);
+    
+    return {
+      stockSymbol: `${market.coinASymbol} vs ${market.coinBSymbol}`,
+      currentPrice: coinAClosing,
+      openingPrice: market.coinAOpeningPrice!,
+      priceChangePercent: coinAChange,
+      winner,
+    };
+  } catch (error: any) {
+    console.error(`❌ Error settling dual-coin market:`, error.message);
+    return null;
   }
 }
 

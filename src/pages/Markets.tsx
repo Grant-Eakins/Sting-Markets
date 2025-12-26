@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Market, fetchMarkets } from '@/lib/marketApi';
 import { TOKEN_SYMBOL } from '@/config/contract';
 import { MarketCard } from '@/components/MarketCard';
+import { DualCoinMarketCard } from '@/components/DualCoinMarketCard';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
@@ -237,9 +238,13 @@ export default function Markets() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {filteredMarkets.map((market) => (
-              <MarketCard key={market.id} market={market} onBetPlaced={() => refetch()} />
-            ))}
+            {filteredMarkets.map((market) => {
+              // Check if this is a dual-coin market
+              if ((market as any).isDualCoin) {
+                return <DualCoinMarketCard key={market.id} market={market as any} />;
+              }
+              return <MarketCard key={market.id} market={market} onBetPlaced={() => refetch()} />;
+            })}
           </div>
         )}
         </div>

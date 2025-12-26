@@ -146,7 +146,8 @@ export async function createOnChainMarket(
   openingPrice: number,
   lockTime: Date,
   settleTime: Date,
-  isAfterHours: boolean = false
+  isAfterHours: boolean = false,
+  numBuckets: number = 10 // Default 10 buckets, but can be 2 for dual-coin
 ): Promise<number | null> {
   if (!isInitialized) {
     console.log('⚠️  Blockchain not initialized - skipping on-chain creation');
@@ -161,7 +162,8 @@ export async function createOnChainMarket(
     const sessionType = isAfterHours ? 1 : 0;
 
     console.log(`⛓️  Creating on-chain market: ${stockSymbol} @ $${(openingPrice / 100).toFixed(2)}`);
-    console.log(`   Session: ${isAfterHours ? 'OVERNIGHT (42 buckets)' : 'INTRADAY (22 buckets)'}`);
+    console.log(`   Buckets: ${numBuckets} ${numBuckets === 2 ? '(Dual-Coin Head-to-Head)' : ''}`);
+    console.log(`   Session: ${isAfterHours ? 'OVERNIGHT' : 'INTRADAY'}`);
 
     // Read nextMarketId BEFORE the transaction - this will be the ID of our new market
     const marketIdBeforeCreate = await publicClient.readContract({

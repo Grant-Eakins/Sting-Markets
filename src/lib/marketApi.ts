@@ -32,6 +32,25 @@ export interface Market {
   contractAddress?: string;     // Contract address for meme coins (for price lookups)
   blockchainMarketId?: number;  // On-chain market ID
   probabilities?: number[];     // LMSR probabilities for each outcome (0-100%)
+  
+  // Dual-coin fields
+  isDualCoin?: boolean;
+  coinASymbol?: string;
+  coinAName?: string;
+  coinAImage?: string;
+  coinAAddress?: string;
+  coinAOpeningPrice?: number;
+  coinACurrentPrice?: number;
+  coinAClosingPrice?: number;
+  coinAChangePercent?: number;
+  coinBSymbol?: string;
+  coinBName?: string;
+  coinBImage?: string;
+  coinBAddress?: string;
+  coinBOpeningPrice?: number;
+  coinBCurrentPrice?: number;
+  coinBClosingPrice?: number;
+  coinBChangePercent?: number;
 }
 
 export interface MarketOdds {

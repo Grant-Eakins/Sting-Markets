@@ -76,6 +76,19 @@ export default function AdminPage() {
   } | null>(null);
   const [tokenLoading, setTokenLoading] = useState(false);
 
+  // Dual-coin market creation state
+  const [dualCoinData, setDualCoinData] = useState({
+    coinAAddress: '',
+    coinBAddress: '',
+    lockMinutes: 720,
+    settleMinutes: 720.05,
+  });
+  const [dualCoinPreview, setDualCoinPreview] = useState<{
+    coinA: { symbol: string; name: string; price: number; liquidity: number } | null;
+    coinB: { symbol: string; name: string; price: number; liquidity: number } | null;
+  }>({ coinA: null, coinB: null });
+  const [dualCoinLoading, setDualCoinLoading] = useState({ coinA: false, coinB: false });
+
   // Check if the connected wallet is an admin
   const addressLower = address?.toLowerCase();
   const isAdmin = isConnected && addressLower && ADMIN_WALLETS.includes(addressLower);
@@ -194,6 +207,28 @@ export default function AdminPage() {
     },
   });
 
+  // Create dual-coin market mutation
+  const createDualCoin = useMutation({
+    mutationFn: async (data: typeof dualCoinData) => {
+      const response = await axios.post(`${API_BASE}/markets/create-dual-coin`, data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-markets'] });
+      setDualCoinData({
+        coinAAddress: '',
+        coinBAddress: '',
+        lockMinutes: 720,
+        settleMinutes: 720.05,
+      });
+      setDualCoinPreview({ coinA: null, coinB: null });
+      alert(`✅ Dual-coin market created: ${data.market.coinASymbol} vs ${data.market.coinBSymbol}! ID: ${data.blockchainMarketId}`);
+    },
+    onError: (error: any) => {
+      alert(`❌ Error: ${error.response?.data?.error || error.message}`);
+    },
+  });
+
   // Lookup token by contract address
   const handleContractLookup = async () => {
     if (!contractData.contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(contractData.contractAddress)) {
@@ -229,6 +264,47 @@ export default function AdminPage() {
       return;
     }
     createByContract.mutate(contractData);
+  };
+
+  // Dual-coin handlers
+  const handleDualCoinLookup = async (coin: 'A' | 'B') => {
+    const address = coin === 'A' ? dualCoinData.coinAAddress : dualCoinData.coinBAddress;
+    
+    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      alert('Please enter a valid contract address (0x...)');
+      return;
+    }
+    
+    setDualCoinLoading({ ...dualCoinLoading, [`coin${coin}`]: true });
+    
+    try {
+      const response = await axios.get(`${API_BASE}/markets/token/${address}`);
+      if (response.data.success && response.data.token) {
+        const tokenData = {
+          symbol: response.data.token.symbol,
+          name: response.data.token.name,
+          price: response.data.token.price,
+          liquidity: response.data.token.liquidity,
+        };
+        setDualCoinPreview({ 
+          ...dualCoinPreview, 
+          [`coin${coin}`]: tokenData 
+        });
+      }
+    } catch (error: any) {
+      alert(`❌ Token not found: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setDualCoinLoading({ ...dualCoinLoading, [`coin${coin}`]: false });
+    }
+  };
+
+  const handleDualCoinCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dualCoinPreview.coinA || !dualCoinPreview.coinB) {
+      alert('Please look up both tokens first');
+      return;
+    }
+    createDualCoin.mutate(dualCoinData);
   };
 
   // Handler functions
@@ -550,6 +626,142 @@ export default function AdminPage() {
                     : tokenPreview 
                       ? `Create ${tokenPreview.symbol} Market` 
                       : 'Look up token first'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Create Dual-Coin Market Card */}
+          <Card className="border-green-500/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                ⚔️ Create Dual-Coin Battle
+              </CardTitle>
+              <CardDescription>
+                Pick two coins - users bet which one gains more %
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleDualCoinCreate} className="space-y-4">
+                {/* Coin A */}
+                <div>
+                  <Label htmlFor="coinAAddress">Coin A Contract Address *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="coinAAddress"
+                      value={dualCoinData.coinAAddress}
+                      onChange={(e) => {
+                        setDualCoinData({ ...dualCoinData, coinAAddress: e.target.value });
+                        setDualCoinPreview({ ...dualCoinPreview, coinA: null });
+                      }}
+                      placeholder="0x..."
+                      className="font-mono"
+                      required
+                    />
+                    <Button 
+                      type="button" 
+                      variant="secondary"
+                      onClick={() => handleDualCoinLookup('A')}
+                      disabled={dualCoinLoading.coinA}
+                    >
+                      {dualCoinLoading.coinA ? '...' : 'Lookup'}
+                    </Button>
+                  </div>
+                </div>
+
+                {dualCoinPreview.coinA && (
+                  <div className="bg-green-500/10 rounded-lg p-3 space-y-1">
+                    <div className="font-bold text-green-500">
+                      {dualCoinPreview.coinA.symbol} - {dualCoinPreview.coinA.name}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      ${dualCoinPreview.coinA.price < 0.01 
+                        ? dualCoinPreview.coinA.price.toFixed(8) 
+                        : dualCoinPreview.coinA.price.toFixed(4)}{' '}
+                      | Liq: ${dualCoinPreview.coinA.liquidity.toLocaleString()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Coin B */}
+                <div>
+                  <Label htmlFor="coinBAddress">Coin B Contract Address *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="coinBAddress"
+                      value={dualCoinData.coinBAddress}
+                      onChange={(e) => {
+                        setDualCoinData({ ...dualCoinData, coinBAddress: e.target.value });
+                        setDualCoinPreview({ ...dualCoinPreview, coinB: null });
+                      }}
+                      placeholder="0x..."
+                      className="font-mono"
+                      required
+                    />
+                    <Button 
+                      type="button" 
+                      variant="secondary"
+                      onClick={() => handleDualCoinLookup('B')}
+                      disabled={dualCoinLoading.coinB}
+                    >
+                      {dualCoinLoading.coinB ? '...' : 'Lookup'}
+                    </Button>
+                  </div>
+                </div>
+
+                {dualCoinPreview.coinB && (
+                  <div className="bg-red-500/10 rounded-lg p-3 space-y-1">
+                    <div className="font-bold text-red-500">
+                      {dualCoinPreview.coinB.symbol} - {dualCoinPreview.coinB.name}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      ${dualCoinPreview.coinB.price < 0.01 
+                        ? dualCoinPreview.coinB.price.toFixed(8) 
+                        : dualCoinPreview.coinB.price.toFixed(4)}{' '}
+                      | Liq: ${dualCoinPreview.coinB.liquidity.toLocaleString()}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="dualCoinLockMinutes">Lock After (minutes)</Label>
+                    <Input
+                      id="dualCoinLockMinutes"
+                      type="number"
+                      min="1"
+                      value={dualCoinData.lockMinutes}
+                      onChange={(e) => setDualCoinData({ 
+                        ...dualCoinData, 
+                        lockMinutes: parseFloat(e.target.value) || 720 
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="dualCoinSettleMinutes">Settle After (minutes)</Label>
+                    <Input
+                      id="dualCoinSettleMinutes"
+                      type="number"
+                      min="1"
+                      value={dualCoinData.settleMinutes}
+                      onChange={(e) => setDualCoinData({ 
+                        ...dualCoinData, 
+                        settleMinutes: parseFloat(e.target.value) || 720.05 
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full bg-green-600 hover:bg-green-700" 
+                  disabled={!dualCoinPreview.coinA || !dualCoinPreview.coinB || createDualCoin.isPending}
+                >
+                  {createDualCoin.isPending 
+                    ? 'Creating Battle...' 
+                    : (dualCoinPreview.coinA && dualCoinPreview.coinB)
+                      ? `⚔️ ${dualCoinPreview.coinA.symbol} vs ${dualCoinPreview.coinB.symbol}` 
+                      : 'Look up both tokens first'}
                 </Button>
               </form>
             </CardContent>
