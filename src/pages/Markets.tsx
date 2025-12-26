@@ -139,9 +139,6 @@ export default function Markets() {
         {/* Scheduled Battles Section */}
         {!isLoadingScheduled && scheduledMarkets.length > 0 && (
           <div className="mb-6 sm:mb-8">
-            <h2 className="text-lg sm:text-2xl font-bold italic mb-3 sm:mb-4 px-1" style={{ color: 'hsl(222 35% 25%)' }}>
-              Upcoming Battles
-            </h2>
             <div className="space-y-2 sm:space-y-4">
               {scheduledMarkets
                 .filter(m => (m as any).isDualCoin && (m as any).startTime)
