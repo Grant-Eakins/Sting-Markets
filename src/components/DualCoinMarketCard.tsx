@@ -172,7 +172,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
             {isActive && !userBet && (
               <Button 
                 onClick={() => handleBet('UP')}
-                className="w-full bg-green-600 hover:bg-green-700"
+                className="w-full bg-blue-600 hover:bg-blue-700"
                 size="sm"
               >
                 <TrendingUp className="w-4 h-4 mr-2" />
@@ -217,10 +217,10 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
             {isActive && !userBet && (
               <Button 
                 onClick={() => handleBet('DOWN')}
-                className="w-full bg-red-600 hover:bg-red-700"
+                className="w-full bg-purple-600 hover:bg-purple-700"
                 size="sm"
               >
-                <TrendingDown className="w-4 h-4 mr-2" />
+                <TrendingUp className="w-4 h-4 mr-2" />
                 Bet on {market.coinBSymbol}
               </Button>
             )}
