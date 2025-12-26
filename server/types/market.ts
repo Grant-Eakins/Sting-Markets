@@ -12,8 +12,8 @@ export enum Position {
 
 export interface Market {
   id: string;
-  stockSymbol: string;        // Stock ticker (e.g., "AAPL", "TSLA")
-  stockName?: string;         // Full company name
+  stockSymbol: string;        // Stock ticker (e.g., "AAPL", "TSLA") - LEGACY: now used for Coin A
+  stockName?: string;         // Full company name - LEGACY: now used for Coin A
   description: string;
   status: MarketStatus;
   
@@ -22,24 +22,46 @@ export interface Market {
   lockTime: Date;             // When betting closes
   settleTime: Date;           // When market settles
   
-  // Price data (in cents to avoid decimals: 17525 = $175.25)
+  // LEGACY FIELDS (kept for backward compatibility with old single-coin markets)
   openingPrice: number;       // Opening price in cents
   currentPrice?: number;      // Current price (updated live)
   openTimestamp: Date;        // When opening price was recorded
-  
-  // Settlement data
   closingPrice?: number;      // Closing price in cents
   closeTimestamp?: Date;
   priceChange?: number;       // Change in price (cents)
   priceChangePercent?: number; // Percentage change
-  winningPosition?: Position;
+  
+  // DUAL COIN FIELDS (for head-to-head comparison markets)
+  // Coin A (UP position)
+  coinASymbol?: string;
+  coinAName?: string;
+  coinAAddress?: string;
+  coinAImageUrl?: string;
+  coinAOpeningPrice?: number;
+  coinACurrentPrice?: number;
+  coinAClosingPrice?: number;
+  coinAChangePercent?: number;
+  
+  // Coin B (DOWN position)
+  coinBSymbol?: string;
+  coinBName?: string;
+  coinBAddress?: string;
+  coinBImageUrl?: string;
+  coinBOpeningPrice?: number;
+  coinBCurrentPrice?: number;
+  coinBClosingPrice?: number;
+  coinBChangePercent?: number;
+  
+  // Settlement
+  winningPosition?: Position;  // UP = Coin A wins, DOWN = Coin B wins
   
   // Market type
   isAfterHours: boolean;      // True for after-hours markets (4PM-9:30AM)
+  isDualCoin?: boolean;       // True for head-to-head coin comparison markets
   
-  // Betting pools (in ETH)
-  upPool: number;
-  downPool: number;
+  // Betting pools (in MIND tokens)
+  upPool: number;             // Pool for Coin A (UP)
+  downPool: number;           // Pool for Coin B (DOWN)
   totalPool: number;
   
   // Statistics
@@ -48,12 +70,13 @@ export interface Market {
   totalBets: number;
   
   // Metadata
-  imageUrl?: string;
+  imageUrl?: string;          // LEGACY: Coin A image
   category?: string;
-  contractAddress?: string;       // Contract address for meme coins
+  contractAddress?: string;   // LEGACY: Coin A contract address
   
   // Blockchain integration
   blockchainMarketId?: number;  // On-chain market ID (if created on blockchain)
+  probabilities?: number[];     // Blockchain probabilities for buckets
 }
 
 export interface Bet {
@@ -89,19 +112,32 @@ export interface MarketOdds {
 }
 
 export interface CreateMarketRequest {
-  stockSymbol: string;        // Stock ticker (e.g., "AAPL")
-  stockName?: string;         // Full company name
+  stockSymbol: string;        // Stock ticker (e.g., "AAPL") - LEGACY or Coin A symbol
+  stockName?: string;         // Full company name - LEGACY or Coin A name
   description: string;
-  openingPrice: number;       // Opening price in cents (17525 = $175.25)
+  openingPrice: number;       // Opening price in cents (17525 = $175.25) - LEGACY or Coin A price
   isAfterHours: boolean;      // True for after-hours markets
   lockHours?: number;         // Hours until betting locks (default varies by market type)
   settleHours?: number;       // Hours until settlement (default varies by market type)
   lockTime?: Date;            // Direct lock time (overrides lockHours if provided)
   settleTime?: Date;          // Direct settle time (overrides settleHours if provided)
-  imageUrl?: string;
+  imageUrl?: string;          // LEGACY or Coin A image
   category?: string;
-  contractAddress?: string;     // Contract address for meme coins (for price lookups)
+  contractAddress?: string;   // Contract address for meme coins (for price lookups) - LEGACY or Coin A
   blockchainMarketId?: number;  // Optional: on-chain market ID if already created
+  
+  // Dual coin fields
+  isDualCoin?: boolean;
+  coinASymbol?: string;
+  coinAName?: string;
+  coinAAddress?: string;
+  coinAImageUrl?: string;
+  coinAOpeningPrice?: number;
+  coinBSymbol?: string;
+  coinBName?: string;
+  coinBAddress?: string;
+  coinBImageUrl?: string;
+  coinBOpeningPrice?: number;
 }
 
 export interface PlaceBetRequest {
