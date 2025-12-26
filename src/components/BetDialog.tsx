@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-reac
 import { Market, placeBet } from '@/lib/marketApi';
 import { useAccount, useChainId } from 'wagmi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance } from '@/hooks/useContract';
+import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance, useBucketLiquidity } from '@/hooks/useContract';
 import { CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { parseUnits } from 'viem';
 
@@ -36,6 +36,12 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
 
   // Get live probabilities to calculate bucket-specific odds
   const { probabilities } = useMarketProbabilities(market.blockchainMarketId);
+  
+  // Get bucket liquidity for share calculation
+  const { liquidity: bucketLiquidity } = useBucketLiquidity(
+    market.blockchainMarketId,
+    bucketIndex !== undefined ? bucketIndex : (position === 'UP' ? 4 : 5)
+  );
 
   // Smart contract hooks
   const { placeBet: placeBetOnChain, isPending, isConfirming, isConfirmed, error: contractError } = usePlaceBet();
@@ -64,6 +70,33 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
   }
 
   const potentialWin = parseFloat(amount || '0') * effectiveOdds;
+  
+  // Calculate shares using on-chain bucket liquidity data
+  // Contract formula: shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
+  const PROTOCOL_FEE_BPS = 200; // 2%
+  const STEEPNESS = 50;
+  
+  let sharesReceived = 0;
+  const amountNum = parseFloat(amount || '0');
+  
+  if (bucketLiquidity !== undefined && amountNum > 0) {
+    // Amount is in tokens (e.g. 5 MIND), convert to wei for calculation
+    const amountInWei = amountNum * 1e18;
+    const protocolFee = (amountInWei * PROTOCOL_FEE_BPS) / 10000;
+    const netAmount = amountInWei - protocolFee;
+    
+    // Use on-chain liquidity (already in wei)
+    const liquidityNum = Number(bucketLiquidity);
+    const divisor = 1e18 + (liquidityNum * STEEPNESS);
+    const sharesInWei = (netAmount * 1e18) / divisor;
+    sharesReceived = sharesInWei / 1e18; // Convert to readable number
+  } else if (amountNum > 0) {
+    // Fallback if liquidity not loaded: assume empty bucket
+    const amountInWei = amountNum * 1e18;
+    const protocolFee = (amountInWei * PROTOCOL_FEE_BPS) / 10000;
+    const netAmount = amountInWei - protocolFee;
+    sharesReceived = netAmount / 1e18; // Max shares when bucket is empty
+  }
 
   // Auto-close on successful transaction
   useEffect(() => {
@@ -265,24 +298,18 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
               </div>
             )}
             <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Shares Received:</span>
+              <span className="font-bold text-blue-500">
+                {sharesReceived.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Win Chance:</span>
               <span className="font-bold">{(bucketProbability * 100).toFixed(1)}%</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Multiplier:</span>
               <span className="font-bold">{effectiveOdds.toFixed(2)}x</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Potential Win:</span>
-              <span className="font-bold text-green-500">
-                {potentialWin.toFixed(2)} {TOKEN_SYMBOL}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Profit:</span>
-              <span className="font-bold">
-                {(potentialWin - parseFloat(amount || '0')).toFixed(2)} {TOKEN_SYMBOL}
-              </span>
             </div>
           </div>
 

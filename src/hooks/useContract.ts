@@ -335,4 +335,41 @@ export function useMarketProbabilities(marketId: number | undefined) {
   };
 }
 
+/**
+ * Hook to get liquidity in a specific bucket
+ */
+export function useBucketLiquidity(marketId: number | undefined, outcomeIndex: number | undefined) {
+  const chainId = useChainId();
+  // Default to Base Sepolia if not connected
+  const activeChainId = chainId || 84532;
+  const contractAddress = CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'getBucketData',
+    args: marketId !== undefined && outcomeIndex !== undefined ? [BigInt(marketId), outcomeIndex] : undefined,
+    chainId: 84532, // Explicitly use Base Sepolia
+    query: {
+      enabled: marketId !== undefined && outcomeIndex !== undefined,
+      refetchInterval: 3000, // Refetch every 3 seconds
+      staleTime: 0,
+      gcTime: 1000,
+    },
+  });
+  
+  // getBucketData returns [bucketLiquidity, totalShares]
+  const bucketData = data as [bigint, bigint] | undefined;
+  
+  return {
+    liquidity: bucketData ? bucketData[0] : undefined,
+    totalShares: bucketData ? bucketData[1] : undefined,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+
+
 
