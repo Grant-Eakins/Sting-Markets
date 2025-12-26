@@ -20,7 +20,7 @@ import { Position, MarketStatus } from '../types/market';
 import { testDiscordWebhook } from '../services/discordBot';
 import { getCryptoQuote } from '../services/cryptoApi';
 import { getTokenByAddress, searchTokens, getTokenHistory } from '../services/dexScreenerApi';
-import { saveMarket } from '../services/database';
+import { saveMarket, deleteMarketFromDb } from '../services/database';
 
 const router = express.Router();
 
@@ -1033,6 +1033,86 @@ router.post('/symbol/:symbol/resume', async (req, res) => {
     message: `Resumed auto-creation for ${symbol}`,
     pausedSymbols: getDisabledSymbols(),
   });
+});
+
+/**
+ * DELETE /api/markets/settled
+ * Delete all settled markets
+ */
+router.delete('/settled', async (req, res) => {
+  try {
+    const markets = getAllMarkets();
+    const settledMarkets = markets.filter(m => m.status === MarketStatus.SETTLED);
+    
+    let deleteCount = 0;
+    for (const market of settledMarkets) {
+      await deleteMarketFromDb(market.id);
+      const { deleteMarketById } = await import('../services/marketService');
+      const deleted = deleteMarketById(market.id);
+      if (deleted) deleteCount++;
+    }
+    
+    console.log(`🗑️ Deleted ${deleteCount} settled markets`);
+    
+    res.json({
+      success: true,
+      message: `Deleted ${deleteCount} settled markets`,
+      count: deleteCount,
+    });
+  } catch (error: any) {
+    console.error('Error deleting settled markets:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/markets/:id
+ * Delete a specific market by ID
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get market info before deletion
+    const market = getMarket(id);
+    if (!market) {
+      return res.status(404).json({
+        success: false,
+        error: 'Market not found',
+      });
+    }
+    
+    // Delete from database
+    const dbDeleted = await deleteMarketFromDb(id);
+    
+    // Delete from memory using the service function
+    const { deleteMarketById } = await import('../services/marketService');
+    const memoryDeleted = deleteMarketById(id);
+    
+    if (!memoryDeleted && !dbDeleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Market not found',
+      });
+    }
+    
+    console.log(`🗑️ Deleted market: ${market.stockSymbol} (${id})`);
+    
+    res.json({
+      success: true,
+      message: `Market ${market.stockSymbol} deleted successfully`,
+      marketId: id,
+    });
+  } catch (error: any) {
+    console.error('Error deleting market:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 });
 
 /**

@@ -9,12 +9,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Pause, Play } from 'lucide-react';
+import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Trash2, RefreshCw, TrendingUp, Search, Filter } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAccount } from 'wagmi';
 import { TOKEN_SYMBOL } from '@/config/contract';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
@@ -23,6 +24,12 @@ const ADMIN_WALLETS = [
   '0x6b1b7e7b207ec756b8d9edc59db4b32184160b22',
   '0xb0687ef6ea5906089ec3586f9997764650bf1934',
 ];
+
+enum MarketStatus {
+  ACTIVE = 'ACTIVE',
+  LOCKED = 'LOCKED',
+  SETTLED = 'SETTLED',
+}
 
 interface Market {
   id: string;
@@ -40,6 +47,8 @@ interface Market {
   upPool: number;
   downPool: number;
   totalBets: number;
+  upBettors?: number;
+  downBettors?: number;
 }
 
 export default function AdminPage() {
@@ -91,6 +100,8 @@ export default function AdminPage() {
     coinB: { symbol: string; name: string; price: number; liquidity: number } | null;
   }>({ coinA: null, coinB: null });
   const [dualCoinLoading, setDualCoinLoading] = useState({ coinA: false, coinB: false });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Check if the connected wallet is an admin
   const addressLower = address?.toLowerCase();
@@ -111,42 +122,40 @@ export default function AdminPage() {
     enabled: isAdmin, // Only fetch if admin
   });
 
-  // Fetch paused symbols
-  const { data: pausedSymbols = [] } = useQuery({
-    queryKey: ['paused-symbols'],
-    queryFn: async () => {
-      const response = await axios.get(`${API_BASE}/markets/paused-symbols`);
-      return response.data.pausedSymbols as string[];
-    },
-    refetchInterval: 10000,
-    enabled: isAdmin,
-  });
-
-  // Pause market mutation
-  const pauseMarket = useMutation({
-    mutationFn: async (symbol: string) => {
-      const response = await axios.post(`${API_BASE}/markets/symbol/${symbol}/pause`);
+  // Delete market mutation
+  const deleteMarket = useMutation({
+    mutationFn: async (marketId: string) => {
+      const response = await axios.delete(`${API_BASE}/markets/${marketId}`);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['paused-symbols'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-markets'] });
     },
     onError: (error: any) => {
-      alert(`❌ Error pausing: ${error.response?.data?.error || error.message}`);
+      alert(`❌ Error deleting: ${error.response?.data?.error || error.message}`);
     },
   });
 
-  // Resume market mutation
-  const resumeMarket = useMutation({
-    mutationFn: async (symbol: string) => {
-      const response = await axios.post(`${API_BASE}/markets/symbol/${symbol}/resume`);
+  // Delete settled markets mutation
+  const deleteSettled = useMutation({
+    mutationFn: async () => {
+      const response = await axios.delete(`${API_BASE}/markets/settled`);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['paused-symbols'] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-markets'] });
+      alert(`✅ Deleted ${data.count} settled markets`);
     },
     onError: (error: any) => {
-      alert(`❌ Error resuming: ${error.response?.data?.error || error.message}`);
+      alert(`❌ Error: ${error.response?.data?.error || error.message}`);
+    },
+  });
+
+  // Refresh markets mutation
+  const refreshMarkets = useMutation({
+    mutationFn: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-markets'] });
+      return { success: true };
     },
   });
 
@@ -351,6 +360,40 @@ export default function AdminPage() {
     }
     settleMarket.mutate(settleData);
   };
+
+  const handleDeleteMarket = (marketId: string, symbol: string) => {
+    if (confirm(`Are you sure you want to delete the market for ${symbol}? This action cannot be undone.`)) {
+      deleteMarket.mutate(marketId);
+    }
+  };
+
+  const handleDeleteSettled = () => {
+    if (confirm('Are you sure you want to delete ALL settled markets? This action cannot be undone.')) {
+      deleteSettled.mutate();
+    }
+  };
+
+  // Filter markets based on search and status
+  const filteredMarkets = markets.filter(market => {
+    const matchesSearch = searchQuery === '' || 
+      market.stockSymbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      market.stockName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      market.id.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || market.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  // Calculate statistics
+  const stats = {
+    total: markets.length,
+    active: markets.filter(m => m.status === MarketStatus.ACTIVE).length,
+    locked: markets.filter(m => m.status === MarketStatus.LOCKED).length,
+    settled: markets.filter(m => m.status === MarketStatus.SETTLED).length,
+    totalVolume: markets.reduce((sum, m) => sum + m.upPool + m.downPool, 0),
+    totalBets: markets.reduce((sum, m) => sum + m.totalBets, 0),
+  };
   
   // Show loading while wallet is connecting
   if (status === 'connecting' || status === 'reconnecting') {
@@ -435,11 +478,51 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
-      <div className="p-8">
+      <div className="p-4 md:p-6 lg:p-8">
         <div className="container mx-auto max-w-7xl">
           <div className="mb-8">
             <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
             <p className="text-muted-foreground">Create and manage prediction markets</p>
+          </div>
+
+          {/* Statistics Dashboard */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-6 md:mb-8">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-blue-500">{stats.total}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total Markets</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-green-500">{stats.active}</div>
+                <p className="text-xs text-muted-foreground mt-1">Active</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-yellow-500">{stats.locked}</div>
+                <p className="text-xs text-muted-foreground mt-1">Locked</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-blue-500">{stats.settled}</div>
+                <p className="text-xs text-muted-foreground mt-1">Settled</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{stats.totalVolume.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total Volume ({TOKEN_SYMBOL})</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{stats.totalBets}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total Bets</p>
+              </CardContent>
+            </Card>
           </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -866,13 +949,84 @@ export default function AdminPage() {
           </Card>
         </div>
 
+        {/* Quick Actions */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Quick Actions
+            </CardTitle>
+            <CardDescription>
+              Bulk operations and utilities
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="outline"
+                onClick={() => refreshMarkets.mutate()}
+                disabled={refreshMarkets.isPending}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshMarkets.isPending ? 'animate-spin' : ''}`} />
+                Refresh Markets
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteSettled}
+                disabled={deleteSettled.isPending || stats.settled === 0}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete All Settled ({stats.settled})
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/api/markets/admin/reset'}
+                className="flex items-center gap-2 text-orange-600 border-orange-600 hover:bg-orange-600/10"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reset All Markets
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Markets List */}
         <Card>
           <CardHeader>
-            <CardTitle>All Markets</CardTitle>
-            <CardDescription>
-              {markets.length} total markets
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>All Markets</CardTitle>
+                <CardDescription>
+                  {filteredMarkets.length} of {markets.length} markets {searchQuery || statusFilter !== 'all' ? '(filtered)' : ''}
+                </CardDescription>
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:flex-initial">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search markets..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 w-full sm:w-64"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-32">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="LOCKED">Locked</SelectItem>
+                    <SelectItem value="SETTLED">Settled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -886,17 +1040,15 @@ export default function AdminPage() {
               </Alert>
             ) : (
               <div className="space-y-3">
-                {markets.map((market) => (
+                {filteredMarkets.map((market) => (
                   <div
                     key={market.id}
-                    className={`border rounded-lg p-4 hover:bg-muted/50 transition-colors ${
-                      pausedSymbols.includes(market.stockSymbol) ? 'border-yellow-500/50 bg-yellow-500/5' : ''
-                    }`}
+                    className="border rounded-lg p-3 md:p-4 hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold">{market.stockSymbol} {market.stockName && `- ${market.stockName}`}</h3>
+                    <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
+                      <div className="flex-1 w-full overflow-hidden">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h3 className="font-semibold text-sm md:text-base">{market.stockSymbol} {market.stockName && `- ${market.stockName}`}</h3>
                           <span className={`text-xs px-2 py-1 rounded ${
                             market.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500' :
                             market.status === 'LOCKED' ? 'bg-yellow-500/20 text-yellow-500' :
@@ -905,74 +1057,79 @@ export default function AdminPage() {
                           }`}>
                             {market.status}
                           </span>
-                          {pausedSymbols.includes(market.stockSymbol) && (
-                            <span className="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-500 flex items-center gap-1">
-                              <Pause className="w-3 h-3" />
-                              PAUSED
-                            </span>
-                          )}
                           {market.isAfterHours && (
                             <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-500">
                               After Hours
                             </span>
                           )}
+                          {market.blockchainMarketId !== undefined && (
+                            <span className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-500 flex items-center gap-1">
+                              <CheckCircle className="w-3 h-3" />
+                              On-Chain
+                            </span>
+                          )}
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          ID: <code className="text-xs bg-muted px-1 py-0.5 rounded">{market.id}</code>
+                        <p className="text-xs md:text-sm text-muted-foreground mb-2 truncate">
+                          ID: <code className="text-xs bg-muted px-1 py-0.5 rounded font-mono break-all">{market.id}</code>
                         </p>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 text-xs md:text-sm">
                           <div>
-                            <span className="text-muted-foreground">Opening:</span> ${(market.openingPrice / 100).toFixed(2)}
+                            <span className="text-muted-foreground text-xs">Opening:</span>
+                            <div className="font-medium">${(market.openingPrice / 100).toFixed(2)}</div>
                           </div>
                           {market.currentPrice && (
                             <div>
-                              <span className="text-muted-foreground">Current:</span> ${(market.currentPrice / 100).toFixed(2)}
+                              <span className="text-muted-foreground text-xs">Current:</span>
+                              <div className="font-medium">${(market.currentPrice / 100).toFixed(2)}</div>
                             </div>
                           )}
                           {market.closingPrice && (
                             <div>
-                              <span className="text-muted-foreground">Closing:</span> ${(market.closingPrice / 100).toFixed(2)}
+                              <span className="text-muted-foreground text-xs">Closing:</span>
+                              <div className="font-medium">${(market.closingPrice / 100).toFixed(2)}</div>
                             </div>
                           )}
                           <div>
-                            <span className="text-muted-foreground">Pool ID:</span> {market.blockchainMarketId ?? 'N/A'}
+                            <span className="text-muted-foreground text-xs">Pool ID:</span>
+                            <div className="font-medium">{market.blockchainMarketId ?? 'N/A'}</div>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Total Pool:</span> {(market.upPool + market.downPool).toFixed(4)} {TOKEN_SYMBOL}
+                            <span className="text-muted-foreground text-xs">Volume:</span>
+                            <div className="font-medium truncate">{(market.upPool + market.downPool).toFixed(2)} {TOKEN_SYMBOL}</div>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Bets:</span> {market.totalBets}
+                            <span className="text-muted-foreground text-xs">Bets:</span>
+                            <div className="font-medium">{market.totalBets}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">UP Pool:</span>
+                            <div className="font-medium text-green-500">{market.upPool.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">DOWN Pool:</span>
+                            <div className="font-medium text-red-500">{market.downPool.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">UP Bettors:</span>
+                            <div className="font-medium">{market.upBettors}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-xs">DOWN Bettors:</span>
+                            <div className="font-medium">{market.downBettors}</div>
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        {market.blockchainMarketId && (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        )}
-                        {/* Pause/Resume Auto-Creation Button */}
-                        {pausedSymbols.includes(market.stockSymbol) ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => resumeMarket.mutate(market.stockSymbol)}
-                            disabled={resumeMarket.isPending}
-                            className="flex items-center gap-1 text-green-600 border-green-600 hover:bg-green-600/10"
-                          >
-                            <Play className="w-4 h-4" />
-                            Resume
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => pauseMarket.mutate(market.stockSymbol)}
-                            disabled={pauseMarket.isPending}
-                            className="flex items-center gap-1 text-yellow-600 border-yellow-600 hover:bg-yellow-600/10"
-                          >
-                            <Pause className="w-4 h-4" />
-                            Pause
-                          </Button>
-                        )}
+                      <div className="flex sm:flex-col items-center sm:items-end gap-2 flex-shrink-0 w-full sm:w-auto">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteMarket(market.id, market.stockSymbol)}
+                          disabled={deleteMarket.isPending}
+                          className="flex items-center gap-1 w-full sm:w-auto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span className="sm:inline">Delete</span>
+                        </Button>
                       </div>
                     </div>
                   </div>

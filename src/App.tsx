@@ -12,6 +12,7 @@ import { FarcasterAuthProvider } from "@/hooks/useFarcasterAuth";
 import { FarcasterAutoConnect } from "@/components/FarcasterAutoConnect";
 import Index from "./pages/Index";
 import Markets from "./pages/Markets";
+import SingleMarkets from "./pages/SingleMarkets";
 import MyBets from "./pages/MyBets";
 import BetHistory from "./pages/BetHistory";
 import HowItWorks from "./pages/HowItWorks";
@@ -39,6 +40,7 @@ const App = () => (
                 <ScrollToTop />
                 <Routes>
                   <Route path="/" element={<Markets />} />
+                  <Route path="/single-markets" element={<SingleMarkets />} />
                   <Route path="/my-bets" element={<MyBets />} />
                   <Route path="/bet-history" element={<BetHistory />} />
                   <Route path="/how-it-works" element={<HowItWorks />} />

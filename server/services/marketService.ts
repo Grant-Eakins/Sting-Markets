@@ -464,3 +464,21 @@ export function deleteMarketBySymbol(symbol: string): boolean {
   }
   return false;
 }
+
+/**
+ * Deletes a market by ID
+ */
+export function deleteMarketById(marketId: string): boolean {
+  const market = markets.get(marketId);
+  if (market) {
+    markets.delete(marketId);
+    // Also clean up associated bets
+    const marketUserBets = userBetsByMarket.get(marketId);
+    if (marketUserBets) {
+      userBetsByMarket.delete(marketId);
+    }
+    console.log(`🗑️ Deleted market: ${market.stockSymbol} (${marketId})`);
+    return true;
+  }
+  return false;
+}

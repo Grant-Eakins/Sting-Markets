@@ -139,6 +139,7 @@ export interface CreateMarketRequest {
   coinBAddress?: string;
   coinBImageUrl?: string;
   coinBOpeningPrice?: number;
+  autoRecreate?: boolean;     // If true, automatically create new market when this settles
 }
 
 export interface PlaceBetRequest {

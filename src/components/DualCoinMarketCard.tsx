@@ -216,6 +216,23 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
               {/* Winning indicator - only show during active betting or after settlement */}
               {(coinAChange !== 0 || coinBChange !== 0) && (
                 <div className="flex flex-col items-center gap-3">
+                  {/* Animated percentage display */}
+                  <div 
+                    className="text-2xl sm:text-3xl font-bold animate-pulse"
+                    style={{ 
+                      color: coinAChange > coinBChange 
+                        ? (coinAChange >= 0 ? '#00ff00' : '#ff0000')
+                        : (coinBChange >= 0 ? '#00ff00' : '#ff0000'),
+                      textShadow: coinAChange > coinBChange
+                        ? (coinAChange >= 0 ? '0 0 10px #00ff00' : '0 0 10px #ff0000')
+                        : (coinBChange >= 0 ? '0 0 10px #00ff00' : '0 0 10px #ff0000')
+                    }}
+                  >
+                    {coinAChange > coinBChange 
+                      ? `${coinAChange >= 0 ? '+' : ''}${coinAChange.toFixed(2)}%`
+                      : `${coinBChange >= 0 ? '+' : ''}${coinBChange.toFixed(2)}%`
+                    }
+                  </div>
                   <div className="text-sm sm:text-base font-bold" style={{ color: '#fffd7e' }}>
                     Winning:
                   </div>

@@ -1,19 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Market, fetchMarkets } from '@/lib/marketApi';
-import { TOKEN_SYMBOL } from '@/config/contract';
+import { fetchMarkets } from '@/lib/marketApi';
 import { MarketCard } from '@/components/MarketCard';
-import { DualCoinMarketCard } from '@/components/DualCoinMarketCard';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { MarketCardSkeleton, StatCardSkeleton } from '@/components/ui/skeleton';
+import { MarketCardSkeleton } from '@/components/ui/skeleton';
 import { Footer } from '@/components/Footer';
-import { useAggregateMarketStats } from '@/hooks/useAggregateMarketStats';
 import { useAccount } from 'wagmi';
 
 // Authorized admin wallet addresses (lowercase for comparison)
@@ -22,7 +19,7 @@ const ADMIN_WALLETS = [
   '0xb0687ef6ea5906089ec3586f9997764650bf1934',
 ];
 
-export default function Markets() {
+export default function SingleMarkets() {
   const { address, isConnected } = useAccount();
   const { isInFarcasterClient } = useFarcasterAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -36,14 +33,8 @@ export default function Markets() {
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
-  // Debug: Log markets to see if blockchainMarketId is set
-  if (markets.length > 0) {
-    console.log('🏪 Markets from API:', markets.map(m => ({
-      id: m.id,
-      symbol: m.stockSymbol,
-      blockchainMarketId: m.blockchainMarketId,
-    })));
-  }
+  // Filter for single-coin markets only
+  const singleCoinMarkets = markets.filter(m => !(m as any).isDualCoin);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -116,31 +107,32 @@ export default function Markets() {
 
         {/* Page Title */}
         <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'hsl(222 35% 25%)' }}>⚔️ Coin Battles</h1>
-          <p className="text-muted-foreground" style={{ color: 'hsl(222 35% 25%)' }}>Bet on which coin gains more percentage in head-to-head battles</p>
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-2">
+            <TrendingUp className="w-8 h-8" />
+            Single Coin Markets
+          </h1>
+          <p className="text-muted-foreground">Bet on whether a single coin will go up or down</p>
         </div>
 
-        {/* Coin Battles Grid */}
+        {/* Markets Grid */}
         {isLoading ? (
-          <div className="space-y-6">
-            {[...Array(3)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {[...Array(6)].map((_, i) => (
               <MarketCardSkeleton key={i} />
             ))}
           </div>
-        ) : markets.filter(m => (m as any).isDualCoin).length === 0 ? (
+        ) : singleCoinMarkets.length === 0 ? (
           <Card className="p-8 sm:p-12 text-center">
-            <CardTitle className="mb-2">No Coin Battles Available</CardTitle>
+            <CardTitle className="mb-2">No Single Coin Markets Available</CardTitle>
             <CardDescription>
-              Check back soon for exciting coin battles!
+              Check back soon for single coin markets!
             </CardDescription>
           </Card>
         ) : (
-          <div className="space-y-6">
-            {markets
-              .filter(m => (m as any).isDualCoin)
-              .map((market) => (
-                <DualCoinMarketCard key={market.id} market={market as any} />
-              ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {singleCoinMarkets.map((market) => (
+              <MarketCard key={market.id} market={market} onBetPlaced={() => refetch()} />
+            ))}
           </div>
         )}
         </div>
