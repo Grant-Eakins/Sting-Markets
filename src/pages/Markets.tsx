@@ -65,11 +65,11 @@ export default function Markets() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Navigation Bar */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="w-full px-2 sm:container sm:mx-auto sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+        <div className="w-full px-2 sm:container sm:mx-auto sm:px-4 py-4 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
             <Link to="/" className="flex items-center gap-1 sm:gap-2 shrink-0">
               <img src="/Copilot_20251128_175824-removebg-preview.png" alt="Sting Markets" className="h-7 sm:h-10" />
-              <span className="text-base sm:text-lg md:text-xl font-bold italic tracking-tight hidden sm:inline">Sting Markets</span>
+              <span className="text-base sm:text-lg md:text-xl font-bold italic tracking-tight">Sting Markets</span>
             </Link>
             {/* Desktop nav */}
             <nav className="hidden md:flex gap-4">
