@@ -131,8 +131,8 @@ export default function Markets() {
         <div className="w-full px-1 sm:container sm:mx-auto sm:px-4 py-3 sm:py-8">
 
         {/* Page Title */}
-        <div className="mb-3 sm:mb-8 px-1 flex justify-center">
-          <img src="/Copilot_20251226_230143.png" alt="Coin Battles" className="h-16 sm:h-20 md:h-24" />
+        <div className="mb-3 sm:mb-8 px-1">
+          <img src="/Copilot_20251226_230143.png" alt="Coin Battles" className="h-24 sm:h-32 md:h-40" />
         </div>
 
         {/* Scheduled Battles Section */}
