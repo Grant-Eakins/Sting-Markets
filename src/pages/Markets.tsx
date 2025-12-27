@@ -131,9 +131,8 @@ export default function Markets() {
         <div className="w-full px-1 sm:container sm:mx-auto sm:px-4 py-3 sm:py-8">
 
         {/* Page Title */}
-        <div className="mb-3 sm:mb-8 px-1">
-          <h1 className="text-xl sm:text-3xl md:text-4xl font-bold italic mb-1 sm:mb-2" style={{ color: 'hsl(222 35% 25%)' }}>Coin Battles</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground" style={{ color: 'hsl(222 35% 25%)' }}>Bet on which coin gains more percentage in head-to-head battles</p>
+        <div className="mb-3 sm:mb-8 px-1 flex justify-center">
+          <img src="/Copilot_20251226_230143.png" alt="Coin Battles" className="h-16 sm:h-20 md:h-24" />
         </div>
 
         {/* Scheduled Battles Section */}
