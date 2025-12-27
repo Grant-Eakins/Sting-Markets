@@ -140,7 +140,9 @@ export default function MyBets() {
   const { data: markets = [], isLoading: isLoadingMarkets } = useQuery({
     queryKey: ['markets'],
     queryFn: () => fetchMarkets('all'),
-    refetchInterval: 120000, // 2 minutes
+    refetchInterval: false, // Only refresh manually
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch market details from blockchain for all markets in bets
@@ -157,7 +159,9 @@ export default function MyBets() {
     })) as any,
     query: {
       enabled: marketIds.length > 0,
-      refetchInterval: 30000, // 30 seconds
+      refetchInterval: false, // Only refresh manually
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   } as any);
 
@@ -179,7 +183,9 @@ export default function MyBets() {
     })) as any,
     query: {
       enabled: marketIds.length > 0,
-      refetchInterval: 30000, // 30 seconds
+      refetchInterval: 60000, // 1 minute for probabilities (subtle background update)
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   } as any);
 
@@ -193,7 +199,9 @@ export default function MyBets() {
     })) as any,
     query: {
       enabled: bets.length > 0,
-      refetchInterval: 30000, // 30 seconds for live updates
+      refetchInterval: 60000, // 1 minute for sell quotes (subtle background update)
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   } as any);
 
