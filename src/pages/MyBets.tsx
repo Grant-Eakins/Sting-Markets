@@ -140,7 +140,7 @@ export default function MyBets() {
   const { data: markets = [], isLoading: isLoadingMarkets } = useQuery({
     queryKey: ['markets'],
     queryFn: () => fetchMarkets('all'),
-    refetchInterval: 30000,
+    refetchInterval: 120000, // 2 minutes
   });
 
   // Fetch market details from blockchain for all markets in bets
@@ -157,7 +157,7 @@ export default function MyBets() {
     })) as any,
     query: {
       enabled: marketIds.length > 0,
-      refetchInterval: 15000,
+      refetchInterval: 30000, // 30 seconds
     },
   } as any);
 
@@ -179,7 +179,7 @@ export default function MyBets() {
     })) as any,
     query: {
       enabled: marketIds.length > 0,
-      refetchInterval: 15000,
+      refetchInterval: 30000, // 30 seconds
     },
   } as any);
 
@@ -193,7 +193,7 @@ export default function MyBets() {
     })) as any,
     query: {
       enabled: bets.length > 0,
-      refetchInterval: 10000, // Refresh every 10 seconds for live updates
+      refetchInterval: 30000, // 30 seconds for live updates
     },
   } as any);
 
@@ -549,7 +549,7 @@ export default function MyBets() {
   const claimableBets = settledBets.filter(b => b.won && !b.claimed);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex flex-col">
       {/* Navigation Bar */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -612,7 +612,7 @@ export default function MyBets() {
           </div>
         )}
       </div>
-      <div className="container mx-auto px-4 py-6 sm:py-8">
+      <div className="flex-1 container mx-auto px-4 py-6 sm:py-8">
         {/* Header */}
         <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div>
