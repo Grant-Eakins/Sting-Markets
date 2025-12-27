@@ -32,6 +32,17 @@ export async function activateScheduledMarkets(): Promise<number> {
     try {
       console.log(`⏰ Activating market: ${market.stockSymbol}`);
 
+      // Recalculate lock and settle times at activation (12 hours from now)
+      const activationTime = new Date();
+      const newLockTime = new Date(activationTime.getTime() + 12 * 60 * 60 * 1000); // 12 hours from now
+      const newSettleTime = new Date(activationTime.getTime() + 12 * 60 * 60 * 1000 + 5 * 60 * 1000); // 12 hours + 5 min
+      
+      market.lockTime = newLockTime;
+      market.settleTime = newSettleTime;
+
+      console.log(`   Lock time: ${newLockTime.toLocaleString()}`);
+      console.log(`   Settle time: ${newSettleTime.toLocaleString()}`);
+
       // Fetch current prices for dual-coin markets
       if (market.isDualCoin && market.coinAAddress && market.coinBAddress) {
         const [tokenA, tokenB] = await Promise.all([
@@ -63,8 +74,8 @@ export async function activateScheduledMarkets(): Promise<number> {
         const blockchainMarketId = await createOnChainMarket(
           symbol,
           market.openingPrice,
-          market.lockTime,
-          market.settleTime,
+          newLockTime,
+          newSettleTime,
           false, // isAfterHours
           numOutcomes
         );

@@ -132,7 +132,7 @@ export default function Markets() {
 
         {/* Page Title */}
         <div className="mb-3 sm:mb-8 px-1">
-          <h1 className="text-xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2" style={{ color: 'hsl(222 35% 25%)' }}>⚔️ Coin Battles</h1>
+          <h1 className="text-xl sm:text-3xl md:text-4xl font-bold italic mb-1 sm:mb-2" style={{ color: 'hsl(222 35% 25%)' }}>Coin Battles</h1>
           <p className="text-xs sm:text-sm text-muted-foreground" style={{ color: 'hsl(222 35% 25%)' }}>Bet on which coin gains more percentage in head-to-head battles</p>
         </div>
 
@@ -160,10 +160,11 @@ export default function Markets() {
         {/* Active Coin Battles Grid - Only show if no scheduled battles */}
         {scheduledMarkets.length === 0 && (
           <>
-            <div className="mb-3 sm:mb-6 px-1">
-              <h2 className="text-lg sm:text-2xl font-bold" style={{ color: 'hsl(222 35% 25%)' }}>
-                🔥 Live Battles
+            <div className="mb-3 sm:mb-6 px-1 flex items-center gap-2">
+              <h2 className="text-lg sm:text-2xl font-bold italic" style={{ color: 'hsl(222 35% 25%)' }}>
+                Live Battles
               </h2>
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
             </div>
             
             {isLoading ? (
