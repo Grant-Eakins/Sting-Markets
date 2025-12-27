@@ -21,7 +21,7 @@ export function ScheduledMarketCard({
 }: ScheduledMarketCardProps) {
   return (
     <Card className="w-full bg-card border-2 border-yellow-500/50 shadow-lg hover:shadow-yellow-500/20 transition-all duration-300">
-      <div className="p-4 sm:p-6">
+      <div className="p-3 sm:p-6">
         {/* Header */}
         <div className="text-center mb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500/20 rounded-full border border-yellow-500/50">
@@ -33,7 +33,7 @@ export function ScheduledMarketCard({
         </div>
 
         {/* Coin Battle Display */}
-        <div className="flex items-center justify-center gap-3 sm:gap-6 mb-6">
+        <div className="flex items-center justify-center gap-2 sm:gap-6 mb-4 sm:mb-6">
           {/* Coin A */}
           <div className="flex flex-col items-center gap-2">
             {coinAImage ? (
@@ -41,7 +41,7 @@ export function ScheduledMarketCard({
                 <img
                   src={coinAImage}
                   alt={coinASymbol}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-green-500/50 shadow-lg hover:scale-110 transition-transform"
+                  className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-2 border-green-500/50 shadow-lg hover:scale-110 transition-transform"
                 />
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold">
                   ↑
@@ -59,8 +59,8 @@ export function ScheduledMarketCard({
 
           {/* VS Symbol */}
           <div className="flex flex-col items-center">
-            <Swords className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-500 animate-pulse" />
-            <span className="text-lg sm:text-xl font-bold text-yellow-500 mt-1">
+            <Swords className="w-6 h-6 sm:w-10 sm:h-10 text-yellow-500 animate-pulse" />
+            <span className="text-base sm:text-xl font-bold text-yellow-500 mt-1">
               VS
             </span>
           </div>
@@ -72,7 +72,7 @@ export function ScheduledMarketCard({
                 <img
                   src={coinBImage}
                   alt={coinBSymbol}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-green-500/50 shadow-lg hover:scale-110 transition-transform"
+                  className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-2 border-green-500/50 shadow-lg hover:scale-110 transition-transform"
                 />
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold">
                   ↑

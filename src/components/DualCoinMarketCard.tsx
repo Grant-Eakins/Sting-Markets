@@ -132,7 +132,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow max-w-7xl mx-auto bg-card/90">
+      <Card className="hover:shadow-lg transition-shadow max-w-7xl mx-auto bg-card/90 overflow-hidden">
         <CardHeader className="pb-2 sm:pb-3 px-2 sm:px-6 pt-2 sm:pt-6">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base sm:text-xl font-bold italic" style={{ color: '#fffd7e' }}>
@@ -159,23 +159,23 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
           </div>
         </CardHeader>
 
-        <CardContent className="p-1 sm:p-4 md:p-6 lg:p-8">
+        <CardContent className="p-2 sm:p-4 md:p-6 lg:p-8">
           {/* Horizontal Layout on all screen sizes: Coin A | VS | Coin B */}
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-1 sm:gap-4 md:gap-6 lg:gap-8 items-stretch">
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-0.5 sm:gap-4 md:gap-6 lg:gap-8 items-stretch">
             
             {/* Coin A - Left Side (Top on mobile) */}
-            <div className={`relative rounded-lg border transition-all min-h-[260px] sm:min-h-[350px] md:min-h-[400px] flex flex-col ${
+            <div className={`relative rounded-lg border transition-all min-h-[240px] sm:min-h-[350px] md:min-h-[400px] flex flex-col overflow-hidden ${
               isSettled && market.winningPosition === 'UP' 
                 ? 'border-green-500 bg-green-500/5' 
                 : 'border-muted hover:border-blue-500/40 bg-card/80'
             }`}>
               {/* Coin A Image - Top Left Corner */}
-              <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10">
+              <div className="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 z-10">
                 {market.coinAImage ? (
                   <img 
                     src={market.coinAImage} 
                     alt={market.coinASymbol} 
-                    className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 border-muted shadow-md" 
+                    className="w-7 h-7 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 border-muted shadow-md" 
                   />
                 ) : (
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-500/10 border-2 border-muted shadow-md flex items-center justify-center text-sm sm:text-base font-semibold">
@@ -185,16 +185,16 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
               </div>
 
               {/* Price Info - Top Right */}
-              <div className="absolute top-2 right-2 sm:top-3 sm:right-3 text-right z-10">
+              <div className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 text-right z-10">
                 <div className="font-mono text-xs sm:text-sm md:text-base font-bold">{formatPrice(coinAPrice)}</div>
                 <div className={`text-[10px] sm:text-xs md:text-sm font-bold ${coinAChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {coinAChange >= 0 ? '+' : ''}{coinAChange.toFixed(2)}%
                 </div>
               </div>
 
-              <div className="p-2 sm:p-3 md:p-4 pt-12 sm:pt-16 md:pt-20 flex-1 flex flex-col">
-                <div className="mb-1 sm:mb-2 md:mb-3">
-                  <div className="font-bold text-lg sm:text-xl md:text-2xl">{market.coinASymbol}</div>
+              <div className="p-1.5 sm:p-3 md:p-4 pt-10 sm:pt-16 md:pt-20 flex-1 flex flex-col">
+                <div className="mb-0.5 sm:mb-2 md:mb-3">
+                  <div className="font-bold text-base sm:text-xl md:text-2xl">{market.coinASymbol}</div>
                   {market.coinAName && (
                     <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{market.coinAName}</div>
                   )}
@@ -202,7 +202,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 
                 {/* Coin A Chart */}
                 {market.coinAAddress && (
-                  <div className="mb-2 sm:mb-3 md:mb-4 flex-1">
+                  <div className="mb-1 sm:mb-3 md:mb-4 flex-1 min-h-0">
                     <CoinChart
                       name={market.coinAName || market.coinASymbol}
                       symbol={market.coinASymbol}
@@ -231,13 +231,13 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
             </div>
 
             {/* VS Divider - Center (always visible in horizontal layout) */}
-            <div className="flex flex-col items-center justify-center px-1 sm:px-2 md:px-4 gap-2 sm:gap-3 md:gap-4">
+            <div className="flex flex-col items-center justify-center px-0.5 sm:px-2 md:px-4 gap-1 sm:gap-3 md:gap-4">
               {/* Winning indicator - only show during active betting or after settlement */}
               {(coinAChange !== 0 || coinBChange !== 0) && (
                 <div className="flex flex-col items-center gap-1 sm:gap-2 md:gap-3">
                   {/* Animated percentage display */}
                   <div 
-                    className="text-lg sm:text-2xl md:text-3xl font-bold animate-pulse"
+                    className="text-sm sm:text-2xl md:text-3xl font-bold animate-pulse"
                     style={{ 
                       color: coinAChange > coinBChange 
                         ? (coinAChange >= 0 ? '#00ff00' : '#ff0000')
@@ -252,7 +252,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       : `${coinBChange >= 0 ? '+' : ''}${coinBChange.toFixed(2)}%`
                     }
                   </div>
-                  <div className="text-xs sm:text-sm md:text-base font-bold" style={{ color: '#fffd7e' }}>
+                  <div className="text-[10px] sm:text-sm md:text-base font-bold" style={{ color: '#fffd7e' }}>
                     Winning:
                   </div>
                   {coinAChange > coinBChange ? (
@@ -260,10 +260,10 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       <img 
                         src={market.coinAImage} 
                         alt={market.coinASymbol} 
-                        className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full border-3 border-green-500 shadow-lg" 
+                        className="w-8 h-8 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full border-3 border-green-500 shadow-lg" 
                       />
                     ) : (
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-3 border-green-500 shadow-lg flex items-center justify-center text-xl font-bold">
+                      <div className="w-8 h-8 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-3 border-green-500 shadow-lg flex items-center justify-center text-sm sm:text-xl font-bold">
                         {market.coinASymbol.charAt(0)}
                       </div>
                     )
@@ -272,10 +272,10 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       <img 
                         src={market.coinBImage} 
                         alt={market.coinBSymbol} 
-                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-3 border-green-500 shadow-lg" 
+                        className="w-8 h-8 sm:w-20 sm:h-20 rounded-full border-3 border-green-500 shadow-lg" 
                       />
                     ) : (
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-3 border-green-500 shadow-lg flex items-center justify-center text-xl font-bold">
+                      <div className="w-8 h-8 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-3 border-green-500 shadow-lg flex items-center justify-center text-sm sm:text-xl font-bold">
                         {market.coinBSymbol.charAt(0)}
                       </div>
                     )
@@ -283,21 +283,21 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 </div>
               )}
               
-              <div className="rounded-lg border border-muted bg-muted/30 px-2 py-2 sm:px-3 sm:py-4 md:px-4 md:py-6">
-                <div className="text-base sm:text-xl md:text-2xl font-bold text-foreground">
+              <div className="rounded-lg border border-muted bg-muted/30 px-1.5 py-1.5 sm:px-3 sm:py-4 md:px-4 md:py-6">
+                <div className="text-xs sm:text-xl md:text-2xl font-bold text-foreground">
                   VS
                 </div>
               </div>
             </div>
 
             {/* Coin B - Right Side (Bottom on mobile) */}
-            <div className={`relative rounded-lg border transition-all min-h-[280px] sm:min-h-[350px] md:min-h-[400px] flex flex-col ${
+            <div className={`relative rounded-lg border transition-all min-h-[240px] sm:min-h-[350px] md:min-h-[400px] flex flex-col overflow-hidden ${
               isSettled && market.winningPosition === 'DOWN' 
                 ? 'border-green-500 bg-green-500/5' 
                 : 'border-muted hover:border-purple-500/40 bg-card/80'
             }`}>
               {/* Price Info - Top Left */}
-              <div className="absolute top-2 left-2 sm:top-3 sm:left-3 text-left z-10">
+              <div className="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 text-left z-10">
                 <div className="font-mono text-xs sm:text-sm md:text-base font-bold">{formatPrice(coinBPrice)}</div>
                 <div className={`text-[10px] sm:text-xs md:text-sm font-bold ${coinBChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {coinBChange >= 0 ? '+' : ''}{coinBChange.toFixed(2)}%
@@ -305,12 +305,12 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
               </div>
 
               {/* Coin B Image - Top Right Corner */}
-              <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
+              <div className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 z-10">
                 {market.coinBImage ? (
                   <img 
                     src={market.coinBImage} 
                     alt={market.coinBSymbol} 
-                    className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 border-muted shadow-md" 
+                    className="w-7 h-7 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 border-muted shadow-md" 
                   />
                 ) : (
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-500/10 border-2 border-muted shadow-md flex items-center justify-center text-sm sm:text-base font-semibold">
@@ -319,9 +319,9 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 )}
               </div>
 
-              <div className="p-2 sm:p-3 md:p-4 pt-12 sm:pt-16 md:pt-20 flex-1 flex flex-col">
-                <div className="mb-1 sm:mb-2 md:mb-3">
-                  <div className="font-bold text-lg sm:text-xl md:text-2xl">{market.coinBSymbol}</div>
+              <div className="p-1.5 sm:p-3 md:p-4 pt-10 sm:pt-16 md:pt-20 flex-1 flex flex-col">
+                <div className="mb-0.5 sm:mb-2 md:mb-3">
+                  <div className="font-bold text-base sm:text-xl md:text-2xl">{market.coinBSymbol}</div>
                   {market.coinBName && (
                     <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{market.coinBName}</div>
                   )}
@@ -329,7 +329,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 
                 {/* Coin B Chart */}
                 {market.coinBAddress && (
-                  <div className="mb-2 sm:mb-3 md:mb-4 flex-1">
+                  <div className="mb-1 sm:mb-3 md:mb-4 flex-1 min-h-0">
                     <CoinChart
                       name={market.coinBName || market.coinBSymbol}
                       symbol={market.coinBSymbol}

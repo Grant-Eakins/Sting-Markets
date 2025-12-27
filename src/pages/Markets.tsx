@@ -128,10 +128,10 @@ export default function Markets() {
       
       {/* Main Content Area with Yellow Background */}
       <div className="flex-1 bg-yellow-content">
-        <div className="w-full px-1 sm:container sm:mx-auto sm:px-4 py-3 sm:py-8">
+        <div className="w-full px-2 sm:px-4 sm:container sm:mx-auto py-3 sm:py-8">
 
         {/* Page Title */}
-        <div className="mb-3 sm:mb-8 px-1">
+        <div className="mb-3 sm:mb-8">
           <img src="/Copilot_20251226_230143.png" alt="Coin Battles" className="h-24 sm:h-32 md:h-40" />
         </div>
 
@@ -159,7 +159,7 @@ export default function Markets() {
         {/* Active Coin Battles Grid - Only show if no scheduled battles */}
         {scheduledMarkets.length === 0 && (
           <>
-            <div className="mb-3 sm:mb-6 px-1 flex items-center gap-2">
+            <div className="mb-3 sm:mb-6 flex items-center gap-2">
               <h2 className="text-lg sm:text-2xl font-bold italic" style={{ color: 'hsl(222 35% 25%)' }}>
                 Live Battles
               </h2>
