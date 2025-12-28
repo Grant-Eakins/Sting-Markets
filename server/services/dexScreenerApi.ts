@@ -275,12 +275,15 @@ export async function getTokenHistory(
     try {
       const tokenInfo = await getTokenByAddress(contractAddress);
       if (tokenInfo) {
+        console.log(`   Using fallback history for ${tokenInfo.symbol}`);
         return generateApproximateHistory(tokenInfo.price, tokenInfo.priceChange24h);
       }
-    } catch {
-      // Ignore fallback errors
+    } catch (fallbackError) {
+      console.error('   Fallback history generation failed:', fallbackError);
     }
     
+    // If all else fails, return empty array so frontend can show mock data
+    console.log('   Returning empty chart data');
     return [];
   }
 }
