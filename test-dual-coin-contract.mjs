@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const CONTRACT_ADDRESS = '0x219De13c961be6Bb0AA2CB1101944a443c79548d';
+const CONTRACT_ADDRESS = '0xcddCc37B9A6a5736953C81E7AB0fca40f293B1ff'; // ProportionalMarketUSDC
 const TOKEN_ADDRESS = '0xCe31Ae82c11dd708eF51c93dEEb5Be0474A132D1'; // MIND token
 
 const CONTRACT_ABI = [

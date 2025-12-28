@@ -420,7 +420,8 @@ export const CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0x219De13c961be6Bb0AA2CB1101944a443c79548d', // ProportionalMarketMIND
+  84532: '0xcddCc37B9A6a5736953C81E7AB0fca40f293B1ff', // ProportionalMarketUSDC (ACTIVE - markets created here)
+  // 84532: '0x219De13c961be6Bb0AA2CB1101944a443c79548d', // ProportionalMarketMIND (OLD)
 } as const;
 
 // MIND token contract addresses (your custom token)
