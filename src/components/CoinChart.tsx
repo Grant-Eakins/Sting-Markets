@@ -59,33 +59,76 @@ export const CoinChart = ({ name, symbol, growth, tokenAddress, contractAddress 
 
   const maxValue = Math.max(...chartData);
   const minValue = Math.min(...chartData);
+  const dataRange = maxValue - minValue;
+  
   // Add 10% padding to top and bottom for better visibility
-  const paddedMin = minValue - (maxValue - minValue) * 0.1;
-  const paddedMax = maxValue + (maxValue - minValue) * 0.1;
+  // If range is very small (< 1% of value), use a minimum range
+  const paddingPercent = 0.1;
+  let paddedMin = minValue - dataRange * paddingPercent;
+  let paddedMax = maxValue + dataRange * paddingPercent;
+  
+  // If the range is too small (flat line), create a reasonable scale
+  if (dataRange < maxValue * 0.01) {
+    const centerValue = (maxValue + minValue) / 2;
+    const minRange = centerValue * 0.02; // At least 2% range
+    paddedMin = centerValue - minRange;
+    paddedMax = centerValue + minRange;
+  }
+  
   const range = paddedMax - paddedMin || 1; // Avoid division by zero
 
-  // Create SVG path for the chart
+  // Create SVG path for the chart with smooth curves
   const createPath = () => {
     const width = 300;
     const height = 100;
     const points = chartData.map((value: number, index: number) => {
       const x = (index / (chartData.length - 1)) * width;
       const y = height - ((value - paddedMin) / range) * height;
-      return `${x},${y}`;
+      return { x, y };
     });
-    return `M ${points.join(' L ')}`;
+    
+    // Create smooth bezier curve path
+    if (points.length < 2) return '';
+    
+    let path = `M ${points[0].x},${points[0].y}`;
+    
+    for (let i = 0; i < points.length - 1; i++) {
+      const current = points[i];
+      const next = points[i + 1];
+      const controlX = (current.x + next.x) / 2;
+      
+      path += ` Q ${controlX},${current.y} ${controlX},${(current.y + next.y) / 2}`;
+      path += ` Q ${controlX},${next.y} ${next.x},${next.y}`;
+    }
+    
+    return path;
   };
 
-  // Create area path
+  // Create area path with smooth curves
   const createAreaPath = () => {
     const width = 300;
     const height = 100;
     const points = chartData.map((value: number, index: number) => {
       const x = (index / (chartData.length - 1)) * width;
       const y = height - ((value - paddedMin) / range) * height;
-      return `${x},${y}`;
+      return { x, y };
     });
-    return `M 0,${height} L ${points.join(' L ')} L ${width},${height} Z`;
+    
+    if (points.length < 2) return '';
+    
+    let path = `M 0,${height} L ${points[0].x},${points[0].y}`;
+    
+    for (let i = 0; i < points.length - 1; i++) {
+      const current = points[i];
+      const next = points[i + 1];
+      const controlX = (current.x + next.x) / 2;
+      
+      path += ` Q ${controlX},${current.y} ${controlX},${(current.y + next.y) / 2}`;
+      path += ` Q ${controlX},${next.y} ${next.x},${next.y}`;
+    }
+    
+    path += ` L ${width},${height} Z`;
+    return path;
   };
 
   // Determine chart color based on actual price movement if we have real data
@@ -125,7 +168,7 @@ export const CoinChart = ({ name, symbol, growth, tokenAddress, contractAddress 
             <svg
               viewBox="0 0 300 100"
               className="w-full h-full"
-              preserveAspectRatio="none"
+              preserveAspectRatio="xMidYMid meet"
             >
               {/* Gradient definition */}
               <defs>
