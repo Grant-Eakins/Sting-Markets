@@ -201,15 +201,25 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
           return;
         }
         
-        // Use actual bucket index from PriceSpinner, or fallback to 0% bucket +/- 1
+        // Use actual bucket index from PriceSpinner, or fallback based on market type
         let outcomeIndex: number;
         if (bucketIndex !== undefined) {
           outcomeIndex = bucketIndex;
         } else {
-          // Meme coin buckets: 10 total, bucket 4 = 0-5% gain, bucket 5 = 0 to -5% loss
-          // UP bet: small gain bucket (4), DOWN bet: small loss bucket (5)
-          outcomeIndex = position === 'UP' ? 4 : 5;
+          // Determine market type from backend data
+          const isDualCoin = (market as any).isDualCoin;
+          
+          if (isDualCoin) {
+            // Dual-coin: 2 buckets only - 0=Coin A, 1=Coin B
+            outcomeIndex = position === 'UP' ? 0 : 1;
+          } else {
+            // Solo markets: 10 buckets - bucket 4 = 0-5% gain, bucket 5 = 0 to -5% loss
+            outcomeIndex = position === 'UP' ? 4 : 5;
+          }
         }
+        
+        // Validate bucket exists in market (safety check)
+        // Note: We don't have numOutcomes here, but contract will reject if invalid
         
         // Check if approval is needed first
         const betAmountBigInt = parseUnits(amount, TOKEN_DECIMALS);

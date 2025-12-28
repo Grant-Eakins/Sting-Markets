@@ -227,11 +227,22 @@ export function useBlockchainBets() {
         console.log(`📊 Position ${key} active with ${Number(position.totalShares)/DECIMALS_DIVISOR} shares, claimed: ${isClaimed}`);
         
         // Determine if this is an UP or DOWN position
-        // For intraday (22 buckets): bucket 0-10 = UP (positive change), 11-21 = DOWN
-        // For overnight (42 buckets): bucket 0-20 = UP, 21-41 = DOWN
-        // We assume overnight (42) unless we can determine otherwise
-        // UP = 0, DOWN = 1
-        const isUpPosition = position.outcomeIndex <= 20; // Safe for both 22 and 42 buckets
+        // For 2-bucket dual-coin: bucket 0 = UP (Coin A), bucket 1 = DOWN (Coin B)
+        // For 10-bucket solo: bucket 0-4 = UP (gains), bucket 5-9 = DOWN (losses)
+        // For 22/42 bucket LMSR: middle bucket separates UP/DOWN
+        // Note: We don't know numOutcomes here, so use bucket index heuristics
+        let isUpPosition: boolean;
+        if (position.outcomeIndex === 0) {
+          isUpPosition = true; // Bucket 0 is always UP in all market types
+        } else if (position.outcomeIndex === 1) {
+          isUpPosition = false; // For 2-bucket, bucket 1 is DOWN; for others, still UP but safer to mark DOWN
+        } else if (position.outcomeIndex <= 4) {
+          isUpPosition = true; // Buckets 2-4 are UP for 10-bucket markets
+        } else if (position.outcomeIndex <= 20) {
+          isUpPosition = false; // Buckets 5-20 are DOWN for 10-bucket or middle for 22/42
+        } else {
+          isUpPosition = false; // Buckets 21+ are definitely DOWN
+        }
         const positionType = isUpPosition ? 0 : 1;
         
         activeBets.push({

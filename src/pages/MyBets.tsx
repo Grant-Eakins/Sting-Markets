@@ -189,9 +189,18 @@ export default function MyBets() {
     },
   } as any);
 
-  // Fetch live sell quotes for each bet position
+  // Fetch live sell quotes for each bet position (only for active/locked markets)
+  const activeBetsForSellQuotes = bets.filter(bet => {
+    const index = marketIds.indexOf(bet.marketId);
+    if (index === -1 || !marketsData?.[index]) return false;
+    const marketResult: any = marketsData[index];
+    if (marketResult.status !== 'success' || !marketResult.result) return false;
+    const status = marketResult.result[2]; // status is index 2 in tuple
+    return status === 0 || status === 1; // 0=ACTIVE, 1=LOCKED
+  });
+
   const { data: sellQuotesData } = useReadContracts({
-    contracts: bets.map((bet) => ({
+    contracts: activeBetsForSellQuotes.map((bet) => ({
       address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'getSellQuote',
@@ -429,13 +438,19 @@ export default function MyBets() {
     
     console.log(`📊 Bet ${index} result: isSettled=${isSettled}, won=${won}, outcomeIndex=${bet.outcomeIndex}, winningOutcome=${marketData?.winningOutcome}, isDualCoin=${market?.isDualCoin}`);
     
-    // Get live sell value from contract
+    // Get live sell value for active positions (selling is disabled for settled markets)
     let liveSellValue: number | null = null;
-    const sellQuoteResult = sellQuotesData?.[index];
-    if (sellQuoteResult?.status === 'success' && sellQuoteResult.result) {
-      // result is [grossPayout, netPayout, sellFee] - we want netPayout
-      const netPayout = sellQuoteResult.result[1] as bigint;
-      liveSellValue = Number(netPayout) / TOKEN_DIVISOR; // MIND has 18 decimals
+    if (!isSettled && sellQuotesData) {
+      // Map bet to sellQuotesData index (since we filtered bets for sell quotes)
+      const sellQuoteIndex = activeBetsForSellQuotes.findIndex(b => b.betId === bet.betId);
+      if (sellQuoteIndex !== -1) {
+        const sellQuoteResult: any = sellQuotesData[sellQuoteIndex];
+        if (sellQuoteResult?.status === 'success' && sellQuoteResult.result) {
+          // result is [grossPayout, netPayout, sellFee] - we want netPayout
+          const netPayout = sellQuoteResult.result[1] as bigint;
+          liveSellValue = Number(netPayout) / TOKEN_DIVISOR; // MIND has 18 decimals
+        }
+      }
     }
     
     // Calculate estimated payout and sell value based on current shares and market state
@@ -459,19 +474,36 @@ export default function MyBets() {
     
     // Format the bucket as a price range based on contract's getBucketIndex logic
     // Contract mapping: bucket 0 = >+10%, lower buckets = higher positive %, higher buckets = negative %
-    const getBucketLabel = (outcomeIndex: number, numOutcomes: number = 42) => {
+    const getBucketLabel = (outcomeIndex: number, numOutcomes: number = 42, isDualCoin: boolean = false) => {
+      // For 2-bucket dual-coin markets
+      if (isDualCoin && numOutcomes === 2) {
+        return outcomeIndex === 0 ? 'Coin A Wins' : 'Coin B Wins';
+      }
+      
+      // For 10-bucket solo markets
+      if (numOutcomes === 10) {
+        // Gain buckets (0-4): 20%+, 15-20%, 10-15%, 5-10%, 0-5%
+        if (outcomeIndex === 0) return '>+20%';
+        if (outcomeIndex === 1) return '+15% to +20%';
+        if (outcomeIndex === 2) return '+10% to +15%';
+        if (outcomeIndex === 3) return '+5% to +10%';
+        if (outcomeIndex === 4) return '0% to +5%';
+        // Loss buckets (5-9): 0 to -5%, -5 to -10%, -10 to -15%, -15 to -20%, -20%+
+        if (outcomeIndex === 5) return '0% to -5%';
+        if (outcomeIndex === 6) return '-5% to -10%';
+        if (outcomeIndex === 7) return '-10% to -15%';
+        if (outcomeIndex === 8) return '-15% to -20%';
+        if (outcomeIndex === 9) return '<-20%';
+      }
+      
+      // Legacy: For 22/42 bucket LMSR markets (if you ever use them)
       const isIntraday = numOutcomes === 22;
       const increment = isIntraday ? 1 : 0.5;
       const maxBucket = numOutcomes - 1;
       
-      // For intraday (22 buckets): 0=>+10%, 10=0-1%, 11=-1-0%, 21=<-10%
-      // For overnight (42 buckets): 0=>+10%, 20=0-0.5%, 21=-0.5-0%, 41=<-10%
-      
       if (outcomeIndex === 0) return '>+10%';
       if (outcomeIndex === maxBucket) return '<-10%';
       
-      // Calculate percentage range for this bucket
-      // Bucket 1 = +9% to +10%, Bucket 2 = +8% to +9%, etc.
       const pctHigh = 10 - (outcomeIndex - 1) * increment;
       const pctLow = pctHigh - increment;
       
@@ -488,10 +520,19 @@ export default function MyBets() {
     // UP = positive price change buckets (lower indices)
     // DOWN = negative price change buckets (higher indices)
     const getIsUpBet = (outcomeIndex: number, numOutcomes: number = 42) => {
+      // For 2-bucket dual-coin markets: 0=UP/Coin A, 1=DOWN/Coin B
+      if (numOutcomes === 2) {
+        return outcomeIndex === 0;
+      }
+      
+      // For 10-bucket solo markets: 0-4=UP (gains), 5-9=DOWN (losses)
+      if (numOutcomes === 10) {
+        return outcomeIndex <= 4;
+      }
+      
+      // Legacy: For 22/42 bucket LMSR markets
       const isIntraday = numOutcomes === 22;
-      // Middle bucket (0% change): index 10 for intraday, index 20 for overnight
       const zeroChangeBucket = isIntraday ? 10 : 20;
-      // Buckets 0 to zeroChangeBucket are UP (positive or zero change)
       return outcomeIndex <= zeroChangeBucket;
     };
     
@@ -530,7 +571,7 @@ export default function MyBets() {
     return {
       ...bet,
       marketName: marketData?.stockSymbol || market?.stockSymbol || market?.stockName || `Market #${bet.marketId}`,
-      bucketLabel: getBucketLabel(bet.outcomeIndex, marketData?.numOutcomes),
+      bucketLabel: getBucketLabel(bet.outcomeIndex, marketData?.numOutcomes, market?.isDualCoin),
       amountToken,
       sharesNum,
       potentialPayout,

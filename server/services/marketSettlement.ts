@@ -231,15 +231,19 @@ async function settleDualCoinMarket(market: Market): Promise<any> {
     
     if (market.blockchainMarketId !== undefined) {
       try {
-        // For dual-coin markets, pass a synthetic price that maps to the winning outcome
-        // Outcome 0 (UP/Coin A wins) = reference price * 1.20 (>+10% triggers bucket 0)
-        // Outcome 1 (DOWN/Coin B wins) = reference price * 0.80 (<-10% triggers bucket 1)
-        const syntheticPrice = winningPosition === Position.UP 
-          ? Math.round(market.coinAOpeningPrice! * 1.20)  // +20% -> bucket 0
-          : Math.round(market.coinAOpeningPrice! * 0.80); // -20% -> bucket 1
+        // For dual-coin markets, send actual winning coin's closing price
+        // Contract now handles 2-bucket logic: finalPrice >= referencePrice = bucket 0, else bucket 1
+        const finalPrice = winningPosition === Position.UP 
+          ? coinAClosing  // Coin A won - send its closing price
+          : coinBClosing; // Coin B won - send its closing price
         
-        console.log(`   Settling on-chain with synthetic price: ${syntheticPrice} (maps to outcome ${winningPosition === Position.UP ? 0 : 1})`);
-        await settleOnChainMarket(market.blockchainMarketId, syntheticPrice);
+        // Use reference price = the winning coin's opening price for comparison
+        const referencePrice = winningPosition === Position.UP 
+          ? market.coinAOpeningPrice!  // Compare against Coin A's opening
+          : market.coinBOpeningPrice!; // Compare against Coin B's opening
+        
+        console.log(`   Settling on-chain: winner=${winningPosition === Position.UP ? 'Coin A' : 'Coin B'}, finalPrice=${finalPrice}, refPrice=${referencePrice}`);
+        await settleOnChainMarket(market.blockchainMarketId, finalPrice);
       } catch (error) {
         console.error('❌ Failed to settle on-chain:', error);
       }

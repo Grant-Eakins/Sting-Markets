@@ -319,9 +319,16 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         market.status = MarketStatus.SETTLED;
         market.settled = true;
         
-        // Calculate winning bucket
-        int256 priceChangePercent = ((int256(finalPrice) - int256(market.referencePrice)) * 10000) / int256(market.referencePrice);
-        market.winningOutcome = getBucketIndex(priceChangePercent, market.sessionType);
+        // Handle 2-bucket dual-coin markets differently
+        if (market.numOutcomes == 2) {
+            // For dual-coin battles: finalPrice >= referencePrice means Coin A wins (bucket 0)
+            // finalPrice < referencePrice means Coin B wins (bucket 1)
+            market.winningOutcome = finalPrice >= market.referencePrice ? 0 : 1;
+        } else {
+            // For 10-bucket solo markets: use traditional getBucketIndex logic
+            int256 priceChangePercent = ((int256(finalPrice) - int256(market.referencePrice)) * 10000) / int256(market.referencePrice);
+            market.winningOutcome = getBucketIndex(priceChangePercent, market.sessionType);
+        }
         
         emit MarketSettled(marketId, finalPrice, market.winningOutcome);
     }

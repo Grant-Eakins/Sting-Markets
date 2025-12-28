@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // ProportionalMarketMIND contract address
-const CONTRACT_ADDRESS = '0xEaF3511DA201AA78906Ceca21a73C00e5e070668'; // ProportionalMarketMIND with MIND token (18 decimals)
+const CONTRACT_ADDRESS = '0x219De13c961be6Bb0AA2CB1101944a443c79548d'; // ProportionalMarketMIND with MIND token (18 decimals)
 
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)
