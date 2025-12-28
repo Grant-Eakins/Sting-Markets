@@ -413,7 +413,7 @@ export async function syncSettlementStatusFromChain(markets: Array<{ id: string;
   }
 
   let syncedCount = 0;
-  const { updateMarketStatus } = await import('./database');
+  const { updateMarketStatusInMemory } = await import('./marketService');
   const { MarketStatus } = await import('../types/market');
   const SETTLED_STATUS = 2; // On-chain status enum value
 
@@ -430,8 +430,8 @@ export async function syncSettlementStatusFromChain(markets: Array<{ id: string;
         console.log(`🔄 Syncing settlement from chain: Market ${market.id} (blockchain #${market.blockchainMarketId})`);
         console.log(`   On-chain: settled=true, winningOutcome=${onChainStatus.winningOutcome}`);
         
-        // Update backend status to SETTLED
-        await updateMarketStatus(market.id, MarketStatus.SETTLED);
+        // Update backend status to SETTLED (both in-memory and database)
+        await updateMarketStatusInMemory(market.id, MarketStatus.SETTLED);
         
         syncedCount++;
       }

@@ -342,6 +342,30 @@ export function getMarket(marketId: string): Market | undefined {
 }
 
 /**
+ * Update market status in memory (syncs with database)
+ */
+export async function updateMarketStatusInMemory(marketId: string, status: MarketStatus): Promise<boolean> {
+  const market = markets.get(marketId);
+  if (!market) {
+    console.error(`❌ Market ${marketId} not found in memory`);
+    return false;
+  }
+  
+  // Update in-memory status
+  market.status = status;
+  markets.set(marketId, market);
+  
+  // Also update database
+  const dbSuccess = await updateMarketStatus(marketId, status);
+  
+  if (dbSuccess) {
+    console.log(`✅ Updated market ${marketId} status to ${MarketStatus[status]} (in-memory + DB)`);
+  }
+  
+  return dbSuccess;
+}
+
+/**
  * Gets user's bets for a market
  */
 export function getUserBetsForMarket(marketId: string, userAddress: string): Bet[] {
