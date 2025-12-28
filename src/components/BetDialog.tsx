@@ -16,11 +16,12 @@ interface BetDialogProps {
   position: 'UP' | 'DOWN';
   odds: number;
   bucketIndex?: number; // Actual contract bucket index from PriceSpinner
+  coinName?: string; // For dual coin markets - display coin name instead of UP/DOWN
   onClose: () => void;
   onBetPlaced: () => void;
 }
 
-export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetPlaced }: BetDialogProps) {
+export function BetDialog({ market, position, odds, bucketIndex, coinName, onClose, onBetPlaced }: BetDialogProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const [amount, setAmount] = useState('5'); // Default 5 tokens
@@ -254,17 +255,8 @@ export function BetDialog({ market, position, odds, bucketIndex, onClose, onBetP
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {position === 'UP' ? (
-              <>
-                <TrendingUp className="w-5 h-5 text-green-500" />
-                <span>Bet UP</span>
-              </>
-            ) : (
-              <>
-                <TrendingDown className="w-5 h-5 text-red-500" />
-                <span>Bet DOWN</span>
-              </>
-            )}
+            <TrendingUp className="w-5 h-5 text-green-500" />
+            <span>Bet UP{coinName ? ` (${coinName})` : ''}</span>
           </DialogTitle>
           <DialogDescription className="line-clamp-2">
             {market.stockSymbol || market.stockName}

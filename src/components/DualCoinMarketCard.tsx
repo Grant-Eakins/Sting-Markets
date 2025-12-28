@@ -2,11 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Clock, Lock, CheckCircle2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BetDialog } from './BetDialog';
-import { CoinChart } from './CoinChart';
 import { useLiveCoinPrice } from '@/hooks/useLiveCoinPrice';
 import { useBucketLiquidity } from '@/hooks/useContract';
+import { createPublicClient, http, parseAbiItem } from 'viem';
+import { baseSepolia } from 'wagmi/chains';
+import { CONTRACT_ADDRESSES } from '@/config/contract';
 
 interface DualCoinMarketCardProps {
   market: {
@@ -62,6 +64,7 @@ function convertPriceToUSD(price: number): number {
 export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps) {
   const [showBetDialog, setShowBetDialog] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<'UP' | 'DOWN'>('UP');
+  const [onChainBetCount, setOnChainBetCount] = useState<number | null>(null);
 
   // Fetch live prices from DexScreener
   const { data: coinAData } = useLiveCoinPrice(market.coinAAddress);
@@ -70,6 +73,45 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   // Fetch real-time on-chain pool liquidity for dynamic percentages
   const { liquidity: coinALiquidity } = useBucketLiquidity(market.blockchainMarketId, 0);
   const { liquidity: coinBLiquidity } = useBucketLiquidity(market.blockchainMarketId, 1);
+
+  // Fetch on-chain bet count
+  useEffect(() => {
+    async function fetchBetCount() {
+      if (!market.blockchainMarketId) {
+        return;
+      }
+
+      try {
+        const contractAddress = CONTRACT_ADDRESSES[84532];
+        const publicClient = createPublicClient({
+          chain: baseSepolia,
+          transport: http('https://sepolia.base.org'),
+        });
+
+        const currentBlock = await publicClient.getBlockNumber();
+        const LOOKBACK_BLOCKS = 500000n;
+        const startBlock = currentBlock > LOOKBACK_BLOCKS ? currentBlock - LOOKBACK_BLOCKS : 0n;
+
+        const logs = await publicClient.getLogs({
+          address: contractAddress as `0x${string}`,
+          event: parseAbiItem('event SharesPurchased(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 cost)'),
+          args: {
+            marketId: BigInt(market.blockchainMarketId),
+          },
+          fromBlock: startBlock,
+          toBlock: currentBlock,
+        });
+
+        setOnChainBetCount(logs.length);
+      } catch (error) {
+        console.error('Error fetching bet count:', error);
+      }
+    }
+
+    fetchBetCount();
+    const interval = setInterval(fetchBetCount, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, [market.blockchainMarketId]);
 
   const isLocked = market.status === 'LOCKED';
   const isSettled = market.status === 'SETTLED';
@@ -98,8 +140,9 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     ? (market.coinBChangePercent ?? 0)
     : ((coinBPrice - coinBOpeningPrice) / coinBOpeningPrice) * 100;
 
-  const handleBet = (position: 'UP' | 'DOWN') => {
-    setSelectedPosition(position);
+  const handleBet = (coin: 'A' | 'B') => {
+    // Coin A = bucket 0 (UP position), Coin B = bucket 1 (DOWN position)
+    setSelectedPosition(coin === 'A' ? 'UP' : 'DOWN');
     setShowBetDialog(true);
   };
 
@@ -180,69 +223,58 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
           <div className="grid grid-cols-[1fr_auto_1fr] gap-0.5 sm:gap-4 md:gap-6 lg:gap-8 items-stretch">
             
             {/* Coin A - Left Side (Top on mobile) */}
-            <div className={`relative rounded-lg border transition-all min-h-[240px] sm:min-h-[350px] md:min-h-[400px] flex flex-col overflow-hidden ${
+            <div className={`relative rounded-lg border transition-all flex flex-col overflow-hidden p-4 sm:p-6 ${
               isSettled && market.winningPosition === 'UP' 
                 ? 'border-green-500 bg-green-500/5' 
                 : 'border-muted hover:border-blue-500/40 bg-card/80'
             }`}>
-              {/* Coin A Image - Top Left Corner */}
-              <div className="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 z-10">
-                {market.coinAImage ? (
-                  <img 
-                    src={market.coinAImage} 
-                    alt={market.coinASymbol} 
-                    className="w-7 h-7 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 border-muted shadow-md" 
-                  />
-                ) : (
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-500/10 border-2 border-muted shadow-md flex items-center justify-center text-sm sm:text-base font-semibold">
-                    {market.coinASymbol.charAt(0)}
-                  </div>
-                )}
-              </div>
-
-              {/* Price Info - Top Right */}
-              <div className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 text-right z-10">
-                <div className="font-mono text-xs sm:text-sm md:text-base font-bold">{formatPrice(coinAPrice)}</div>
-                <div className={`text-[10px] sm:text-xs md:text-sm font-bold ${coinAChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="flex flex-col items-center justify-center flex-1 space-y-4">
+                {/* Percentage Change - Above Image */}
+                <div className={`text-3xl sm:text-4xl md:text-5xl font-bold ${coinAChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {coinAChange >= 0 ? '+' : ''}{coinAChange.toFixed(2)}%
                 </div>
-              </div>
-
-              <div className="p-1.5 sm:p-3 md:p-4 pt-10 sm:pt-16 md:pt-20 flex-1 flex flex-col">
-                <div className="mb-0.5 sm:mb-2 md:mb-3">
-                  <div className="font-bold text-base sm:text-xl md:text-2xl">{market.coinASymbol}</div>
-                  {market.coinAName && (
-                    <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{market.coinAName}</div>
+                
+                {/* Coin A Image - Center */}
+                <div className="my-4">
+                  {market.coinAImage ? (
+                    <img 
+                      src={market.coinAImage} 
+                      alt={market.coinASymbol} 
+                      className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full border-4 border-muted shadow-lg" 
+                    />
+                  ) : (
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full bg-blue-500/10 border-4 border-muted shadow-lg flex items-center justify-center text-4xl font-bold">
+                      {market.coinASymbol.charAt(0)}
+                    </div>
                   )}
                 </div>
                 
-                {/* Coin A Chart */}
-                {market.coinAAddress && (
-                  <div className="mb-1 sm:mb-3 md:mb-4 flex-1 min-h-0">
-                    <CoinChart
-                      name={market.coinAName || market.coinASymbol}
-                      symbol={market.coinASymbol}
-                      growth={`${coinAChange >= 0 ? '+' : ''}${coinAChange.toFixed(2)}%`}
-                      contractAddress={market.coinAAddress}
-                    />
-                  </div>
-                )}
+                {/* Symbol and Name */}
+                <div className="text-center">
+                  <div className="font-bold text-xl sm:text-2xl md:text-3xl">{market.coinASymbol}</div>
+                  {market.coinAName && (
+                    <div className="text-xs sm:text-sm text-muted-foreground truncate mt-1">{market.coinAName}</div>
+                  )}
+                </div>
                 
+                {/* Pool Liquidity Percentage - Below Image */}
+                <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white">
+                  {coinAPoolPercent.toFixed(1)}%
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Pool Liquidity</div>
+                
+                {/* Bet Button */}
                 {isActive && !userBet && (
                   <Button 
-                    onClick={() => handleBet('UP')}
-                    className="w-full font-semibold text-black"
+                    onClick={() => handleBet('A')}
+                    className="w-full font-semibold text-black mt-4"
                     style={{ backgroundColor: '#fffd7e' }}
                     size="lg"
                   >
                     <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    BET {market.coinASymbol}
+                    BET UP
                   </Button>
                 )}
-                
-                <div className="mt-1 sm:mt-2 md:mt-3 text-[10px] sm:text-xs text-muted-foreground text-center">
-                  Pool: {coinAPoolPercent.toFixed(1)}%
-                </div>
               </div>
             </div>
 
@@ -307,69 +339,58 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
             </div>
 
             {/* Coin B - Right Side (Bottom on mobile) */}
-            <div className={`relative rounded-lg border transition-all min-h-[240px] sm:min-h-[350px] md:min-h-[400px] flex flex-col overflow-hidden ${
+            <div className={`relative rounded-lg border transition-all flex flex-col overflow-hidden p-4 sm:p-6 ${
               isSettled && market.winningPosition === 'DOWN' 
                 ? 'border-green-500 bg-green-500/5' 
                 : 'border-muted hover:border-purple-500/40 bg-card/80'
             }`}>
-              {/* Price Info - Top Left */}
-              <div className="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 text-left z-10">
-                <div className="font-mono text-xs sm:text-sm md:text-base font-bold">{formatPrice(coinBPrice)}</div>
-                <div className={`text-[10px] sm:text-xs md:text-sm font-bold ${coinBChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="flex flex-col items-center justify-center flex-1 space-y-4">
+                {/* Percentage Change - Above Image */}
+                <div className={`text-3xl sm:text-4xl md:text-5xl font-bold ${coinBChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {coinBChange >= 0 ? '+' : ''}{coinBChange.toFixed(2)}%
                 </div>
-              </div>
-
-              {/* Coin B Image - Top Right Corner */}
-              <div className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 z-10">
-                {market.coinBImage ? (
-                  <img 
-                    src={market.coinBImage} 
-                    alt={market.coinBSymbol} 
-                    className="w-7 h-7 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 border-muted shadow-md" 
-                  />
-                ) : (
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-500/10 border-2 border-muted shadow-md flex items-center justify-center text-sm sm:text-base font-semibold">
-                    {market.coinBSymbol.charAt(0)}
-                  </div>
-                )}
-              </div>
-
-              <div className="p-1.5 sm:p-3 md:p-4 pt-10 sm:pt-16 md:pt-20 flex-1 flex flex-col">
-                <div className="mb-0.5 sm:mb-2 md:mb-3">
-                  <div className="font-bold text-base sm:text-xl md:text-2xl">{market.coinBSymbol}</div>
-                  {market.coinBName && (
-                    <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{market.coinBName}</div>
+                
+                {/* Coin B Image - Center */}
+                <div className="my-4">
+                  {market.coinBImage ? (
+                    <img 
+                      src={market.coinBImage} 
+                      alt={market.coinBSymbol} 
+                      className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full border-4 border-muted shadow-lg" 
+                    />
+                  ) : (
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full bg-purple-500/10 border-4 border-muted shadow-lg flex items-center justify-center text-4xl font-bold">
+                      {market.coinBSymbol.charAt(0)}
+                    </div>
                   )}
                 </div>
                 
-                {/* Coin B Chart */}
-                {market.coinBAddress && (
-                  <div className="mb-1 sm:mb-3 md:mb-4 flex-1 min-h-0">
-                    <CoinChart
-                      name={market.coinBName || market.coinBSymbol}
-                      symbol={market.coinBSymbol}
-                      growth={`${coinBChange >= 0 ? '+' : ''}${coinBChange.toFixed(2)}%`}
-                      contractAddress={market.coinBAddress}
-                    />
-                  </div>
-                )}
+                {/* Symbol and Name */}
+                <div className="text-center">
+                  <div className="font-bold text-xl sm:text-2xl md:text-3xl">{market.coinBSymbol}</div>
+                  {market.coinBName && (
+                    <div className="text-xs sm:text-sm text-muted-foreground truncate mt-1">{market.coinBName}</div>
+                  )}
+                </div>
                 
+                {/* Pool Liquidity Percentage - Below Image */}
+                <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white">
+                  {coinBPoolPercent.toFixed(1)}%
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Pool Liquidity</div>
+                
+                {/* Bet Button */}
                 {isActive && !userBet && (
                   <Button 
-                    onClick={() => handleBet('DOWN')}
-                    className="w-full font-semibold text-black"
+                    onClick={() => handleBet('B')}
+                    className="w-full font-semibold text-black mt-4"
                     style={{ backgroundColor: '#fffd7e' }}
                     size="lg"
                   >
                     <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    BET {market.coinBSymbol}
+                    BET UP
                   </Button>
                 )}
-                
-                <div className="mt-1 sm:mt-2 md:mt-3 text-[10px] sm:text-xs text-muted-foreground text-center">
-                  Pool: {coinBPoolPercent.toFixed(1)}%
-                </div>
               </div>
             </div>
           </div>
@@ -395,7 +416,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
 
           {/* Market Stats */}
           <div className="mt-3 sm:mt-4 grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm pt-2 sm:pt-3 border-t">
-            <div>Total Bets: <span className="font-semibold">{market.totalBets}</span></div>
+            <div>Total Bets: <span className="font-semibold">{onChainBetCount !== null ? onChainBetCount : market.totalBets}</span></div>
             <div>Total Pool: <span className="font-semibold">
               {coinALiquidity !== undefined && coinBLiquidity !== undefined 
                 ? ((Number(coinALiquidity) + Number(coinBLiquidity)) / 1e18).toFixed(2)
@@ -423,6 +444,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
           position={selectedPosition}
           odds={2.0} // Placeholder - actual odds calculated from probabilities
           bucketIndex={selectedPosition === 'UP' ? 0 : 1} // Dual-coin has 2 buckets: 0=Coin A, 1=Coin B
+          coinName={selectedPosition === 'UP' ? market.coinASymbol : market.coinBSymbol} // Show coin name
           onBetPlaced={() => {
             setShowBetDialog(false);
           }}
