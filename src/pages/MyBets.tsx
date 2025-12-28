@@ -695,6 +695,18 @@ export default function MyBets() {
           </div>
         </div>
 
+        {/* Bonding Curve Explainer */}
+        {activeBets.length > 0 && (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Why different share amounts?</strong> This market uses a bonding curve - early bets get MORE shares per {TOKEN_SYMBOL}, 
+              late bets get FEWER shares. Your share count depends on when you bought, not just how much you spent. 
+              Check "Your Avg Cost" to see your entry price!
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Bets List */}
         <div className="space-y-6">
           {/* Active Bets */}
