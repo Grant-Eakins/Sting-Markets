@@ -815,7 +815,7 @@ export default function AdminPage() {
                         setDualCoinData({ ...dualCoinData, coinBAddress: e.target.value });
                         setDualCoinPreview({ ...dualCoinPreview, coinB: null });
                       }}
-                      placeholder="0x..."
+                      placeholder="0x... (Base) or base58 (Solana)"
                       className="font-mono"
                       required
                     />

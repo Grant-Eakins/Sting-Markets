@@ -67,12 +67,14 @@ export async function getTokenByAddress(contractAddress: string): Promise<TokenI
       return null;
     }
 
-    // Filter for Base chain pairs (chainId: 'base')
-    const basePairs = data.pairs.filter((pair: any) => pair.chainId === 'base');
+    // Filter for Base or Solana chain pairs
+    const supportedPairs = data.pairs.filter((pair: any) => 
+      pair.chainId === 'base' || pair.chainId === 'solana'
+    );
     
-    if (basePairs.length === 0) {
-      // If no Base pairs, try all pairs but warn
-      console.log(`⚠️ No Base chain pairs found, checking other chains...`);
+    if (supportedPairs.length === 0) {
+      // If no supported chain pairs, try all pairs but warn
+      console.log(`⚠️ No Base/Solana pairs found, checking other chains...`);
       
       // Use the highest liquidity pair
       const bestPair = data.pairs.sort((a: any, b: any) => 
@@ -85,8 +87,8 @@ export async function getTokenByAddress(contractAddress: string): Promise<TokenI
       return null;
     }
 
-    // Sort by liquidity and get the best Base pair
-    const bestPair = basePairs.sort((a: any, b: any) => 
+    // Sort by liquidity and get the best pair
+    const bestPair = supportedPairs.sort((a: any, b: any) => 
       (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0)
     )[0];
 
