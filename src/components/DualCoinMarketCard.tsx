@@ -78,9 +78,16 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     ? convertPriceToUSD(market.coinBCurrentPrice)
     : convertPriceToUSD(market.coinBOpeningPrice));
 
-  // Use live 24h price change from DexScreener
-  const coinAChange = coinAData?.priceChange24h ?? (market.coinAChangePercent ?? 0);
-  const coinBChange = coinBData?.priceChange24h ?? (market.coinBChangePercent ?? 0);
+  // Calculate change from MARKET OPENING PRICE (not 24h change)
+  const coinAOpeningUSD = convertPriceToUSD(market.coinAOpeningPrice);
+  const coinBOpeningUSD = convertPriceToUSD(market.coinBOpeningPrice);
+  
+  const coinAChange = coinAOpeningUSD > 0 
+    ? ((coinAPrice - coinAOpeningUSD) / coinAOpeningUSD) * 100
+    : 0;
+  const coinBChange = coinBOpeningUSD > 0 
+    ? ((coinBPrice - coinBOpeningUSD) / coinBOpeningUSD) * 100
+    : 0;
 
   const handleBet = (position: 'UP' | 'DOWN') => {
     setSelectedPosition(position);
@@ -208,6 +215,8 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       symbol={market.coinASymbol}
                       growth={`${coinAChange >= 0 ? '+' : ''}${coinAChange.toFixed(2)}%`}
                       contractAddress={market.coinAAddress}
+                      marketOpeningTime={(market as any).createdAt}
+                      openingPrice={coinAOpeningUSD}
                     />
                   </div>
                 )}
@@ -335,6 +344,8 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       symbol={market.coinBSymbol}
                       growth={`${coinBChange >= 0 ? '+' : ''}${coinBChange.toFixed(2)}%`}
                       contractAddress={market.coinBAddress}
+                      marketOpeningTime={(market as any).createdAt}
+                      openingPrice={coinBOpeningUSD}
                     />
                   </div>
                 )}
