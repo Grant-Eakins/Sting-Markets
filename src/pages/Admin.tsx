@@ -1119,10 +1119,16 @@ export default function AdminPage() {
                           <div>
                             <span className="text-muted-foreground text-xs">Volume:</span>
                             <div className="font-medium truncate">{(market.upPool + market.downPool).toFixed(2)} {TOKEN_SYMBOL}</div>
+                            {market.blockchainMarketId && (market.upPool + market.downPool) === 0 && (
+                              <div className="text-[10px] text-yellow-500">Backend only - check chain</div>
+                            )}
                           </div>
                           <div>
                             <span className="text-muted-foreground text-xs">Bets:</span>
                             <div className="font-medium">{market.totalBets}</div>
+                            {market.blockchainMarketId && market.totalBets === 0 && (
+                              <div className="text-[10px] text-yellow-500">Backend only</div>
+                            )}
                           </div>
                           <div>
                             <span className="text-muted-foreground text-xs">UP Pool:</span>
