@@ -736,8 +736,12 @@ export default function MyBets() {
                               <span className="font-bold text-blue-500 sm:ml-2">{bet.sharesNum.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Bucket Odds:</span>
+                              <span className="text-muted-foreground">Current Odds:</span>
                               <span className="font-bold sm:ml-2">{bet.probability}%</span>
+                            </div>
+                            <div className="flex justify-between sm:block">
+                              <span className="text-muted-foreground">Your Avg Cost:</span>
+                              <span className="font-bold text-blue-500 sm:ml-2">{(bet.amountToken / bet.sharesNum).toFixed(2)} {TOKEN_SYMBOL}/share</span>
                             </div>
                             <div className="flex justify-between sm:block">
                               <span className="text-muted-foreground">Potential Win:</span>
