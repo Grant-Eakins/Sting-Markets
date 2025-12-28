@@ -121,7 +121,11 @@ router.get('/chart-by-contract/:address', async (req, res) => {
     const { address } = req.params;
     const { timeframe = '15m' } = req.query;
     
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    // Validate address format - support both Ethereum (0x...) and Solana (base58)
+    const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(address);
+    const isSolanaAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+    
+    if (!address || (!isEthAddress && !isSolanaAddress)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid contract address format',
@@ -244,7 +248,11 @@ router.get('/token/:address', async (req, res) => {
   try {
     const { address } = req.params;
     
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    // Validate address format - support both Ethereum (0x...) and Solana (base58)
+    const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(address);
+    const isSolanaAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+    
+    if (!address || (!isEthAddress && !isSolanaAddress)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid contract address format',
@@ -310,7 +318,11 @@ router.post('/create-by-contract', async (req, res) => {
   try {
     const { contractAddress, autoRecreate = true } = req.body;
     
-    if (!contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
+    // Validate address format - support both Ethereum (0x...) and Solana (base58)
+    const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(contractAddress);
+    const isSolanaAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(contractAddress);
+    
+    if (!contractAddress || (!isEthAddress && !isSolanaAddress)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid contract address format',
@@ -454,10 +466,16 @@ router.post('/create-dual-coin', async (req, res) => {
     
     const { contractAddressA, contractAddressB, lockMinutes = 720, settleMinutes = 720.05, autoRecreate = true } = req.body;
     
-    if (!contractAddressA || !/^0x[a-fA-F0-9]{40}$/.test(contractAddressA)) {
+    // Validate address formats - support both Ethereum (0x...) and Solana (base58)
+    const isEthAddressA = /^0x[a-fA-F0-9]{40}$/.test(contractAddressA);
+    const isSolanaAddressA = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(contractAddressA);
+    const isEthAddressB = /^0x[a-fA-F0-9]{40}$/.test(contractAddressB);
+    const isSolanaAddressB = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(contractAddressB);
+    
+    if (!contractAddressA || (!isEthAddressA && !isSolanaAddressA)) {
       return res.status(400).json({ success: false, error: 'Invalid contract address A' });
     }
-    if (!contractAddressB || !/^0x[a-fA-F0-9]{40}$/.test(contractAddressB)) {
+    if (!contractAddressB || (!isEthAddressB && !isSolanaAddressB)) {
       return res.status(400).json({ success: false, error: 'Invalid contract address B' });
     }
     
