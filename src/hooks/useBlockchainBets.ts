@@ -54,6 +54,7 @@ export function useBlockchainBets() {
     setError(null);
 
     console.log(`📊 Fetching bets for ${address} from contract ${contractAddress}`);
+    console.log(`   Contract: ${contractAddress}`);
 
     try {
       // Get current block number
@@ -63,10 +64,10 @@ export function useBlockchainBets() {
       
       // Query in chunks of 50,000 blocks (well under the 100k limit)
       const CHUNK_SIZE = 50000n;
-      const LOOKBACK_BLOCKS = 200000n; // ~5 days on Base Sepolia
+      const LOOKBACK_BLOCKS = 500000n; // ~12 days on Base Sepolia (increased from 200k)
       const startBlock = currentBlock > LOOKBACK_BLOCKS ? currentBlock - LOOKBACK_BLOCKS : 0n;
       
-      console.log(`📊 Querying blocks ${startBlock} to ${currentBlock} in chunks of ${CHUNK_SIZE}`);
+      console.log(`📊 Querying blocks ${startBlock} to ${currentBlock} (looking back ${LOOKBACK_BLOCKS} blocks)`);
 
       const purchaseLogs: any[] = [];
       const sellLogs: any[] = [];
