@@ -568,9 +568,16 @@ export default function MyBets() {
       }
     }
     
+    // For dual-coin markets, construct the full "Coin A vs Coin B" market name
+    let displayMarketName = marketData?.stockSymbol || market?.stockSymbol || market?.stockName || `Market #${bet.marketId}`;
+    if (market?.isDualCoin && marketData?.numOutcomes === 2) {
+      // Show both coins in the format "WOJAK vs 67"
+      displayMarketName = `${market.coinASymbol || 'Coin A'} vs ${market.coinBSymbol || 'Coin B'}`;
+    }
+    
     return {
       ...bet,
-      marketName: marketData?.stockSymbol || market?.stockSymbol || market?.stockName || `Market #${bet.marketId}`,
+      marketName: displayMarketName,
       bucketLabel: getBucketLabel(bet.outcomeIndex, marketData?.numOutcomes, market?.isDualCoin),
       amountToken,
       sharesNum,
@@ -710,7 +717,7 @@ export default function MyBets() {
                             )}
                             <Badge variant="secondary" className="font-mono text-xs">
                               {bet.market?.isDualCoin 
-                                ? (bet.isUpBet ? bet.market.coinASymbol : bet.market.coinBSymbol)
+                                ? (bet.outcomeIndex === 0 ? bet.market.coinASymbol : bet.market.coinBSymbol)
                                 : bet.bucketLabel
                               }
                             </Badge>
@@ -793,7 +800,7 @@ export default function MyBets() {
                             )}
                             <Badge variant="secondary" className="font-mono text-xs">
                               {bet.market?.isDualCoin 
-                                ? (bet.isUpBet ? bet.market.coinASymbol : bet.market.coinBSymbol)
+                                ? (bet.outcomeIndex === 0 ? bet.market.coinASymbol : bet.market.coinBSymbol)
                                 : bet.bucketLabel
                               }
                             </Badge>
