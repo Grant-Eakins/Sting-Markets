@@ -78,16 +78,18 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     ? convertPriceToUSD(market.coinBCurrentPrice)
     : convertPriceToUSD(market.coinBOpeningPrice));
 
-  // Calculate change from MARKET OPENING PRICE (not 24h change)
-  const coinAOpeningUSD = convertPriceToUSD(market.coinAOpeningPrice);
-  const coinBOpeningUSD = convertPriceToUSD(market.coinBOpeningPrice);
+  // Calculate percentage change from market opening price (not 24h change)
+  const coinAOpeningPrice = convertPriceToUSD(market.coinAOpeningPrice);
+  const coinBOpeningPrice = convertPriceToUSD(market.coinBOpeningPrice);
   
-  const coinAChange = coinAOpeningUSD > 0 
-    ? ((coinAPrice - coinAOpeningUSD) / coinAOpeningUSD) * 100
-    : 0;
-  const coinBChange = coinBOpeningUSD > 0 
-    ? ((coinBPrice - coinBOpeningUSD) / coinBOpeningUSD) * 100
-    : 0;
+  // For settled markets, use stored change percent. For active/locked, calculate live from opening price
+  const coinAChange = isSettled 
+    ? (market.coinAChangePercent ?? 0)
+    : ((coinAPrice - coinAOpeningPrice) / coinAOpeningPrice) * 100;
+  
+  const coinBChange = isSettled 
+    ? (market.coinBChangePercent ?? 0)
+    : ((coinBPrice - coinBOpeningPrice) / coinBOpeningPrice) * 100;
 
   const handleBet = (position: 'UP' | 'DOWN') => {
     setSelectedPosition(position);
@@ -215,8 +217,6 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       symbol={market.coinASymbol}
                       growth={`${coinAChange >= 0 ? '+' : ''}${coinAChange.toFixed(2)}%`}
                       contractAddress={market.coinAAddress}
-                      marketOpeningTime={(market as any).createdAt}
-                      openingPrice={coinAOpeningUSD}
                     />
                   </div>
                 )}
@@ -344,8 +344,6 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       symbol={market.coinBSymbol}
                       growth={`${coinBChange >= 0 ? '+' : ''}${coinBChange.toFixed(2)}%`}
                       contractAddress={market.coinBAddress}
-                      marketOpeningTime={(market as any).createdAt}
-                      openingPrice={coinBOpeningUSD}
                     />
                   </div>
                 )}
