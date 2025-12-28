@@ -258,8 +258,12 @@ export default function AdminPage() {
 
   // Lookup token by contract address
   const handleContractLookup = async () => {
-    if (!contractData.contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(contractData.contractAddress)) {
-      alert('Please enter a valid contract address (0x...)');
+    // Validate address format - support both Ethereum (0x...) and Solana (base58)
+    const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(contractData.contractAddress);
+    const isSolanaAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(contractData.contractAddress);
+    
+    if (!contractData.contractAddress || (!isEthAddress && !isSolanaAddress)) {
+      alert('Please enter a valid contract address (0x... for Base or base58 for Solana)');
       return;
     }
     
@@ -297,8 +301,12 @@ export default function AdminPage() {
   const handleDualCoinLookup = async (coin: 'A' | 'B') => {
     const address = coin === 'A' ? dualCoinData.coinAAddress : dualCoinData.coinBAddress;
     
-    if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
-      alert('Please enter a valid contract address (0x...)');
+    // Validate address format - support both Ethereum (0x...) and Solana (base58)
+    const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(address);
+    const isSolanaAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+    
+    if (!address || (!isEthAddress && !isSolanaAddress)) {
+      alert('Please enter a valid contract address (0x... for Base or base58 for Solana)');
       return;
     }
     
@@ -635,7 +643,7 @@ export default function AdminPage() {
                 🪙 Create Meme Coin Market
               </CardTitle>
               <CardDescription>
-                Paste a Base token contract address to create a market
+                Paste a Base or Solana token contract address to create a market
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -650,7 +658,7 @@ export default function AdminPage() {
                         setContractData({ ...contractData, contractAddress: e.target.value });
                         setTokenPreview(null);
                       }}
-                      placeholder="0x..."
+                      placeholder="0x... (Base) or base58 (Solana)"
                       className="font-mono"
                       required
                     />
