@@ -45,8 +45,14 @@ interface DualCoinMarketCardProps {
 
 // Helper function to convert price from storage format to USD
 function convertPriceToUSD(price: number): number {
-  // For prices stored in micro-units (price * 100,000,000), convert back
-  if (price > 10_000_000) {
+  // Prices are stored in two formats:
+  // - If original price < $0.01: stored as price * 100,000,000 (micro-units)
+  // - If original price >= $0.01: stored as price * 100 (cents)
+  // 
+  // To detect which format: prices in cents max out around 1,000,000 (for $10,000)
+  // but micro-units for small prices start at 1,000,000 (for $0.01)
+  // So use 1,000,000 as the threshold
+  if (price > 1_000_000) {
     return price / 100_000_000;
   }
   // For prices stored in cents (price * 100), convert back
@@ -69,19 +75,20 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   const isSettled = market.status === 'SETTLED';
   const isActive = market.status === 'ACTIVE';
 
-  // Use live prices when available, fall back to market data
+  // Convert opening prices from storage format to USD
+  const coinAOpeningPrice = convertPriceToUSD(market.coinAOpeningPrice);
+  const coinBOpeningPrice = convertPriceToUSD(market.coinBOpeningPrice);
+
+  // Use live prices when available (already in USD), fall back to market data
   const coinAPrice = coinAData?.price ?? (market.coinACurrentPrice 
     ? convertPriceToUSD(market.coinACurrentPrice)
-    : convertPriceToUSD(market.coinAOpeningPrice));
+    : coinAOpeningPrice); // Use converted opening price as fallback
 
   const coinBPrice = coinBData?.price ?? (market.coinBCurrentPrice 
     ? convertPriceToUSD(market.coinBCurrentPrice)
-    : convertPriceToUSD(market.coinBOpeningPrice));
+    : coinBOpeningPrice); // Use converted opening price as fallback
 
   // Calculate percentage change from market opening price (not 24h change)
-  const coinAOpeningPrice = convertPriceToUSD(market.coinAOpeningPrice);
-  const coinBOpeningPrice = convertPriceToUSD(market.coinBOpeningPrice);
-  
   // For settled markets, use stored change percent. For active/locked, calculate live from opening price
   const coinAChange = isSettled 
     ? (market.coinAChangePercent ?? 0)
