@@ -89,20 +89,32 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
         });
 
         const currentBlock = await publicClient.getBlockNumber();
+        
+        // Query in chunks to avoid exceeding RPC's 100k block limit
+        const CHUNK_SIZE = 50000n;
         const LOOKBACK_BLOCKS = 500000n;
         const startBlock = currentBlock > LOOKBACK_BLOCKS ? currentBlock - LOOKBACK_BLOCKS : 0n;
 
-        const logs = await publicClient.getLogs({
-          address: contractAddress as `0x${string}`,
-          event: parseAbiItem('event SharesPurchased(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 cost)'),
-          args: {
-            marketId: BigInt(market.blockchainMarketId),
-          },
-          fromBlock: startBlock,
-          toBlock: currentBlock,
-        });
+        const allLogs: any[] = [];
+        
+        // Query in chunks
+        for (let fromBlock = startBlock; fromBlock < currentBlock; fromBlock += CHUNK_SIZE) {
+          const toBlock = fromBlock + CHUNK_SIZE - 1n > currentBlock ? currentBlock : fromBlock + CHUNK_SIZE - 1n;
+          
+          const logs = await publicClient.getLogs({
+            address: contractAddress as `0x${string}`,
+            event: parseAbiItem('event SharesPurchased(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 cost)'),
+            args: {
+              marketId: BigInt(market.blockchainMarketId),
+            },
+            fromBlock: fromBlock,
+            toBlock: toBlock,
+          });
+          
+          allLogs.push(...logs);
+        }
 
-        setOnChainBetCount(logs.length);
+        setOnChainBetCount(allLogs.length);
       } catch (error) {
         console.error('Error fetching bet count:', error);
       }
