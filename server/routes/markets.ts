@@ -584,8 +584,14 @@ router.get('/', async (req, res) => {
       : getActiveMarkets();
     
     // Fetch LMSR probabilities from blockchain for each market
+    // Only fetch for ACTIVE markets to avoid unnecessary blockchain calls for settled markets
     const marketsWithProbabilities = await Promise.all(
       markets.map(async (market) => {
+        // Skip probability fetch for settled markets
+        if (market.status === MarketStatus.SETTLED) {
+          return market;
+        }
+        
         if (market.blockchainMarketId !== undefined && market.blockchainMarketId !== null) {
           console.log(`📊 Fetching probabilities for market ${market.stockSymbol} (ID: ${market.blockchainMarketId})`);
           const probabilities = await getMarketProbabilities(market.blockchainMarketId);
