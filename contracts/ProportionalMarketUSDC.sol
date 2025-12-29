@@ -7,6 +7,20 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+// Uniswap V2 Router interface for swapping USDC → Utility Token
+interface IUniswapV2Router {
+    function swapExactTokensForTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external returns (uint[] memory amounts);
+    
+    function getAmountsOut(uint amountIn, address[] calldata path) 
+        external view returns (uint[] memory amounts);
+}
+
 // Chainlink interface for price feed validation
 interface AggregatorV3Interface {
     function latestRoundData()
@@ -24,25 +38,35 @@ interface AggregatorV3Interface {
 /**
  * @title ProportionalMarketMIND
  * @notice Simple proportional prediction market with bonding curve for multi-outcome price predictions
- * @dev Uses MIND token (18 decimals). Probability = Bucket Liquidity / Total Liquidity
+ * @dev Uses USDC for betting. Protocol takes 3% fee: 2% for protocol, 1% auto-swapped to burn utility token
  *
- * MIND Token on Base Sepolia: 0xCe31Ae82c11dd708eF51c93dEEb5Be0474A132D1
- * MIND has 18 decimals (standard ERC20)
+ * USDC Token on Base: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 (6 decimals)
+ * 
+ * FEE STRUCTURE:
+ * - Total fee: 3% (300 BPS)
+ * - 2% protocol fee (collected in USDC for owner)
+ * - 1% burn fee (auto-swapped USDC → utility token → burned)
  *
  * SECURITY FEATURES:
  * - ReentrancyGuard on all state-changing functions
  * - Access control with Ownable and Pausable
  * - SafeERC20 for token transfers
  * - Proportional payout distribution
- * - Protocol fee collection (2%)
- * - Minimum bet size (1 MIND) to prevent dust trades
+ * - Minimum bet size (1 USDC) to prevent dust trades
  * - Bonding curve with safety limits
  */
 contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
     
-    // MIND token (or any ERC20)
+    // USDC token (6 decimals)
     IERC20 public immutable token;
+    
+    // Utility token for burning (18 decimals typically)
+    IERC20 public immutable utilityToken;
+    address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
+    
+    // Uniswap V2 Router for swapping
+    IUniswapV2Router public immutable uniswapRouter;
     
     enum SessionType { INTRADAY, OVERNIGHT }
     enum MarketStatus { ACTIVE, LOCKED, SETTLED, CANCELLED }
@@ -67,13 +91,18 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
     struct UserPosition {
         mapping(uint8 => uint256) shares; // User's shares in each bucket
         uint256 totalInvested; // Total tokens user has put in
+        mapping(uint8 => uint256) investmentPerOutcome; // Amount invested in each outcome
+        mapping(uint8 => uint256) purchaseProbabilityBPS; // Probability (in basis points) when purchased each outcome
     }
     
     uint256 public nextMarketId;
-    uint256 public constant PROTOCOL_FEE_BPS = 200; // 2%
-    uint256 public constant MIN_BET_SIZE = 1 * 10**18; // 1 MIND (18 decimals)
+    uint256 public constant PROTOCOL_FEE_BPS = 200; // 2% for protocol
+    uint256 public constant BURN_FEE_BPS = 100; // 1% for burning utility token
+    uint256 public constant TOTAL_FEE_BPS = 300; // 3% total
+    uint256 public constant MIN_BET_SIZE = 1 * 10**6; // 1 USDC (6 decimals)
     uint256 public constant PRICE_DEVIATION_TOLERANCE_BPS = 10; // 0.1% tolerance for Chainlink validation
     uint256 public protocolFeesCollected;
+    uint256 public totalBurned; // Track total utility tokens burned
     address public oracle; // Authorized oracle for settlement
     
     // Optional: Chainlink price feed addresses for validation (address(0) = disabled)
@@ -121,12 +150,10 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
     event PriceFeedSet(string indexed stockSymbol, address indexed feedAddress);
     event MarketLocked(uint256 indexed marketId, uint256 timestamp);
     
-    event SharesSold(
+    event UtilityTokenBurned(
         uint256 indexed marketId,
-        address indexed user,
-        uint8 outcomeIndex,
-        uint256 shares,
-        uint256 payout
+        uint256 usdcAmount,
+        uint256 tokensBurned
     );
     
     event RefundClaimed(
@@ -135,11 +162,20 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         uint256 refundAmount
     );
     
-    constructor(address _oracle, address _token) Ownable(msg.sender) {
+    constructor(
+        address _oracle, 
+        address _usdcToken,
+        address _utilityToken,
+        address _uniswapRouter
+    ) Ownable(msg.sender) {
         require(_oracle != address(0), "Invalid oracle");
-        require(_token != address(0), "Invalid token address");
+        require(_usdcToken != address(0), "Invalid USDC address");
+        require(_utilityToken != address(0), "Invalid utility token address");
+        require(_uniswapRouter != address(0), "Invalid router address");
         oracle = _oracle;
-        token = IERC20(_token);
+        token = IERC20(_usdcToken);
+        utilityToken = IERC20(_utilityToken);
+        uniswapRouter = IUniswapV2Router(_uniswapRouter);
         nextMarketId = 1;
         marketCounter = 0;
     }
@@ -157,6 +193,8 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         require(referencePrice > 0, "Invalid reference price");
         require(lockTime > block.timestamp, "Lock time must be future");
         require(settleTime > lockTime, "Settle time must be after lock");
+        require(lockTime < block.timestamp + 365 days, "Lock time too far in future");
+        require(settleTime < lockTime + 30 days, "Settle time too far from lock");
         
         uint256 marketId = nextMarketId++;
         marketCounter++;
@@ -172,16 +210,16 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         market.settleTime = settleTime;
         
         emit MarketCreated(marketId, stockSymbol, sessionType, market.numOutcomes, referencePrice, lockTime, settleTime);
+        
         return marketId;
     }
     
     /**
-     * @notice Buy shares in a bucket with bonding curve
-     * @dev User must approve token spending before calling this
+     * @notice Buy shares in an outcome bucket (bonding curve)
      * @param marketId The market ID
      * @param outcomeIndex The bucket index to buy
-     * @param amount Amount of tokens to spend (18 decimals)
-     * @param maxCost Maximum tokens willing to spend (slippage protection)
+     * @param amount Amount of tokens to spend
+     * @param maxCost Maximum cost willing to pay (slippage protection)
      */
     function buyShares(
         uint256 marketId,
@@ -189,104 +227,85 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         uint256 amount,
         uint256 maxCost
     ) external nonReentrant whenNotPaused {
-        require(amount >= MIN_BET_SIZE, "Bet below minimum (1 MIND)");
+        require(amount >= MIN_BET_SIZE, "Bet below minimum (1 USDC)");
         require(amount <= maxCost, "Cost exceeds maxCost");
         
         Market storage market = markets[marketId];
         require(market.status == MarketStatus.ACTIVE, "Market not active");
         require(block.timestamp < market.lockTime, "Market locked");
         require(outcomeIndex < market.numOutcomes, "Invalid outcome");
+        require(market.marketId != 0, "Market does not exist"); // Ensure market was created
         
         // Transfer tokens from user to contract
         token.safeTransferFrom(msg.sender, address(this), amount);
         
-        // Deduct protocol fee (2%)
+        // Split fees: 2% protocol + 1% burn
         uint256 protocolFee = (amount * PROTOCOL_FEE_BPS) / 10000;
-        uint256 netAmount = amount - protocolFee;
+        uint256 burnFee = (amount * BURN_FEE_BPS) / 10000;
+        uint256 netAmount = amount - protocolFee - burnFee;
+        
         protocolFeesCollected += protocolFee;
         emit ProtocolFeeCollected(marketId, protocolFee);
         
-        // Calculate shares with STEEP bonding curve
-        // Early bettors get MORE shares per token, late bettors get FEWER
-        // This means when you sell: valuePerShare = bucketLiquidity / totalShares
-        // Early bettors profit because they own more of the share pool
-        //
-        // Formula: shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
-        // STEEPNESS = 50 means bonding curve rewards early bettors
+        // Auto-swap and burn utility token (1% of bet)
+        if (burnFee > 0) {
+            _swapAndBurn(burnFee, marketId);
+        }
         
-        uint256 STEEPNESS = 50; // Lower = gentler curve, Higher = steeper advantage for early
-        uint256 shares;
-        
-        // shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
-        uint256 divisor = 1e18 + (market.bucketLiquidity[outcomeIndex] * STEEPNESS);
-        shares = (netAmount * 1e18) / divisor;
-        
+        // Calculate shares with bonding curve (STEEPNESS = 10)
+        // shares = netAmount * 1e18 / (1e18 + bucketLiquidity * 10)
+        uint256 divisor = 1e18 + (market.bucketLiquidity[outcomeIndex] * 10);
+        require(divisor > 0, "Divisor overflow");
+        uint256 shares = (netAmount * 1e18) / divisor;
         require(shares > 0, "Shares too small");
+        
+        UserPosition storage position = userPositions[marketId][msg.sender];
+        
+        // Calculate and store probability BEFORE updating liquidity
+        {
+            uint256 currentProbabilityBPS = market.totalLiquidity > 0 
+                ? (market.bucketLiquidity[outcomeIndex] * 10000) / market.totalLiquidity 
+                : 0;
+            
+            // If user already has position, calculate weighted average
+            if (position.shares[outcomeIndex] > 0) {
+                uint256 existingInv = position.investmentPerOutcome[outcomeIndex];
+                position.purchaseProbabilityBPS[outcomeIndex] = 
+                    (existingInv * position.purchaseProbabilityBPS[outcomeIndex] + amount * currentProbabilityBPS) 
+                    / (existingInv + amount);
+            } else {
+                position.purchaseProbabilityBPS[outcomeIndex] = currentProbabilityBPS;
+            }
+        }
         
         // Update state
         market.bucketLiquidity[outcomeIndex] += netAmount;
         market.totalLiquidity += netAmount;
         market.totalSharesPerBucket[outcomeIndex] += shares;
         
-        UserPosition storage position = userPositions[marketId][msg.sender];
         position.shares[outcomeIndex] += shares;
         position.totalInvested += amount;
+        position.investmentPerOutcome[outcomeIndex] += amount;
         
         emit SharesPurchased(marketId, msg.sender, outcomeIndex, shares, amount);
     }
     
     /**
      * @notice Sell shares back to the pool before market locks
-     * @param marketId The market ID
-     * @param outcomeIndex The bucket index to sell from
-     * @param sharesToSell Number of shares to sell
-     * @param minPayout Minimum token payout expected (slippage protection)
+     * @dev DISABLED - All positions are locked until settlement to ensure liquidity for winners
+     *      Users can hedge by buying multiple outcomes but cannot exit early
      */
     function sellShares(
-        uint256 marketId,
-        uint8 outcomeIndex,
-        uint256 sharesToSell,
-        uint256 minPayout
+        uint256 /* marketId */,
+        uint8 /* outcomeIndex */,
+        uint256 /* sharesToSell */,
+        uint256 /* minPayout */
     ) external nonReentrant whenNotPaused {
-        Market storage market = markets[marketId];
-        require(market.status == MarketStatus.ACTIVE, "Market not active");
-        require(block.timestamp < market.lockTime, "Market locked");
-        require(outcomeIndex < market.numOutcomes, "Invalid outcome");
-        
-        UserPosition storage position = userPositions[marketId][msg.sender];
-        require(position.shares[outcomeIndex] >= sharesToSell, "Insufficient shares");
-        require(sharesToSell > 0, "Must sell at least 1 share");
-        
-        // Calculate payout using reverse bonding curve
-        uint256 totalSharesInBucket = market.totalSharesPerBucket[outcomeIndex];
-        require(totalSharesInBucket > 0, "No shares in bucket");
-        
-        // Value per share = bucket liquidity / total shares in bucket
-        uint256 valuePerShare = (market.bucketLiquidity[outcomeIndex] * 1e18) / totalSharesInBucket;
-        uint256 grossPayout = (sharesToSell * valuePerShare) / 1e18;
-        
-        // Apply 1% sell spread (fee for exiting early)
-        uint256 sellFee = grossPayout / 100;
-        uint256 netPayout = grossPayout - sellFee;
-        
-        require(netPayout >= minPayout, "Payout below minimum");
-        require(grossPayout <= market.bucketLiquidity[outcomeIndex], "Insufficient bucket liquidity");
-        
-        // Update state BEFORE transfer (CEI pattern)
-        position.shares[outcomeIndex] -= sharesToSell;
-        market.totalSharesPerBucket[outcomeIndex] -= sharesToSell;
-        market.bucketLiquidity[outcomeIndex] -= grossPayout;
-        market.totalLiquidity -= grossPayout;
-        
-        // Add sell fee to protocol fees
-        protocolFeesCollected += sellFee;
-        
-        // Transfer token payout
-        token.safeTransfer(msg.sender, netPayout);
-        
-        emit SharesSold(marketId, msg.sender, outcomeIndex, sharesToSell, netPayout);
+        // Selling is disabled - positions are locked until market settles
+        // This ensures all money stays in the pool for winners
+        revert("Positions locked until settlement - hedge by buying other outcomes");
     }
-    
+
     /**
      * @notice Settle market with final price
      */
@@ -299,6 +318,7 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         Market storage market = markets[marketId];
         require(market.status == MarketStatus.ACTIVE || market.status == MarketStatus.LOCKED, "Market not active");
         require(block.timestamp >= market.settleTime, "Too early to settle");
+        require(!market.settled, "Already settled"); // Prevent double settlement
         require(finalPrice > 0, "Invalid final price");
         
         // Validate with Chainlink price feed if configured
@@ -335,6 +355,7 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
     
     /**
      * @notice Claim payout for winning shares
+     * @dev Uses bonding curve shares - early buyers have more shares = bigger payout
      */
     function claimPayout(uint256 marketId) external nonReentrant {
         Market storage market = markets[marketId];
@@ -349,10 +370,13 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         require(totalWinningShares > 0, "No winning shares in bucket");
         
         // Payout = (user's shares / total winning shares) * total pool
+        // Early buyers got more shares per dollar via bonding curve, so they get bigger slice
         uint256 payout = (userWinningShares * market.totalLiquidity) / totalWinningShares;
         
         // Mark as claimed BEFORE transfer (CEI pattern)
         position.shares[market.winningOutcome] = 0;
+        position.investmentPerOutcome[market.winningOutcome] = 0;
+        position.purchaseProbabilityBPS[market.winningOutcome] = 0;
         
         // Transfer token payout
         token.safeTransfer(msg.sender, payout);
@@ -384,6 +408,8 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         position.totalInvested = 0;
         for (uint8 i = 0; i < market.numOutcomes; i++) {
             position.shares[i] = 0;
+            position.investmentPerOutcome[i] = 0;
+            position.purchaseProbabilityBPS[i] = 0;
         }
         
         market.totalLiquidity -= refundAmount;
@@ -425,39 +451,16 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
-     * @notice Get sell quote - returns the token amount user would receive for selling shares
-     * @param marketId The market ID
-     * @param outcomeIndex The bucket index
-     * @param sharesToSell Number of shares to sell
-     * @return grossPayout The payout before fees
-     * @return netPayout The payout after 1% sell fee
-     * @return sellFee The fee amount
+     * @notice Get a quote for selling shares (view function, no state changes)
+     * @dev SELLING IS DISABLED - Returns 0 to indicate positions are locked
      */
     function getSellQuote(
-        uint256 marketId, 
-        uint8 outcomeIndex, 
-        uint256 sharesToSell
-    ) external view returns (uint256 grossPayout, uint256 netPayout, uint256 sellFee) {
-        Market storage market = markets[marketId];
-        
-        if (market.status != MarketStatus.ACTIVE || sharesToSell == 0) {
-            return (0, 0, 0);
-        }
-        
-        uint256 totalSharesInBucket = market.totalSharesPerBucket[outcomeIndex];
-        if (totalSharesInBucket == 0) {
-            return (0, 0, 0);
-        }
-        
-        // Value per share = bucket liquidity / total shares in bucket
-        uint256 valuePerShare = (market.bucketLiquidity[outcomeIndex] * 1e18) / totalSharesInBucket;
-        grossPayout = (sharesToSell * valuePerShare) / 1e18;
-        
-        // Apply 1% sell spread
-        sellFee = grossPayout / 100;
-        netPayout = grossPayout - sellFee;
-        
-        return (grossPayout, netPayout, sellFee);
+        uint256 /* marketId */, 
+        uint8 /* outcomeIndex */, 
+        uint256 /* sharesToSell */
+    ) external pure returns (uint256 grossPayout, uint256 netPayout, uint256 sellFee) {
+        // Selling is disabled - all positions locked until settlement
+        return (0, 0, 0);
     }
     
     /**
@@ -563,6 +566,61 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
+     
+    
+    /**
+     * @notice Swap USDC to utility token and burn it
+     * @dev Called internally when users place bets (1% burn fee)
+     */
+    function _swapAndBurn(uint256 usdcAmount, uint256 marketId) private {
+        // Approve router to spend USDC (use approve instead of safeApprove to avoid allowance restrictions)
+        token.approve(address(uniswapRouter), usdcAmount);
+        
+        // Set up swap path: USDC → Utility Token
+        address[] memory path = new address[](2);
+        path[0] = address(token); // USDC
+        path[1] = address(utilityToken); // Utility token
+        
+        try uniswapRouter.swapExactTokensForTokens(
+            usdcAmount,
+            0, // Accept any amount of utility tokens
+            path,
+            address(this), // Receive tokens to this contract
+            block.timestamp + 300 // 5 minute deadline
+        ) returns (uint[] memory amounts) {
+            uint256 tokensBought = amounts[1];
+            
+            // Burn the utility tokens by sending to dead address
+            if (tokensBought > 0) {
+                utilityToken.safeTransfer(BURN_ADDRESS, tokensBought);
+                totalBurned += tokensBought;
+                emit UtilityTokenBurned(marketId, usdcAmount, tokensBought);
+            }
+        } catch {
+            // If swap fails (low liquidity, etc.), add to protocol fees instead
+            protocolFeesCollected += usdcAmount;
+        }
+        
+        // Reset approval to 0 for security
+        token.approve(address(uniswapRouter), 0);
+    }
+    
+    /**
+     * @notice View function to estimate burn amount
+     */
+    function estimateBurnAmount(uint256 usdcAmount) external view returns (uint256) {
+        address[] memory path = new address[](2);
+        path[0] = address(token);
+        path[1] = address(utilityToken);
+        
+        try uniswapRouter.getAmountsOut(usdcAmount, path) returns (uint[] memory amounts) {
+            return amounts[1];
+        } catch {
+            return 0;
+        }
+    }
+    
+    /**
      * @notice Set Chainlink price feed for a symbol
      */
     function setPriceFeed(string calldata stockSymbol, address feedAddress) external onlyOwner {
@@ -592,24 +650,10 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
     
     /**
      * @notice Alias for claimPayout (frontend compatibility)
+     * @dev Redirects to claimPayout to prevent double-claim vulnerability
      */
-    function claimWinnings(uint256 marketId) external nonReentrant {
-        Market storage market = markets[marketId];
-        require(market.settled, "Market not settled");
-        
-        UserPosition storage position = userPositions[marketId][msg.sender];
-        uint256 userWinningShares = position.shares[market.winningOutcome];
-        require(userWinningShares > 0, "No winning shares");
-        
-        uint256 totalWinningShares = getTotalSharesInBucket(marketId, market.winningOutcome);
-        require(totalWinningShares > 0, "No winning shares in bucket");
-        
-        uint256 payout = (userWinningShares * market.totalLiquidity) / totalWinningShares;
-        
-        position.shares[market.winningOutcome] = 0;
-        
-        token.safeTransfer(msg.sender, payout);
-        
-        emit PayoutClaimed(marketId, msg.sender, payout);
+    function claimWinnings(uint256 marketId) external {
+        // Delegate to claimPayout to avoid code duplication and double-claim risk
+        this.claimPayout(marketId);
     }
 }

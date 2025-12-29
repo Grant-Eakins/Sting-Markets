@@ -209,8 +209,9 @@ export function useBlockchainBets() {
       // Convert to bets array, filtering out fully sold positions
       const activeBets: BlockchainBet[] = [];
       
-      // Dust threshold: positions with less than 0.01 tokens worth are considered fully sold
-      const DUST_THRESHOLD = BigInt(10000000000000000); // 0.01 * 1e18
+      // Dust threshold: positions with less than 0.0001 tokens worth are considered fully sold
+      // Lowered from 0.01 to handle bonding curve creating very small share amounts
+      const DUST_THRESHOLD = BigInt(100000000000000); // 0.0001 * 1e18
       
       console.log(`📊 Processing ${positionMap.size} positions...`);
       

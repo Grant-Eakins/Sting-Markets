@@ -267,6 +267,17 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                   {market.coinAName && (
                     <div className="text-xs sm:text-sm text-muted-foreground truncate mt-1">{market.coinAName}</div>
                   )}
+                  {/* Price Information */}
+                  <div className="mt-2 space-y-1">
+                    <div className="text-xs text-muted-foreground">
+                      Open: ${convertPriceToUSD(market.coinAOpeningPrice).toFixed(coinAPrice < 0.01 ? 6 : 4)}
+                    </div>
+                    {coinAData?.priceUsd && (
+                      <div className="text-sm font-semibold text-foreground">
+                        Now: ${parseFloat(coinAData.priceUsd).toFixed(parseFloat(coinAData.priceUsd) < 0.01 ? 6 : 4)}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Pool Liquidity Percentage - Below Image */}
@@ -383,6 +394,17 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                   {market.coinBName && (
                     <div className="text-xs sm:text-sm text-muted-foreground truncate mt-1">{market.coinBName}</div>
                   )}
+                  {/* Price Information */}
+                  <div className="mt-2 space-y-1">
+                    <div className="text-xs text-muted-foreground">
+                      Open: ${convertPriceToUSD(market.coinBOpeningPrice).toFixed(coinBPrice < 0.01 ? 6 : 4)}
+                    </div>
+                    {coinBData?.priceUsd && (
+                      <div className="text-sm font-semibold text-foreground">
+                        Now: ${parseFloat(coinBData.priceUsd).toFixed(parseFloat(coinBData.priceUsd) < 0.01 ? 6 : 4)}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Pool Liquidity Percentage - Below Image */}

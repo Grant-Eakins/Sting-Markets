@@ -75,7 +75,7 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
   // Calculate shares using on-chain bucket liquidity data
   // Contract formula: shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
   const PROTOCOL_FEE_BPS = 200; // 2%
-  const STEEPNESS = 50;
+  const STEEPNESS = 5; // Updated to match new contract deployment
   
   let sharesReceived = 0;
   const amountNum = parseFloat(amount || '0');

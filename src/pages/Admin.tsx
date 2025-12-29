@@ -9,13 +9,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Trash2, RefreshCw, TrendingUp, Search, Filter } from 'lucide-react';
+import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Trash2, RefreshCw, TrendingUp, Search, Filter, DollarSign } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAccount } from 'wagmi';
-import { TOKEN_SYMBOL } from '@/config/contract';
+import { TOKEN_SYMBOL, TOKEN_DECIMALS } from '@/config/contract';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useWithdrawFees, useProtocolFees } from '@/hooks/useContract';
+import { formatUnits } from 'viem';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
@@ -106,6 +108,10 @@ export default function AdminPage() {
   const [dualCoinLoading, setDualCoinLoading] = useState({ coinA: false, coinB: false });
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Protocol fees hooks
+  const { feesCollected, isLoading: feesLoading, refetch: refetchFees } = useProtocolFees();
+  const { withdrawFees, isPending: isWithdrawing, isConfirming, isConfirmed, error: withdrawError } = useWithdrawFees();
 
   // Check if the connected wallet is an admin
   const addressLower = address?.toLowerCase();
@@ -502,6 +508,58 @@ export default function AdminPage() {
             <h1 className="text-4xl font-bold mb-2">Admin Dashboard</h1>
             <p className="text-muted-foreground">Create and manage prediction markets</p>
           </div>
+
+          {/* Protocol Fees Card */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Protocol Fees
+              </CardTitle>
+              <CardDescription>
+                Collect accumulated protocol fees (2% of all bets)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fees Available</p>
+                    <p className="text-2xl font-bold">
+                      {feesLoading ? '...' : feesCollected ? `${formatUnits(feesCollected, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}` : '0 ' + TOKEN_SYMBOL}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => withdrawFees()}
+                    disabled={isWithdrawing || isConfirming || !feesCollected || feesCollected === 0n}
+                    size="lg"
+                  >
+                    {isWithdrawing && 'Initiating...'}
+                    {isConfirming && 'Confirming...'}
+                    {!isWithdrawing && !isConfirming && 'Collect Fees'}
+                  </Button>
+                </div>
+                
+                {isConfirmed && (
+                  <Alert>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      ✅ Fees successfully collected!
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {withdrawError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Error: {withdrawError.message}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Statistics Dashboard */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-6 md:mb-8">

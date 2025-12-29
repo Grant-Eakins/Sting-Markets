@@ -370,6 +370,70 @@ export function useBucketLiquidity(marketId: number | undefined, outcomeIndex: n
   };
 }
 
+/**
+ * Hook to withdraw protocol fees (admin only)
+ */
+export function useWithdrawFees() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const withdrawFees = () => {
+    if (!contractAddress) {
+      throw new Error('Contract address not found');
+    }
+    
+    console.log('📤 Withdrawing protocol fees...');
+    writeContract({
+      address: contractAddress as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'withdrawFees',
+      args: [],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    withdrawFees,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
+ * Hook to read protocol fees collected
+ */
+export function useProtocolFees() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'protocolFeesCollected',
+    chainId: chainId || 84532,
+    query: {
+      enabled: !!contractAddress,
+      refetchInterval: 5000,
+    },
+  });
+  
+  return {
+    feesCollected: data as bigint | undefined,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+
 
 
 

@@ -203,6 +203,23 @@ export const PREDICTION_MARKET_ABI = [
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
+  },
+  // Protocol fees functions
+  {
+    "inputs": [],
+    "name": "protocolFeesCollected",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawFees",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ] as const;
 
@@ -420,7 +437,7 @@ export const CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0x219De13c961be6Bb0AA2CB1101944a443c79548d', // ProportionalMarketMIND (HAS YOUR BETS)
+  84532: '0xBD7C32d9B04dA7B9FE81a53315DB27e40cC5ee99', // ProportionalMarketUSDC (USDC + burn mechanism)
 } as const;
 
 // MIND token contract addresses (your custom token)
@@ -431,11 +448,11 @@ export const TOKEN_ADDRESSES = {
   84532: '0xCe31Ae82c11dd708eF51c93dEEb5Be0474A132D1', // Mindshare Token (MIND)
 } as const;
 
-// MIND token has 18 decimals (standard ERC20)
-export const TOKEN_DECIMALS = 18;
+// USDC token has 6 decimals
+export const TOKEN_DECIMALS = 6;
 
 // Token symbol for display
-export const TOKEN_SYMBOL = 'MIND';
+export const TOKEN_SYMBOL = 'USDC';
 
 // ERC20 ABI for token approval
 export const ERC20_ABI = [
