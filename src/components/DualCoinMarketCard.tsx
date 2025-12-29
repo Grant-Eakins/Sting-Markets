@@ -51,10 +51,18 @@ function convertPriceToUSD(price: number): number {
   // - If original price < $0.01: stored as price * 100,000,000 (micro-units)
   // - If original price >= $0.01: stored as price * 100 (cents)
   // 
-  // To detect which format: prices in cents max out around 1,000,000 (for $10,000)
-  // but micro-units for small prices start at 1,000,000 (for $0.01)
-  // So use 1,000,000 as the threshold
-  if (price > 1_000_000) {
+  // Detection logic:
+  // - If price >= $0.01, stored as cents: 1 to 999,999 (0.01 to $9,999.99)
+  // - If price < $0.01, stored as micro-units: 1,000,000+ (0.00000001 to 0.00999999)
+  // 
+  // Threshold: If stored value > 100,000 (represents $0.001 in micro format or $1000 in cents)
+  // Since no meme coin costs $1000, anything > 100,000 must be micro-units
+  if (price >= 1_000_000) {
+    // Definitely micro-units format
+    return price / 100_000_000;
+  } else if (price > 100_000) {
+    // Ambiguous range - check if it makes sense as cents
+    // If > 100,000 cents = $1,000, unlikely for meme coins, treat as micro-units
     return price / 100_000_000;
   }
   // For prices stored in cents (price * 100), convert back
@@ -133,14 +141,18 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   const coinAOpeningPrice = convertPriceToUSD(market.coinAOpeningPrice);
   const coinBOpeningPrice = convertPriceToUSD(market.coinBOpeningPrice);
 
-  // Use live prices when available (already in USD), fall back to market data
-  const coinAPrice = coinAData?.price ?? (market.coinACurrentPrice 
-    ? convertPriceToUSD(market.coinACurrentPrice)
-    : coinAOpeningPrice); // Use converted opening price as fallback
+  // Use live prices when available (already in USD from API), fall back to market data
+  const coinAPrice = (coinAData?.price !== undefined && coinAData?.price !== null)
+    ? coinAData.price
+    : (market.coinACurrentPrice 
+        ? convertPriceToUSD(market.coinACurrentPrice)
+        : coinAOpeningPrice);
 
-  const coinBPrice = coinBData?.price ?? (market.coinBCurrentPrice 
-    ? convertPriceToUSD(market.coinBCurrentPrice)
-    : coinBOpeningPrice); // Use converted opening price as fallback
+  const coinBPrice = (coinBData?.price !== undefined && coinBData?.price !== null)
+    ? coinBData.price
+    : (market.coinBCurrentPrice 
+        ? convertPriceToUSD(market.coinBCurrentPrice)
+        : coinBOpeningPrice);
 
   // Calculate percentage change from market opening price (not 24h change)
   // For settled markets, use stored change percent. For active/locked, calculate live from opening price
@@ -270,13 +282,11 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                   {/* Price Information */}
                   <div className="mt-2 space-y-1">
                     <div className="text-xs text-muted-foreground">
-                      Open: ${convertPriceToUSD(market.coinAOpeningPrice).toFixed(coinAPrice < 0.01 ? 6 : 4)}
+                      Open: ${coinAOpeningPrice.toFixed(coinAOpeningPrice < 0.01 ? 6 : 4)}
                     </div>
-                    {coinAData?.priceUsd && (
-                      <div className="text-sm font-semibold text-foreground">
-                        Now: ${parseFloat(coinAData.priceUsd).toFixed(parseFloat(coinAData.priceUsd) < 0.01 ? 6 : 4)}
-                      </div>
-                    )}
+                    <div className="text-sm font-semibold text-foreground">
+                      Now: ${coinAPrice.toFixed(coinAPrice < 0.01 ? 6 : 4)}
+                    </div>
                   </div>
                 </div>
                 
@@ -397,13 +407,11 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                   {/* Price Information */}
                   <div className="mt-2 space-y-1">
                     <div className="text-xs text-muted-foreground">
-                      Open: ${convertPriceToUSD(market.coinBOpeningPrice).toFixed(coinBPrice < 0.01 ? 6 : 4)}
+                      Open: ${coinBOpeningPrice.toFixed(coinBOpeningPrice < 0.01 ? 6 : 4)}
                     </div>
-                    {coinBData?.priceUsd && (
-                      <div className="text-sm font-semibold text-foreground">
-                        Now: ${parseFloat(coinBData.priceUsd).toFixed(parseFloat(coinBData.priceUsd) < 0.01 ? 6 : 4)}
-                      </div>
-                    )}
+                    <div className="text-sm font-semibold text-foreground">
+                      Now: ${coinBPrice.toFixed(coinBPrice < 0.01 ? 6 : 4)}
+                    </div>
                   </div>
                 </div>
                 
