@@ -437,7 +437,7 @@ export const CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0xBD7C32d9B04dA7B9FE81a53315DB27e40cC5ee99', // ProportionalMarketUSDC (USDC + burn mechanism)
+  84532: '0xa36fA2A8Dc1be09e049FE468281D36bc12c2043F', // ProportionalMarketUSDC (MockUSDC + burn mechanism)
 } as const;
 
 // USDC token contract addresses (used for betting)
