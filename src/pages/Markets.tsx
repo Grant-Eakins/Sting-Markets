@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Market, fetchMarkets } from '@/lib/marketApi';
-import { TOKEN_SYMBOL } from '@/config/contract';
+import { TOKEN_SYMBOL, TOKEN_ADDRESSES } from '@/config/contract';
 import { MarketCard } from '@/components/MarketCard';
 import { DualCoinMarketCard } from '@/components/DualCoinMarketCard';
 import { ScheduledMarketCard } from '@/components/ScheduledMarketCard';
@@ -15,7 +15,9 @@ import { Button } from '@/components/ui/button';
 import { MarketCardSkeleton, StatCardSkeleton } from '@/components/ui/skeleton';
 import { Footer } from '@/components/Footer';
 import { useAggregateMarketStats } from '@/hooks/useAggregateMarketStats';
-import { useAccount } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useToast } from '@/hooks/use-toast';
+import { baseSepolia } from 'viem/chains';
 
 // Authorized admin wallet addresses (lowercase for comparison)
 const ADMIN_WALLETS = [
@@ -23,13 +25,58 @@ const ADMIN_WALLETS = [
   '0xb0687ef6ea5906089ec3586f9997764650bf1934',
 ];
 
+const MOCK_USDC_ABI = [
+  {
+    "inputs": [],
+    "name": "faucet",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+] as const;
+
 export default function Markets() {
   const { address, isConnected } = useAccount();
   const { isInFarcasterClient } = useFarcasterAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { toast } = useToast();
+  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash });
   
   // Check if connected wallet is admin
   const isAdmin = isConnected && address && ADMIN_WALLETS.includes(address.toLowerCase());
+
+  const handleFaucet = async () => {
+    if (!isConnected) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      writeContract({
+        address: TOKEN_ADDRESSES[baseSepolia.id] as `0x${string}`,
+        abi: MOCK_USDC_ABI,
+        functionName: 'faucet',
+        chainId: baseSepolia.id,
+      });
+      
+      toast({
+        title: "Requesting USDC...",
+        description: "Transaction submitted",
+      });
+    } catch (error) {
+      console.error('Faucet error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to request USDC",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Fetch active markets
   const { data: markets = [], isLoading, refetch } = useQuery({
@@ -91,6 +138,14 @@ export default function Markets() {
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2">
+            <Button 
+              size="sm"
+              onClick={handleFaucet}
+              disabled={!isConnected || isPending || isConfirming}
+              className="bg-green-600 hover:bg-green-700 text-white hidden sm:flex"
+            >
+              {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
+            </Button>
             <FarcasterConnect />
             {!isInFarcasterClient && <WalletConnect />}
             {/* Mobile menu button */}
@@ -108,6 +163,17 @@ export default function Markets() {
         {/* Mobile nav menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
+            <Button 
+              size="sm"
+              onClick={() => {
+                handleFaucet();
+                setMobileMenuOpen(false);
+              }}
+              disabled={!isConnected || isPending || isConfirming}
+              className="w-full bg-green-600 hover:bg-green-700 text-white mb-2"
+            >
+              {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
+            </Button>
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Coin Battles</Button>
             </Link>
