@@ -138,21 +138,17 @@ export default function Markets() {
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2">
-            <Button 
-              size="sm"
-              onClick={handleFaucet}
-              disabled={!isConnected || isPending || isConfirming}
-              className="bg-green-600 hover:bg-green-700 text-white hidden sm:flex"
-            >
-              {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
-            </Button>
-            <Button 
-              size="sm"
-              onClick={() => window.open('https://www.alchemy.com/faucets/base-sepolia', '_blank')}
-              className="bg-blue-600 hover:bg-blue-700 text-white hidden sm:flex"
-            >
-              Get Test ETH
-            </Button>
+            <div className="hidden sm:flex flex-col items-center">
+              <Button 
+                size="sm"
+                onClick={handleFaucet}
+                disabled={!isConnected || isPending || isConfirming}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
+              </Button>
+              <span className="text-[10px] text-muted-foreground mt-0.5">(Need test ETH for transactions)</span>
+            </div>
             <FarcasterConnect />
             {!isInFarcasterClient && <WalletConnect />}
             {/* Mobile menu button */}
@@ -170,27 +166,20 @@ export default function Markets() {
         {/* Mobile nav menu */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
-            <Button 
-              size="sm"
-              onClick={() => {
-                handleFaucet();
-                setMobileMenuOpen(false);
-              }}
-              disabled={!isConnected || isPending || isConfirming}
-              className="w-full bg-green-600 hover:bg-green-700 text-white mb-2"
-            >
-              {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
-            </Button>
-            <Button 
-              size="sm"
-              onClick={() => {
-                window.open('https://www.alchemy.com/faucets/base-sepolia', '_blank');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-2"
-            >
-              Get Test ETH
-            </Button>
+            <div className="mb-2">
+              <Button 
+                size="sm"
+                onClick={() => {
+                  handleFaucet();
+                  setMobileMenuOpen(false);
+                }}
+                disabled={!isConnected || isPending || isConfirming}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
+              </Button>
+              <p className="text-xs text-muted-foreground text-center mt-1">(Need test ETH for transactions)</p>
+            </div>
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Coin Battles</Button>
             </Link>
