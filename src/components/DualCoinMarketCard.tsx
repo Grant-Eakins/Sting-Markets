@@ -52,20 +52,16 @@ function convertPriceToUSD(price: number): number {
   // - If original price >= $0.01: stored as price * 100 (cents)
   // 
   // Detection logic:
-  // - If price >= $0.01, stored as cents: 1 to 999,999 (0.01 to $9,999.99)
-  // - If price < $0.01, stored as micro-units: 1,000,000+ (0.00000001 to 0.00999999)
+  // - Cents format: 1 to 99,999 (represents $0.01 to $999.99)
+  // - Micro-units format: 100,000+ (represents $0.000001 to $0.00999999)
   // 
-  // Threshold: If stored value > 100,000 (represents $0.001 in micro format or $1000 in cents)
-  // Since no meme coin costs $1000, anything > 100,000 must be micro-units
-  if (price >= 1_000_000) {
-    // Definitely micro-units format
-    return price / 100_000_000;
-  } else if (price > 100_000) {
-    // Ambiguous range - check if it makes sense as cents
-    // If > 100,000 cents = $1,000, unlikely for meme coins, treat as micro-units
+  // Threshold at 100,000: Anything >= 100K must be micro-units
+  // (100K cents = $1000, no meme coin costs that much, so must be micro-units)
+  if (price >= 100_000) {
+    // Micro-units format for tiny prices
     return price / 100_000_000;
   }
-  // For prices stored in cents (price * 100), convert back
+  // Cents format for normal prices
   return price / 100;
 }
 

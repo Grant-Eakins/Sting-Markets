@@ -135,14 +135,16 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
     }
   }, [isApprovalConfirmed, refetchAllowance]);
 
-  // After approval, automatically update needsApproval state
+  // After approval, automatically update needsApproval state and place bet
   useEffect(() => {
     if (approvalJustConfirmed && allowance !== undefined) {
       const betAmountBigInt = parseUnits(amount || '0', TOKEN_DECIMALS);
       if (betAmountBigInt <= allowance) {
-        console.log('✅ Allowance sufficient, ready to place bet');
+        console.log('✅ Allowance sufficient, auto-placing bet now...');
         setNeedsApproval(false);
         setApprovalJustConfirmed(false);
+        // Automatically trigger bet placement
+        handlePlaceBet();
       }
     }
   }, [approvalJustConfirmed, allowance, amount]);
