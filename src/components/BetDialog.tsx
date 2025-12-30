@@ -74,29 +74,29 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
   
   // Calculate shares using on-chain bucket liquidity data
   // Contract formula: shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
-  const PROTOCOL_FEE_BPS = 200; // 2%
-  const STEEPNESS = 5; // Updated to match new contract deployment
+  const TOTAL_FEE_BPS = 300; // 3% total (2% protocol + 1% burn)
+  const STEEPNESS = 10; // Bonding curve steepness
   
   let sharesReceived = 0;
   const amountNum = parseFloat(amount || '0');
   
   if (bucketLiquidity !== undefined && amountNum > 0) {
-    // Amount is in tokens (e.g. 5 MIND), convert to wei for calculation
-    const amountInWei = amountNum * 1e18;
-    const protocolFee = (amountInWei * PROTOCOL_FEE_BPS) / 10000;
-    const netAmount = amountInWei - protocolFee;
+    // Amount is in tokens (e.g. 5 USDC), convert to base units for calculation
+    const amountInUnits = amountNum * Math.pow(10, TOKEN_DECIMALS);
+    const totalFee = (amountInUnits * TOTAL_FEE_BPS) / 10000;
+    const netAmount = amountInUnits - totalFee;
     
-    // Use on-chain liquidity (already in wei)
+    // Use on-chain liquidity (already in base units)
     const liquidityNum = Number(bucketLiquidity);
-    const divisor = 1e18 + (liquidityNum * STEEPNESS);
-    const sharesInWei = (netAmount * 1e18) / divisor;
-    sharesReceived = sharesInWei / 1e18; // Convert to readable number
+    const divisor = Math.pow(10, TOKEN_DECIMALS) * 1e12 + (liquidityNum * STEEPNESS);
+    const sharesInUnits = (netAmount * 1e18) / divisor;
+    sharesReceived = sharesInUnits / 1e18; // Convert to readable number
   } else if (amountNum > 0) {
     // Fallback if liquidity not loaded: assume empty bucket
-    const amountInWei = amountNum * 1e18;
-    const protocolFee = (amountInWei * PROTOCOL_FEE_BPS) / 10000;
-    const netAmount = amountInWei - protocolFee;
-    sharesReceived = netAmount / 1e18; // Max shares when bucket is empty
+    const amountInUnits = amountNum * Math.pow(10, TOKEN_DECIMALS);
+    const totalFee = (amountInUnits * TOTAL_FEE_BPS) / 10000;
+    const netAmount = amountInUnits - totalFee;
+    sharesReceived = netAmount / Math.pow(10, TOKEN_DECIMALS); // Max shares when bucket is empty
   }
 
   // Auto-close on successful transaction

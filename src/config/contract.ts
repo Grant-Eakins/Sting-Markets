@@ -440,12 +440,12 @@ export const CONTRACT_ADDRESSES = {
   84532: '0xBD7C32d9B04dA7B9FE81a53315DB27e40cC5ee99', // ProportionalMarketUSDC (USDC + burn mechanism)
 } as const;
 
-// MIND token contract addresses (your custom token)
+// USDC token contract addresses (used for betting)
 export const TOKEN_ADDRESSES = {
   // Base Mainnet
-  8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy MIND to mainnet
+  8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Real USDC on Base mainnet
   // Base Sepolia Testnet
-  84532: '0xCe31Ae82c11dd708eF51c93dEEb5Be0474A132D1', // Mindshare Token (MIND)
+  84532: '0x2A9A8eb5a722053AeF8E98A5E1f0dfDC9CaE5f50', // MockUSDC (testnet)
 } as const;
 
 // USDC token has 6 decimals
