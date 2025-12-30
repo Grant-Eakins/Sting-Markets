@@ -146,6 +146,13 @@ export default function Markets() {
             >
               {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
             </Button>
+            <Button 
+              size="sm"
+              onClick={() => window.open('https://www.alchemy.com/faucets/base-sepolia', '_blank')}
+              className="bg-blue-600 hover:bg-blue-700 text-white hidden sm:flex"
+            >
+              Get Test ETH
+            </Button>
             <FarcasterConnect />
             {!isInFarcasterClient && <WalletConnect />}
             {/* Mobile menu button */}
@@ -173,6 +180,16 @@ export default function Markets() {
               className="w-full bg-green-600 hover:bg-green-700 text-white mb-2"
             >
               {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
+            </Button>
+            <Button 
+              size="sm"
+              onClick={() => {
+                window.open('https://www.alchemy.com/faucets/base-sepolia', '_blank');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-2"
+            >
+              Get Test ETH
             </Button>
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Coin Battles</Button>
