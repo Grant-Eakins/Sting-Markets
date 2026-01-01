@@ -11,6 +11,9 @@ dotenv.config();
 // ProportionalMarketMIND contract address
 const CONTRACT_ADDRESS = '0xa36fA2A8Dc1be09e049FE468281D36bc12c2043F'; // ProportionalMarketUSDC (MockUSDC + burn mechanism)
 
+// ProportionalMarketDualCoin contract address
+const DUAL_COIN_CONTRACT_ADDRESS = '0xBc6b9a31AB377D1FF73080F83E30D1e6868B2868'; // DualCoin head-to-head battles
+
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)
   {
@@ -86,6 +89,45 @@ const ABI = [
     "name": "getProbabilities",
     "outputs": [
       { "internalType": "uint256[]", "name": "", "type": "uint256[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
+
+// Dual Coin contract ABI (for head-to-head battles)
+const DUAL_COIN_ABI = [
+  // createMarket(string coinASymbol, string coinBSymbol, uint256 lockTime, uint256 settleTime)
+  {
+    "inputs": [
+      { "internalType": "string", "name": "coinASymbol", "type": "string" },
+      { "internalType": "string", "name": "coinBSymbol", "type": "string" },
+      { "internalType": "uint256", "name": "lockTime", "type": "uint256" },
+      { "internalType": "uint256", "name": "settleTime", "type": "uint256" }
+    ],
+    "name": "createMarket",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  // settleMarket(uint256 marketId, bool coinAWon)
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "marketId", "type": "uint256" },
+      { "internalType": "bool", "name": "coinAWon", "type": "bool" }
+    ],
+    "name": "settleMarket",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "nextMarketId",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
     ],
     "stateMutability": "view",
     "type": "function"
@@ -206,6 +248,71 @@ export async function createOnChainMarket(
     }
   } catch (error: any) {
     console.error('❌ Error creating on-chain market:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Creates a dual-coin battle on-chain and returns the market ID
+ */
+export async function createDualCoinOnChainMarket(
+  coinASymbol: string,
+  coinBSymbol: string,
+  lockTime: Date,
+  settleTime: Date
+): Promise<number | null> {
+  if (!isInitialized) {
+    console.log('⚠️  Blockchain not initialized - skipping on-chain creation');
+    return null;
+  }
+
+  try {
+    const lockTimestamp = Math.floor(lockTime.getTime() / 1000);
+    const settleTimestamp = Math.floor(settleTime.getTime() / 1000);
+
+    console.log(`⛓️  Creating dual-coin market: ${coinASymbol} vs ${coinBSymbol}`);
+    console.log(`   Contract: ${DUAL_COIN_CONTRACT_ADDRESS}`);
+    console.log(`   Lock: ${lockTime.toLocaleString()}`);
+    console.log(`   Settle: ${settleTime.toLocaleString()}`);
+
+    // Read nextMarketId BEFORE the transaction - this will be the ID of our new market
+    const marketIdBeforeCreate = await publicClient.readContract({
+      address: DUAL_COIN_CONTRACT_ADDRESS,
+      abi: DUAL_COIN_ABI,
+      functionName: 'nextMarketId'
+    });
+    const expectedMarketId = Number(marketIdBeforeCreate);
+    console.log(`   Expected market ID: ${expectedMarketId}`);
+
+    const hash = await walletClient.writeContract({
+      address: DUAL_COIN_CONTRACT_ADDRESS,
+      abi: DUAL_COIN_ABI,
+      functionName: 'createMarket',
+      args: [
+        coinASymbol,
+        coinBSymbol,
+        BigInt(lockTimestamp),
+        BigInt(settleTimestamp)
+      ]
+    });
+
+    console.log(`⏳ Transaction submitted: ${hash}`);
+    
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status === 'success') {
+      const marketId = expectedMarketId;
+      
+      console.log(`✅ Dual-coin market created on-chain! ID: ${marketId}`);
+      console.log(`🔗 https://sepolia.basescan.org/tx/${hash}`);
+      
+      return marketId;
+    } else {
+      console.error('❌ Transaction failed');
+      return null;
+    }
+  } catch (error: any) {
+    console.error('❌ Error creating dual-coin on-chain market:', error.message);
     return null;
   }
 }

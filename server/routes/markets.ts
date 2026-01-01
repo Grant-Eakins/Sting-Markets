@@ -13,7 +13,7 @@ import {
   updateMarketPools,
   clearAllMarkets,
 } from '../services/marketService';
-import { createOnChainMarket, syncAllMarketPools, getMarketProbabilities } from '../services/blockchainSync';
+import { createOnChainMarket, syncAllMarketPools, getMarketProbabilities, createDualCoinOnChainMarket } from '../services/blockchainSync';
 import { getCryptoHistory } from '../services/cryptoApi';
 import { syncCryptoMarkets, getNext12HourSettlement, disableSymbolAutoCreation, enableSymbolAutoCreation, isSymbolDisabled, getDisabledSymbols } from '../services/cryptoSync';
 import { Position, MarketStatus } from '../types/market';
@@ -547,15 +547,13 @@ router.post('/create-dual-coin', async (req, res) => {
       autoRecreate, // Optional: Control whether this market auto-recreates
     });
     
-    // Create on-chain market FIRST with 2 buckets (Coin A vs Coin B)
+    // Create on-chain market FIRST with dual coin contract
     try {
-      const blockchainMarketId = await createOnChainMarket(
-        `${tokenA.symbol}vs${tokenB.symbol}`,
-        coinAPriceEncoded, // Use encoded price for blockchain
+      const blockchainMarketId = await createDualCoinOnChainMarket(
+        tokenA.symbol,
+        tokenB.symbol,
         market.lockTime,
-        market.settleTime,
-        false,
-        2 // Only 2 buckets for head-to-head
+        market.settleTime
       );
       
       if (blockchainMarketId !== null) {
