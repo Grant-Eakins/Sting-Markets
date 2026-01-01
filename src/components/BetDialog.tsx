@@ -135,16 +135,31 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
     }
   }, [isApprovalConfirmed, refetchAllowance]);
 
-  // After approval, automatically update needsApproval state and place bet
+  // After approval, automatically place bet (skip approval check)
   useEffect(() => {
     if (approvalJustConfirmed && allowance !== undefined) {
       const betAmountBigInt = parseUnits(amount || '0', TOKEN_DECIMALS);
       if (betAmountBigInt <= allowance) {
-        console.log('✅ Allowance sufficient, auto-placing bet now...');
+        console.log('✅ Allowance sufficient, proceeding with bet...');
         setNeedsApproval(false);
         setApprovalJustConfirmed(false);
-        // Automatically trigger bet placement
-        handlePlaceBet();
+        
+        // Place bet directly without going through approval check again
+        const betAmount = parseFloat(amount);
+        if (isConnected && address && !isNaN(betAmount) && betAmount > 0) {
+          const marketId = (market as any).blockchainMarketId;
+          if (marketId !== undefined && marketId !== null && marketId !== 0) {
+            let outcomeIndex: number;
+            if (bucketIndex !== undefined) {
+              outcomeIndex = bucketIndex;
+            } else {
+              const isDualCoin = (market as any).isDualCoin;
+              outcomeIndex = isDualCoin ? (position === 'UP' ? 0 : 1) : (position === 'UP' ? 4 : 5);
+            }
+            console.log(`🎯 Auto-placing bet on bucket ${outcomeIndex} for market ${marketId}`);
+            placeBetOnChain(marketId, outcomeIndex, amount);
+          }
+        }
       }
     }
   }, [approvalJustConfirmed, allowance, amount]);
