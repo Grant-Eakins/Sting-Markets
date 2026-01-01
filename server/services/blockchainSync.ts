@@ -274,6 +274,62 @@ export async function settleOnChainMarket(blockchainMarketId: number, closingPri
 }
 
 /**
+ * Settle a dual-coin market on-chain
+ * @param blockchainMarketId The on-chain market ID
+ * @param coinAWon True if Coin A won, false if Coin B won
+ */
+export async function settleDualCoinOnChain(blockchainMarketId: number, coinAWon: boolean): Promise<boolean> {
+  if (!isInitialized || !walletClient) {
+    console.log('⚠️  Blockchain not initialized - skipping on-chain settlement');
+    return false;
+  }
+
+  // Dual coin contract address
+  const DUAL_COIN_CONTRACT = '0xBc6b9a31AB377D1FF73080F83E30D1e6868B2868';
+  
+  const DUAL_COIN_ABI = [
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "marketId", "type": "uint256" },
+        { "internalType": "bool", "name": "coinAWon", "type": "bool" }
+      ],
+      "name": "settleMarket",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ] as const;
+
+  try {
+    console.log(`⛓️  Settling dual-coin market #${blockchainMarketId} on-chain`);
+    console.log(`   Winner: ${coinAWon ? 'Coin A' : 'Coin B'}`);
+
+    const hash = await walletClient.writeContract({
+      address: DUAL_COIN_CONTRACT,
+      abi: DUAL_COIN_ABI,
+      functionName: 'settleMarket',
+      args: [BigInt(blockchainMarketId), coinAWon]
+    });
+
+    console.log(`⏳ Dual-coin settlement transaction submitted: ${hash}`);
+    
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status === 'success') {
+      console.log(`✅ Dual-coin market #${blockchainMarketId} settled on-chain!`);
+      console.log(`🔗 https://sepolia.basescan.org/tx/${hash}`);
+      return true;
+    } else {
+      console.error('❌ Dual-coin settlement transaction failed');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('❌ Error settling dual-coin market on-chain:', error.message);
+    return false;
+  }
+}
+
+/**
  * Get the next available on-chain market ID
  */
 export async function getNextMarketId(): Promise<number> {

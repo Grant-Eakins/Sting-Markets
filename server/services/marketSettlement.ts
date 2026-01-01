@@ -2,7 +2,7 @@ import { getMarketsReadyToSettle, settleMarket, lockExpiredMarkets, getActiveMar
 import { getCryptoQuote, getBatchQuotes } from './cryptoApi';
 import { sendPriceUpdateTweets, sendClosingPriceTweets, sendOpeningPriceTweets } from './discordBot';
 import { syncCryptoMarkets } from './cryptoSync';
-import { syncSettlementStatusFromChain, settleOnChainMarket } from './blockchainSync';
+import { syncSettlementStatusFromChain, settleOnChainMarket, settleDualCoinOnChain } from './blockchainSync';
 import { getTokenByAddress } from './dexScreenerApi';
 import { saveMarket } from './database';
 import { MarketStatus, Position } from '../types/market';
@@ -191,6 +191,7 @@ export async function checkAndSettleMarkets(): Promise<void> {
 /**
  * Settle a dual-coin head-to-head market by comparing percentage changes
  */
+
 async function settleDualCoinMarket(market: Market): Promise<any> {
   if (!market.isDualCoin || !market.coinAAddress || !market.coinBAddress) {
     throw new Error('Not a dual-coin market');
@@ -231,18 +232,18 @@ async function settleDualCoinMarket(market: Market): Promise<any> {
     
     if (market.blockchainMarketId !== undefined) {
       try {
-        // Check if this is actually a 2-bucket dual-coin market on-chain
-        // If numOutcomes !== 2, this market was created incorrectly
-        // For now, log a warning and skip on-chain settlement
-        console.log(`   ⚠️  Dual-coin market has non-standard setup on blockchain`);
-        console.log(`   Skipping on-chain settlement (manual intervention required)`);
+        console.log(`   📡 Settling on-chain (dual coin contract)...`);
+        const coinAWon = winningPosition === Position.UP;
+        const success = await settleDualCoinOnChain(market.blockchainMarketId, coinAWon);
         
-        // TODO: For proper 2-bucket dual-coin markets, use simplified settlement:
-        // const referencePrice = 10000;
-        // const finalPriceSimple = winningPosition === Position.UP ? 10001 : 9999;
-        // await settleOnChainMarket(market.blockchainMarketId, finalPriceSimple);
+        if (success) {
+          console.log(`   ✅ Dual-coin market settled on-chain successfully`);
+        } else {
+          console.log(`   ⚠️  On-chain settlement failed, but backend is settled`);
+        }
       } catch (error) {
         console.error('❌ Failed to settle on-chain:', error);
+        console.log('   Backend settlement will proceed anyway');
       }
     }
     
