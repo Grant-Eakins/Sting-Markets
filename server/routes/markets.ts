@@ -468,9 +468,9 @@ router.post('/create-dual-coin', async (req, res) => {
     const { 
       contractAddressA, 
       contractAddressB, 
-      lockMinutes = 720, 
-      settleMinutes = 720.05, 
-      createTiming = 'scheduled',
+      lockMinutes, 
+      settleMinutes, 
+      createTiming,
       autoRecreate = false 
     } = req.body;
     
@@ -489,17 +489,21 @@ router.post('/create-dual-coin', async (req, res) => {
     
     const { lockTime, settleTime, sessionLabel } = getNext12HourSettlement();
     
-    // Determine if market should be scheduled or immediate based on createTiming
-    const isScheduled = createTiming === 'scheduled';
+    // Determine if market should be scheduled or immediate
+    // If custom times provided, default to 'now', otherwise default to 'scheduled'
+    const actualCreateTiming = createTiming || (lockMinutes || settleMinutes ? 'now' : 'scheduled');
+    const actualLockMinutes = lockMinutes || 720;
+    const actualSettleMinutes = settleMinutes || 720.05;
+    const isScheduled = actualCreateTiming === 'scheduled';
     const now = new Date();
     
     // If 'now', create as ACTIVE immediately and use custom lock/settle times from minutes params
     // If 'scheduled', create as SCHEDULED for next cycle
-    const actualLockTime = isScheduled ? lockTime : new Date(now.getTime() + lockMinutes * 60 * 1000);
-    const actualSettleTime = isScheduled ? settleTime : new Date(now.getTime() + settleMinutes * 60 * 1000);
+    const actualLockTime = isScheduled ? lockTime : new Date(now.getTime() + actualLockMinutes * 60 * 1000);
+    const actualSettleTime = isScheduled ? settleTime : new Date(now.getTime() + actualSettleMinutes * 60 * 1000);
     const marketStatus = isScheduled ? 'SCHEDULED' : 'ACTIVE';
     
-    console.log(`   Timing: ${createTiming === 'now' ? 'CREATE NOW' : 'SCHEDULED'}`);
+    console.log(`   Timing: ${actualCreateTiming === 'now' ? 'CREATE NOW' : 'SCHEDULED'}`);
     console.log(`   Status: ${marketStatus}`);
     console.log(`   Lock: ${actualLockTime.toLocaleString()}`);
     console.log(`   Settle: ${actualSettleTime.toLocaleString()}`);
