@@ -131,6 +131,27 @@ const DUAL_COIN_ABI = [
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  // getMarket(uint256 marketId) returns market data including pools
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "marketId", "type": "uint256" }
+    ],
+    "name": "getMarket",
+    "outputs": [
+      { "internalType": "string", "name": "coinASymbol", "type": "string" },
+      { "internalType": "string", "name": "coinBSymbol", "type": "string" },
+      { "internalType": "uint8", "name": "status", "type": "uint8" },
+      { "internalType": "uint256", "name": "coinAPool", "type": "uint256" },
+      { "internalType": "uint256", "name": "coinBPool", "type": "uint256" },
+      { "internalType": "uint256", "name": "totalPool", "type": "uint256" },
+      { "internalType": "uint256", "name": "lockTime", "type": "uint256" },
+      { "internalType": "uint256", "name": "settleTime", "type": "uint256" },
+      { "internalType": "bool", "name": "settled", "type": "bool" },
+      { "internalType": "bool", "name": "coinAWon", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   }
 ] as const;
 
@@ -313,6 +334,42 @@ export async function createDualCoinOnChainMarket(
     }
   } catch (error: any) {
     console.error('❌ Error creating dual-coin on-chain market:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Get dual-coin market pool data from blockchain
+ */
+export async function getDualCoinMarketPools(blockchainMarketId: number): Promise<{
+  upPool: number;
+  downPool: number;
+  totalPool: number;
+} | null> {
+  if (!isInitialized || !publicClient) {
+    return null;
+  }
+
+  try {
+    const result = await publicClient.readContract({
+      address: DUAL_COIN_CONTRACT_ADDRESS,
+      abi: DUAL_COIN_ABI,
+      functionName: 'getMarket',
+      args: [BigInt(blockchainMarketId)]
+    }) as any;
+
+    // result is: [coinASymbol, coinBSymbol, status, coinAPool, coinBPool, totalPool, lockTime, settleTime, settled, coinAWon]
+    const coinAPool = Number(result[3]) / 1e6; // Convert from USDC 6 decimals
+    const coinBPool = Number(result[4]) / 1e6;
+    const totalPool = Number(result[5]) / 1e6;
+
+    return {
+      upPool: coinAPool,    // Coin A = UP
+      downPool: coinBPool,  // Coin B = DOWN
+      totalPool
+    };
+  } catch (error: any) {
+    console.error(`❌ Error getting dual-coin pools for market ${blockchainMarketId}:`, error.message);
     return null;
   }
 }
@@ -510,7 +567,7 @@ export async function syncMarketPools(blockchainMarketId: number): Promise<{
 /**
  * Syncs all markets with blockchain pool data
  */
-export async function syncAllMarketPools(markets: Array<{ id: string; blockchainMarketId?: number }>): Promise<Map<string, { upPool: number; downPool: number; totalPool: number }>> {
+export async function syncAllMarketPools(markets: Array<{ id: string; blockchainMarketId?: number; isDualCoin?: boolean }>): Promise<Map<string, { upPool: number; downPool: number; totalPool: number }>> {
   const results = new Map<string, { upPool: number; downPool: number; totalPool: number }>();
 
   if (!isInitialized) {
@@ -519,7 +576,15 @@ export async function syncAllMarketPools(markets: Array<{ id: string; blockchain
 
   for (const market of markets) {
     if (market.blockchainMarketId !== undefined && market.blockchainMarketId !== null) {
-      const poolData = await syncMarketPools(market.blockchainMarketId);
+      let poolData = null;
+      
+      // Use appropriate contract based on market type
+      if (market.isDualCoin) {
+        poolData = await getDualCoinMarketPools(market.blockchainMarketId);
+      } else {
+        poolData = await syncMarketPools(market.blockchainMarketId);
+      }
+      
       if (poolData) {
         results.set(market.id, poolData);
       }

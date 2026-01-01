@@ -13,7 +13,7 @@ import {
   updateMarketPools,
   clearAllMarkets,
 } from '../services/marketService';
-import { createOnChainMarket, syncAllMarketPools, getMarketProbabilities, createDualCoinOnChainMarket } from '../services/blockchainSync';
+import { createOnChainMarket, syncAllMarketPools, getMarketProbabilities, createDualCoinOnChainMarket, getDualCoinMarketPools } from '../services/blockchainSync';
 import { getCryptoHistory } from '../services/cryptoApi';
 import { syncCryptoMarkets, getNext12HourSettlement, disableSymbolAutoCreation, enableSymbolAutoCreation, isSymbolDisabled, getDisabledSymbols } from '../services/cryptoSync';
 import { Position, MarketStatus } from '../types/market';
