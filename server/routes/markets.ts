@@ -465,7 +465,14 @@ router.post('/create-dual-coin', async (req, res) => {
     console.log('🆚 Dual-coin creation request received');
     console.log('   Body:', JSON.stringify(req.body, null, 2));
     
-    const { contractAddressA, contractAddressB, lockMinutes = 720, settleMinutes = 720.05, createTiming = 'scheduled' } = req.body;
+    const { 
+      contractAddressA, 
+      contractAddressB, 
+      lockMinutes = 720, 
+      settleMinutes = 720.05, 
+      createTiming = 'scheduled',
+      autoRecreate = false 
+    } = req.body;
     
     // Validate address formats - support both Ethereum (0x...) and Solana (base58)
     const isEthAddressA = /^0x[a-fA-F0-9]{40}$/.test(contractAddressA);
@@ -486,10 +493,10 @@ router.post('/create-dual-coin', async (req, res) => {
     const isScheduled = createTiming === 'scheduled';
     const now = new Date();
     
-    // If 'now', create as ACTIVE immediately but use scheduled expiry times
+    // If 'now', create as ACTIVE immediately and use custom lock/settle times from minutes params
     // If 'scheduled', create as SCHEDULED for next cycle
-    const actualLockTime = isScheduled ? lockTime : now;
-    const actualSettleTime = isScheduled ? settleTime : settleTime; // Both use next scheduled settlement
+    const actualLockTime = isScheduled ? lockTime : new Date(now.getTime() + lockMinutes * 60 * 1000);
+    const actualSettleTime = isScheduled ? settleTime : new Date(now.getTime() + settleMinutes * 60 * 1000);
     const marketStatus = isScheduled ? 'SCHEDULED' : 'ACTIVE';
     
     console.log(`   Timing: ${createTiming === 'now' ? 'CREATE NOW' : 'SCHEDULED'}`);
@@ -560,8 +567,18 @@ router.post('/create-dual-coin', async (req, res) => {
       coinBAddress: contractAddressB,
       coinBImageUrl: tokenB.imageUrl,
       coinBOpeningPrice: coinBPrice,
-      autoRecreate: false, // No longer used - timing controlled by createTiming parameter
+      autoRecreate: autoRecreate, // Controlled by autoRecreate parameter
     });
+    
+    // Set market status based on createTiming
+    if (!isScheduled) {
+      market.status = MarketStatus.ACTIVE;
+      console.log('⚡ Creating ACTIVE market (starts immediately)');
+    } else {
+      market.status = MarketStatus.SCHEDULED;
+      market.startTime = lockTime; // Start when scheduled
+      console.log('📅 Creating SCHEDULED market');
+    }
     
     // Create on-chain market FIRST with dual coin contract
     try {
