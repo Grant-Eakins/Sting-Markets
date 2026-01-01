@@ -135,7 +135,20 @@ export async function loadAllMarkets(): Promise<Market[]> {
       return [];
     }
 
-    return (data || []).map(dbMarketToMarket);
+    const markets = (data || []).map(dbMarketToMarket);
+    
+    // Filter out invalid dual coin markets (missing required addresses)
+    const validMarkets = markets.filter(m => {
+      if (m.isDualCoin) {
+        if (!m.coinAAddress || !m.coinBAddress) {
+          console.log(`⚠️  Skipping invalid dual coin market: ${m.stockSymbol} (missing coin addresses)`);
+          return false;
+        }
+      }
+      return true;
+    });
+    
+    return validMarkets;
   } catch (error: any) {
     console.error('❌ Error loading markets:', error.message);
     return [];
@@ -421,30 +434,43 @@ export async function cleanupDuplicateActiveMarkets(): Promise<number> {
     }
 
     // Group by symbol and find duplicates
+    // For dual-coin markets, use composite key of both coin addresses
     const symbolMap = new Map<string, any[]>();
     for (const market of activeMarkets) {
-      const symbol = market.stock_symbol?.toUpperCase();
-      if (!symbol) continue;
+      let key: string;
       
-      if (!symbolMap.has(symbol)) {
-        symbolMap.set(symbol, []);
+      // For dual-coin markets, create a unique key from both addresses
+      if (market.is_dual_coin && market.coin_a_address && market.coin_b_address) {
+        key = `DUAL:${market.coin_a_address.toLowerCase()}:${market.coin_b_address.toLowerCase()}`;
+      } else {
+        // For single-coin markets, use the symbol
+        const symbol = market.stock_symbol?.toUpperCase();
+        if (!symbol) continue;
+        key = symbol;
       }
-      symbolMap.get(symbol)!.push(market);
+      
+      if (!symbolMap.has(key)) {
+        symbolMap.set(key, []);
+      }
+      symbolMap.get(key)!.push(market);
     }
 
     // Find markets to delete
     // Priority: Keep the one with highest blockchain_market_id (most recent on-chain)
     // This ensures we keep the market that was actually created on-chain for this session
     const marketsToDelete: string[] = [];
-    for (const [symbol, markets] of symbolMap.entries()) {
+    for (const [key, markets] of symbolMap.entries()) {
       if (markets.length > 1) {
         // Markets are already sorted by blockchain_market_id DESC
         // Keep the first one (highest blockchain ID), delete the rest
         const toKeep = markets[0];
         const toDelete = markets.slice(1);
-        console.log(`🔍 Found ${markets.length} active ${symbol} markets`);
-        console.log(`   Keeping: blockchain_market_id=${toKeep.blockchain_market_id}`);
-        console.log(`   Deleting: ${toDelete.map((m: any) => m.blockchain_market_id).join(', ')}`);
+        const displayName = markets[0].is_dual_coin 
+          ? `${markets[0].coin_a_symbol}vs${markets[0].coin_b_symbol}` 
+          : key;
+        console.log(`🔍 Found ${markets.length} active ${displayName} markets`);
+        console.log(`   Keeping: blockchain_market_id=${toKeep.blockchain_market_id}, id=${toKeep.id}`);
+        console.log(`   Deleting: ${toDelete.map((m: any) => `id=${m.id} (blockchain=${m.blockchain_market_id})`).join(', ')}`);
         marketsToDelete.push(...toDelete.map((m: any) => m.id));
       }
     }

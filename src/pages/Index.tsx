@@ -41,6 +41,8 @@ const Index = () => {
         abi: MOCK_USDC_ABI,
         functionName: 'faucet',
         chainId: baseSepolia.id,
+        chain: undefined,
+        account: address,
       });
       
       toast({

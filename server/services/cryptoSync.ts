@@ -198,7 +198,7 @@ export async function syncCryptoMarkets(): Promise<void> {
     }
 
     // Get existing markets - only skip symbols that have an ACTIVE or LOCKED market
-    // OR if the last settled market had autoRecreate=false
+    // OR if ANY market (active, locked, or settled) has autoRecreate=false
     const existingMarkets = getAllMarkets();
     const activeSymbols = new Set(
       existingMarkets
@@ -206,12 +206,18 @@ export async function syncCryptoMarkets(): Promise<void> {
         .map(m => m.stockSymbol.toUpperCase())
     );
     
-    // Find symbols that were settled with autoRecreate=false
+    // Find symbols that have autoRecreate=false in ANY status (not just settled)
+    // This prevents recreating dual-coin markets that were manually created with autoRecreate=false
     const noRecreateSymbols = new Set(
       existingMarkets
-        .filter(m => m.status === MarketStatus.SETTLED && m.autoRecreate === false)
+        .filter(m => m.autoRecreate === false)
         .map(m => m.stockSymbol.toUpperCase())
     );
+
+    // Log what we're skipping
+    if (noRecreateSymbols.size > 0) {
+      console.log(`🚫 Symbols with autoRecreate=false: ${Array.from(noRecreateSymbols).join(', ')}`);
+    }
 
     // Only create markets for symbols without an active/locked market AND not disabled AND autoRecreate wasn't disabled
     const cryptosToProcess = POPULAR_CRYPTOS.filter(
