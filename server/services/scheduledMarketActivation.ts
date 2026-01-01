@@ -6,7 +6,7 @@
 import { MarketStatus } from '../types/market';
 import { getAllMarkets } from './marketService';
 import { updateMarketStatus } from './database';
-import { createOnChainMarket } from './blockchainSync';
+import { createOnChainMarket, createDualCoinOnChainMarket } from './blockchainSync';
 import { getTokenByAddress } from './dexScreenerApi';
 
 /**
@@ -71,17 +71,29 @@ export async function activateScheduledMarkets(): Promise<number> {
 
       // Create market on blockchain
       try {
-        const numOutcomes = market.isDualCoin ? 2 : 42; // 2 outcomes for dual-coin battles
-        const symbol = market.isDualCoin ? `${market.coinASymbol}vs${market.coinBSymbol}` : market.stockSymbol;
-        const referencePrice = (market as any).encodedOpeningPrice || market.openingPrice; // Use encoded price if available
-        const blockchainMarketId = await createOnChainMarket(
-          symbol,
-          referencePrice,
-          newLockTime,
-          newSettleTime,
-          false, // isAfterHours
-          numOutcomes
-        );
+        let blockchainMarketId: number | null = null;
+        
+        if (market.isDualCoin && market.coinASymbol && market.coinBSymbol) {
+          // Use dual-coin contract for head-to-head battles
+          blockchainMarketId = await createDualCoinOnChainMarket(
+            market.coinASymbol,
+            market.coinBSymbol,
+            newLockTime,
+            newSettleTime
+          );
+        } else {
+          // Use standard contract for single-coin markets
+          const numOutcomes = 42;
+          const referencePrice = (market as any).encodedOpeningPrice || market.openingPrice;
+          blockchainMarketId = await createOnChainMarket(
+            market.stockSymbol,
+            referencePrice,
+            newLockTime,
+            newSettleTime,
+            false, // isAfterHours
+            numOutcomes
+          );
+        }
         
         if (blockchainMarketId !== null) {
           market.blockchainMarketId = blockchainMarketId;
