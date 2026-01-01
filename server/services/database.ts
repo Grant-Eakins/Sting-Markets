@@ -537,6 +537,15 @@ export async function loadUserBets(userAddress: string): Promise<Bet[]> {
  * Convert database row to Market object
  */
 function dbMarketToMarket(row: any): Market {
+  // Debug log for dual coin markets
+  if (row.is_dual_coin) {
+    console.log(`🔍 Loading dual coin market from DB: ${row.stock_symbol}`);
+    console.log(`   Status: ${row.status}`);
+    console.log(`   Blockchain ID: ${row.blockchain_market_id}`);
+    console.log(`   Coin A opening: ${row.coin_a_opening_price} (type: ${typeof row.coin_a_opening_price})`);
+    console.log(`   Coin B opening: ${row.coin_b_opening_price} (type: ${typeof row.coin_b_opening_price})`);
+  }
+  
   return {
     id: row.id,
     blockchainMarketId: row.blockchain_market_id,
@@ -585,15 +594,6 @@ function dbMarketToMarket(row: any): Market {
     coinBChangePercent: row.coin_b_change_percent,
     autoRecreate: row.auto_recreate ?? false,
   };
-  
-  // Debug log for dual coin markets
-  if (row.is_dual_coin) {
-    console.log(`🔍 Loaded dual coin market: ${row.stock_symbol}`);
-    console.log(`   Coin A opening from DB: ${row.coin_a_opening_price} (type: ${typeof row.coin_a_opening_price})`);
-    console.log(`   Coin B opening from DB: ${row.coin_b_opening_price} (type: ${typeof row.coin_b_opening_price})`);
-  }
-  
-  return market;
 }
 
 function dbBetToBet(row: any): Bet {

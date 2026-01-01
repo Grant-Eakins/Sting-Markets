@@ -464,7 +464,7 @@ router.post('/create-dual-coin', async (req, res) => {
     console.log('🆚 Dual-coin creation request received');
     console.log('   Body:', JSON.stringify(req.body, null, 2));
     
-    const { contractAddressA, contractAddressB, lockMinutes = 720, settleMinutes = 720.05, autoRecreate = true } = req.body;
+    const { contractAddressA, contractAddressB, lockMinutes = 720, settleMinutes = 720.05, createTiming = 'scheduled' } = req.body;
     
     // Validate address formats - support both Ethereum (0x...) and Solana (base58)
     const isEthAddressA = /^0x[a-fA-F0-9]{40}$/.test(contractAddressA);
@@ -480,6 +480,21 @@ router.post('/create-dual-coin', async (req, res) => {
     }
     
     const { lockTime, settleTime, sessionLabel } = getNext12HourSettlement();
+    
+    // Determine if market should be scheduled or immediate based on createTiming
+    const isScheduled = createTiming === 'scheduled';
+    const now = new Date();
+    
+    // If 'now', create as ACTIVE immediately but use scheduled expiry times
+    // If 'scheduled', create as SCHEDULED for next cycle
+    const actualLockTime = isScheduled ? lockTime : now;
+    const actualSettleTime = isScheduled ? settleTime : settleTime; // Both use next scheduled settlement
+    const marketStatus = isScheduled ? 'SCHEDULED' : 'ACTIVE';
+    
+    console.log(`   Timing: ${createTiming === 'now' ? 'CREATE NOW' : 'SCHEDULED'}`);
+    console.log(`   Status: ${marketStatus}`);
+    console.log(`   Lock: ${actualLockTime.toLocaleString()}`);
+    console.log(`   Settle: ${actualSettleTime.toLocaleString()}`);
     
     // Fetch both tokens from DexScreener
     console.log('   Fetching token A:', contractAddressA);
@@ -530,8 +545,8 @@ router.post('/create-dual-coin', async (req, res) => {
       description: `Which will perform better? ${tokenA.symbol} or ${tokenB.symbol}?`,
       openingPrice: coinAPrice, // Legacy field
       isAfterHours: false,
-      lockTime,
-      settleTime,
+      lockTime: actualLockTime,
+      settleTime: actualSettleTime,
       category: 'dual-coin',
       isDualCoin: true,
       coinASymbol: tokenA.symbol,
@@ -544,11 +559,12 @@ router.post('/create-dual-coin', async (req, res) => {
       coinBAddress: contractAddressB,
       coinBImageUrl: tokenB.imageUrl,
       coinBOpeningPrice: coinBPrice,
-      autoRecreate, // Optional: Control whether this market auto-recreates
+      autoRecreate: false, // No longer used - timing controlled by createTiming parameter
     });
     
     // Create on-chain market FIRST with dual coin contract
     try {
+      console.log('🔗 Creating on-chain market...');
       const blockchainMarketId = await createDualCoinOnChainMarket(
         tokenA.symbol,
         tokenB.symbol,
@@ -558,8 +574,10 @@ router.post('/create-dual-coin', async (req, res) => {
       
       if (blockchainMarketId !== null) {
         market.blockchainMarketId = blockchainMarketId;
+        console.log(`💾 Saving market to database with blockchain ID ${blockchainMarketId}...`);
         // NOW save market to database with blockchain ID
         await saveMarket(market);
+        console.log(`✅ Market saved successfully: ${market.id} (status: ${market.status})`);
       } else {
         throw new Error('Failed to get blockchain market ID');
       }
@@ -573,6 +591,7 @@ router.post('/create-dual-coin', async (req, res) => {
         message: `Dual-coin market created: ${tokenA.symbol} vs ${tokenB.symbol}`,
       });
     } catch (error: any) {
+      console.error('❌ Error in dual-coin creation:', error);
       res.status(500).json({
         success: false,
         error: `Failed to create on-chain market: ${error.message}`,

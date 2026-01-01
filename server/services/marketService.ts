@@ -44,9 +44,10 @@ export async function initializeMarketsFromDb(): Promise<void> {
     const activeCount = dbMarkets.filter(m => m.status === MarketStatus.ACTIVE).length;
     const lockedCount = dbMarkets.filter(m => m.status === MarketStatus.LOCKED).length;
     const settledCount = dbMarkets.filter(m => m.status === MarketStatus.SETTLED).length;
+    const scheduledCount = dbMarkets.filter(m => m.status === MarketStatus.SCHEDULED).length;
     
     console.log(`✅ Loaded ${dbMarkets.length} markets from database`);
-    console.log(`   Active: ${activeCount}, Locked: ${lockedCount}, Settled: ${settledCount}`);
+    console.log(`   Active: ${activeCount}, Locked: ${lockedCount}, Settled: ${settledCount}, Scheduled: ${scheduledCount}`);
   } catch (error: any) {
     console.error('❌ Failed to load markets from database:', error.message);
   }

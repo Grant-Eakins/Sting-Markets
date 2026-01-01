@@ -99,7 +99,7 @@ export default function AdminPage() {
     coinBAddress: '',
     lockMinutes: 720,
     settleMinutes: 720.05,
-    autoRecreate: true,
+    createTiming: 'scheduled' as 'now' | 'scheduled', // 'now' = immediate, 'scheduled' = next cycle
   });
   const [dualCoinPreview, setDualCoinPreview] = useState<{
     coinA: { symbol: string; name: string; price: number; liquidity: number } | null;
@@ -254,7 +254,7 @@ export default function AdminPage() {
         contractAddressB: data.coinBAddress,
         lockMinutes: data.lockMinutes,
         settleMinutes: data.settleMinutes,
-        autoRecreate: data.autoRecreate,
+        createTiming: data.createTiming,
       };
       const response = await axios.post(`${API_BASE}/markets/create-dual-coin`, payload);
       return response.data;
@@ -266,7 +266,7 @@ export default function AdminPage() {
         coinBAddress: '',
         lockMinutes: 720,
         settleMinutes: 720.05,
-        autoRecreate: true,
+        createTiming: 'scheduled',
       });
       setDualCoinPreview({ coinA: null, coinB: null });
       const coinASymbol = data.tokenA?.symbol || data.market?.coinASymbol || 'Coin A';
@@ -1135,18 +1135,48 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="dualCoinAutoRecreate"
-                    checked={dualCoinData.autoRecreate}
-                    onCheckedChange={(checked) => setDualCoinData({ 
-                      ...dualCoinData, 
-                      autoRecreate: checked === true 
-                    })}
-                  />
-                  <Label htmlFor="dualCoinAutoRecreate" className="text-sm cursor-pointer">
-                    🔄 Auto-recreate market after settlement (loop forever)
-                  </Label>
+                <div className="space-y-2">
+                  <Label>Market Timing</Label>
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="createNow"
+                        name="createTiming"
+                        value="now"
+                        checked={dualCoinData.createTiming === 'now'}
+                        onChange={(e) => setDualCoinData({ 
+                          ...dualCoinData, 
+                          createTiming: 'now',
+                          lockMinutes: 720,
+                          settleMinutes: 720.05
+                        })}
+                        className="w-4 h-4"
+                      />
+                      <Label htmlFor="createNow" className="text-sm cursor-pointer font-normal">
+                        ⚡ Create Now (Active immediately, expires at next scheduled time)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="createScheduled"
+                        name="createTiming"
+                        value="scheduled"
+                        checked={dualCoinData.createTiming === 'scheduled'}
+                        onChange={(e) => setDualCoinData({ 
+                          ...dualCoinData, 
+                          createTiming: 'scheduled',
+                          lockMinutes: 720,
+                          settleMinutes: 720.05
+                        })}
+                        className="w-4 h-4"
+                      />
+                      <Label htmlFor="createScheduled" className="text-sm cursor-pointer font-normal">
+                        📅 Create at Scheduled Time (Starts at next noon/midnight UTC)
+                      </Label>
+                    </div>
+                  </div>
                 </div>
 
                 <Button 
