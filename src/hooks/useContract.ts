@@ -1,6 +1,6 @@
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount as useWagmiAccount } from 'wagmi';
 import { parseUnits } from 'viem';
-import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES, TOKEN_ADDRESSES, ERC20_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
+import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_ADDRESSES, ERC20_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { useChainId, useAccount } from 'wagmi';
 import { useState, useCallback, useEffect } from 'react';
 
@@ -427,6 +427,337 @@ export function useProtocolFees() {
   
   return {
     feesCollected: data as bigint | undefined,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook to read max bet size
+ */
+export function useMaxBetSize() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'maxBetSize',
+    chainId: chainId || 84532,
+    query: {
+      enabled: !!contractAddress,
+      refetchInterval: 10000,
+    },
+  });
+  
+  return {
+    maxBetSize: data as bigint | undefined,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook to set max bet size (admin only)
+ */
+export function useSetMaxBetSize() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data: hash, isPending, writeContractAsync, error, reset } = useWriteContract();
+  
+  const setMaxBetSize = async (newMaxBet: bigint) => {
+    if (!contractAddress) {
+      throw new Error('Contract address not found');
+    }
+    
+    console.log('📝 Setting max bet size to:', newMaxBet.toString());
+    return writeContractAsync({
+      address: contractAddress as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'setMaxBetSize',
+      args: [newMaxBet],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    setMaxBetSize,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+    reset,
+  };
+}
+
+/**
+ * Hook to read burn configuration
+ */
+export function useBurnConfig() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data: burnEnabled, isLoading: loadingEnabled, refetch: refetchEnabled } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'burnEnabled',
+    chainId: chainId || 84532,
+    query: {
+      enabled: !!contractAddress,
+      refetchInterval: 10000,
+    },
+  });
+  
+  const { data: totalBurned, isLoading: loadingBurned, refetch: refetchBurned } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'totalBurned',
+    chainId: chainId || 84532,
+    query: {
+      enabled: !!contractAddress,
+      refetchInterval: 10000,
+    },
+  });
+  
+  const { data: utilityToken, isLoading: loadingToken, refetch: refetchToken } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'utilityToken',
+    chainId: chainId || 84532,
+    query: {
+      enabled: !!contractAddress,
+      refetchInterval: 10000,
+    },
+  });
+  
+  const { data: uniswapRouter, isLoading: loadingRouter, refetch: refetchRouter } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'uniswapRouter',
+    chainId: chainId || 84532,
+    query: {
+      enabled: !!contractAddress,
+      refetchInterval: 10000,
+    },
+  });
+  
+  const refetch = () => {
+    refetchEnabled();
+    refetchBurned();
+    refetchToken();
+    refetchRouter();
+  };
+  
+  return {
+    burnEnabled: burnEnabled as boolean | undefined,
+    totalBurned: totalBurned as bigint | undefined,
+    utilityToken: utilityToken as string | undefined,
+    uniswapRouter: uniswapRouter as string | undefined,
+    isLoading: loadingEnabled || loadingBurned || loadingToken || loadingRouter,
+    refetch,
+  };
+}
+
+/**
+ * Hook to configure burn mechanism (admin only)
+ */
+export function useConfigureBurn() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data: hash, isPending, writeContractAsync, error, reset } = useWriteContract();
+  
+  const configureBurn = async (utilityToken: string, router: string, enabled: boolean) => {
+    if (!contractAddress) {
+      throw new Error('Contract address not found');
+    }
+    
+    console.log('🔥 Configuring burn:', { utilityToken, router, enabled });
+    return writeContractAsync({
+      address: contractAddress as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'configureBurn',
+      args: [utilityToken as `0x${string}`, router as `0x${string}`, enabled],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    configureBurn,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+    reset,
+  };
+}
+
+// ============================================
+// DUAL COIN CONTRACT HOOKS
+// ============================================
+
+/**
+ * Hook to check token allowance for dual coin contract
+ */
+export function useDualCoinTokenAllowance() {
+  const chainId = useChainId();
+  const { address } = useAccount();
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
+  const tokenAddress = TOKEN_ADDRESSES[chainId as keyof typeof TOKEN_ADDRESSES];
+  
+  const { data: allowance, refetch } = useReadContract({
+    address: tokenAddress as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: address && contractAddress ? [address, contractAddress as `0x${string}`] : undefined,
+    query: {
+      enabled: !!address && !!contractAddress && !!tokenAddress,
+    },
+  });
+  
+  return {
+    allowance: allowance as bigint | undefined,
+    refetch,
+  };
+}
+
+/**
+ * Hook to approve token spending for dual coin contract
+ */
+export function useDualCoinTokenApproval() {
+  const chainId = useChainId();
+  const { address, isConnected, connector } = useAccount();
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
+  const tokenAddress = TOKEN_ADDRESSES[chainId as keyof typeof TOKEN_ADDRESSES];
+  
+  const { data: hash, isPending, writeContractAsync, error, reset, status } = useWriteContract();
+  
+  const approve = async (amount: bigint) => {
+    if (!contractAddress || !tokenAddress) {
+      throw new Error('Contract addresses not available');
+    }
+    
+    if (!isConnected || !address) {
+      throw new Error('Wallet not connected');
+    }
+    
+    console.log(`📝 Approving ${amount} for dual coin contract ${contractAddress}`);
+    
+    return writeContractAsync({
+      address: tokenAddress as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [contractAddress as `0x${string}`, amount],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    approve,
+    hash,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    reset,
+  };
+}
+
+/**
+ * Hook to buy shares in dual coin market
+ */
+export function useDualCoinPlaceBet() {
+  const chainId = useChainId();
+  const { address, isConnected, connector } = useAccount();
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
+  
+  const { data: hash, isPending, writeContractAsync, error, reset, status } = useWriteContract();
+  
+  useEffect(() => {
+    if (status !== 'idle') {
+      console.log(`🔄 useDualCoinPlaceBet status: ${status}, hash: ${hash || 'none'}, error:`, error?.message || 'none');
+    }
+  }, [status, hash, error]);
+  
+  const placeBet = async (marketId: number, outcomeIndex: number, amount: string) => {
+    if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Dual coin contract not deployed on this network');
+    }
+    
+    if (!isConnected || !address) {
+      throw new Error('Wallet not connected');
+    }
+    
+    const amountInToken = parseUnits(amount, TOKEN_DECIMALS);
+    const maxCost = amountInToken + (amountInToken / 100n); // 1% slippage
+    
+    console.log(`🎯 Dual coin bet: marketId=${marketId}, outcomeIndex=${outcomeIndex}, amount=${amount} ${TOKEN_SYMBOL}`);
+    console.log(`📍 Dual coin contract: ${contractAddress}`);
+    
+    return writeContractAsync({
+      address: contractAddress as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'buyShares',
+      args: [BigInt(marketId), outcomeIndex, amountInToken, maxCost],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    placeBet,
+    hash,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    reset,
+  };
+}
+
+/**
+ * Hook to get bucket liquidity for dual coin market
+ */
+export function useDualCoinBucketLiquidity(marketId: number | undefined, outcomeIndex: number | undefined) {
+  const chainId = useChainId();
+  const activeChainId = chainId || 84532;
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'getBucketData',
+    args: marketId !== undefined && outcomeIndex !== undefined ? [BigInt(marketId), outcomeIndex] : undefined,
+    chainId: 84532,
+    query: {
+      enabled: marketId !== undefined && outcomeIndex !== undefined,
+      refetchInterval: 3000,
+      staleTime: 0,
+      gcTime: 1000,
+    },
+  });
+  
+  const bucketData = data as [bigint, bigint] | undefined;
+  
+  return {
+    liquidity: bucketData ? bucketData[0] : undefined,
+    totalShares: bucketData ? bucketData[1] : undefined,
     isLoading,
     error,
     refetch,

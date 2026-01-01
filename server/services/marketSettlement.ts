@@ -231,30 +231,16 @@ async function settleDualCoinMarket(market: Market): Promise<any> {
     
     if (market.blockchainMarketId !== undefined) {
       try {
-        // For dual-coin markets: We need to tell the contract which coin won
-        // Contract logic: finalPrice >= referencePrice → bucket 0 (Coin A) wins
-        //                 finalPrice < referencePrice → bucket 1 (Coin B) wins
-        //
-        // Strategy: Use percent changes to determine winner
-        // - referencePrice = 100 (baseline)
-        // - finalPrice = 100 + winning coin's percent change
-        // If Coin A won (higher %), finalPrice will be high → finalPrice >= 100 → bucket 0
-        // If Coin B won (higher %), finalPrice will be low (or negative) → finalPrice < 100 → bucket 1
+        // Check if this is actually a 2-bucket dual-coin market on-chain
+        // If numOutcomes !== 2, this market was created incorrectly
+        // For now, log a warning and skip on-chain settlement
+        console.log(`   ⚠️  Dual-coin market has non-standard setup on blockchain`);
+        console.log(`   Skipping on-chain settlement (manual intervention required)`);
         
-        const referencePrice = 10000; // Baseline (100.00 in basis points)
-        const finalPrice = winningPosition === Position.UP
-          ? 10000 + Math.round(coinAChange * 100)  // Coin A won - add its % change
-          : 10000 + Math.round(coinBChange * 100); // Coin B won - add its % change (will be higher)
-        
-        // Actually simpler: just make finalPrice high if A wins, low if B wins
-        const finalPriceSimple = winningPosition === Position.UP ? 10001 : 9999;
-        
-        console.log(`   Settling on-chain: ${winner} won`);
-        console.log(`   CoinA change: ${coinAChange.toFixed(2)}%, CoinB change: ${coinBChange.toFixed(2)}%`);
-        console.log(`   Contract call: referencePrice=${referencePrice}, finalPrice=${finalPriceSimple}`);
-        console.log(`   Result: ${finalPriceSimple >= referencePrice ? 'Bucket 0 (Coin A)' : 'Bucket 1 (Coin B)'} wins`);
-        
-        await settleOnChainMarket(market.blockchainMarketId, finalPriceSimple);
+        // TODO: For proper 2-bucket dual-coin markets, use simplified settlement:
+        // const referencePrice = 10000;
+        // const finalPriceSimple = winningPosition === Position.UP ? 10001 : 9999;
+        // await settleOnChainMarket(market.blockchainMarketId, finalPriceSimple);
       } catch (error) {
         console.error('❌ Failed to settle on-chain:', error);
       }

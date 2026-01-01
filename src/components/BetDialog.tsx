@@ -7,8 +7,8 @@ import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-reac
 import { Market, placeBet } from '@/lib/marketApi';
 import { useAccount, useChainId } from 'wagmi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance, useBucketLiquidity } from '@/hooks/useContract';
-import { CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
+import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance, useBucketLiquidity, useDualCoinPlaceBet, useDualCoinTokenAllowance, useDualCoinTokenApproval, useDualCoinBucketLiquidity } from '@/hooks/useContract';
+import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { parseUnits } from 'viem';
 
 interface BetDialogProps {
@@ -30,26 +30,55 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
   const [needsApproval, setNeedsApproval] = useState(false);
   const [approvalJustConfirmed, setApprovalJustConfirmed] = useState(false);
 
-  // Token hooks
+  // Detect if this is a dual coin market
+  const isDualCoin = !!(market as any).isDualCoin;
+
+  // Token hooks - use dual coin versions for dual coin markets
   const { balance: tokenBalance, balanceFormatted: tokenBalanceFormatted } = useTokenBalance();
-  const { allowance, refetch: refetchAllowance } = useTokenAllowance();
-  const { approve: approveToken, isPending: isApproving, isConfirming: isApprovalConfirming, isConfirmed: isApprovalConfirmed, error: approvalError } = useTokenApproval();
+  
+  // Standard market hooks
+  const { allowance: stdAllowance, refetch: refetchStdAllowance } = useTokenAllowance();
+  const { approve: stdApproveToken, isPending: stdIsApproving, isConfirming: stdIsApprovalConfirming, isConfirmed: stdIsApprovalConfirmed, error: stdApprovalError } = useTokenApproval();
+  const { placeBet: stdPlaceBet, isPending: stdIsPending, isConfirming: stdIsConfirming, isConfirmed: stdIsConfirmed, error: stdContractError } = usePlaceBet();
+  
+  // Dual coin market hooks
+  const { allowance: dualAllowance, refetch: refetchDualAllowance } = useDualCoinTokenAllowance();
+  const { approve: dualApproveToken, isPending: dualIsApproving, isConfirming: dualIsApprovalConfirming, isConfirmed: dualIsApprovalConfirmed, error: dualApprovalError } = useDualCoinTokenApproval();
+  const { placeBet: dualPlaceBet, isPending: dualIsPending, isConfirming: dualIsConfirming, isConfirmed: dualIsConfirmed, error: dualContractError } = useDualCoinPlaceBet();
+  
+  // Select the right hooks based on market type
+  const allowance = isDualCoin ? dualAllowance : stdAllowance;
+  const refetchAllowance = isDualCoin ? refetchDualAllowance : refetchStdAllowance;
+  const approveToken = isDualCoin ? dualApproveToken : stdApproveToken;
+  const isApproving = isDualCoin ? dualIsApproving : stdIsApproving;
+  const isApprovalConfirming = isDualCoin ? dualIsApprovalConfirming : stdIsApprovalConfirming;
+  const isApprovalConfirmed = isDualCoin ? dualIsApprovalConfirmed : stdIsApprovalConfirmed;
+  const approvalError = isDualCoin ? dualApprovalError : stdApprovalError;
+  const placeBetOnChain = isDualCoin ? dualPlaceBet : stdPlaceBet;
+  const isPending = isDualCoin ? dualIsPending : stdIsPending;
+  const isConfirming = isDualCoin ? dualIsConfirming : stdIsConfirming;
+  const isConfirmed = isDualCoin ? dualIsConfirmed : stdIsConfirmed;
+  const contractError = isDualCoin ? dualContractError : stdContractError;
 
   // Get live probabilities to calculate bucket-specific odds
   const { probabilities } = useMarketProbabilities(market.blockchainMarketId);
   
-  // Get bucket liquidity for share calculation
-  const { liquidity: bucketLiquidity } = useBucketLiquidity(
-    market.blockchainMarketId,
-    bucketIndex !== undefined ? bucketIndex : (position === 'UP' ? 4 : 5)
+  // Get bucket liquidity for share calculation - use dual coin version for dual coin markets
+  const { liquidity: stdBucketLiquidity } = useBucketLiquidity(
+    isDualCoin ? undefined : market.blockchainMarketId,
+    isDualCoin ? undefined : (bucketIndex !== undefined ? bucketIndex : (position === 'UP' ? 4 : 5))
   );
-
-  // Smart contract hooks
-  const { placeBet: placeBetOnChain, isPending, isConfirming, isConfirmed, error: contractError } = usePlaceBet();
+  const { liquidity: dualBucketLiquidity } = useDualCoinBucketLiquidity(
+    isDualCoin ? market.blockchainMarketId : undefined,
+    isDualCoin ? (bucketIndex !== undefined ? bucketIndex : (position === 'UP' ? 0 : 1)) : undefined
+  );
+  const bucketLiquidity = isDualCoin ? dualBucketLiquidity : stdBucketLiquidity;
   
   // Default to Base Sepolia (84532) if not connected
   const activeChainId = chainId || 84532;
-  const contractAddress = CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
+  const contractAddress = isDualCoin 
+    ? DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES]
+    : CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
   const isContractDeployed = contractAddress && contractAddress !== '0x0000000000000000000000000000000000000000';
 
   // Calculate bucket-specific payout estimate for proportional/parimutuel market

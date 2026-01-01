@@ -5,10 +5,10 @@ import { TrendingUp, TrendingDown, Clock, Lock, CheckCircle2 } from 'lucide-reac
 import { useState, useEffect } from 'react';
 import { BetDialog } from './BetDialog';
 import { useLiveCoinPrice } from '@/hooks/useLiveCoinPrice';
-import { useBucketLiquidity } from '@/hooks/useContract';
+import { useDualCoinBucketLiquidity } from '@/hooks/useContract';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { baseSepolia } from 'wagmi/chains';
-import { CONTRACT_ADDRESSES } from '@/config/contract';
+import { DUAL_COIN_CONTRACT_ADDRESSES } from '@/config/contract';
 
 interface DualCoinMarketCardProps {
   market: {
@@ -74,9 +74,9 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   const { data: coinAData } = useLiveCoinPrice(market.coinAAddress);
   const { data: coinBData } = useLiveCoinPrice(market.coinBAddress);
 
-  // Fetch real-time on-chain pool liquidity for dynamic percentages
-  const { liquidity: coinALiquidity } = useBucketLiquidity(market.blockchainMarketId, 0);
-  const { liquidity: coinBLiquidity } = useBucketLiquidity(market.blockchainMarketId, 1);
+  // Fetch real-time on-chain pool liquidity for dynamic percentages (using dual coin contract)
+  const { liquidity: coinALiquidity } = useDualCoinBucketLiquidity(market.blockchainMarketId, 0);
+  const { liquidity: coinBLiquidity } = useDualCoinBucketLiquidity(market.blockchainMarketId, 1);
 
   // Fetch on-chain bet count
   useEffect(() => {
@@ -86,7 +86,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
       }
 
       try {
-        const contractAddress = CONTRACT_ADDRESSES[84532];
+        const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[84532];
         const publicClient = createPublicClient({
           chain: baseSepolia,
           transport: http('https://sepolia.base.org'),
@@ -162,8 +162,9 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     : ((coinBPrice - coinBOpeningPrice) / coinBOpeningPrice) * 100;
 
   const handleBet = (coin: 'A' | 'B') => {
-    // Both coins bet UP - bucket 0 = Coin A, bucket 1 = Coin B
-    setSelectedPosition('UP');
+    // Set position based on which coin was selected
+    // 'UP' = Coin A (bucket 0), 'DOWN' = Coin B (bucket 1)
+    setSelectedPosition(coin === 'A' ? 'UP' : 'DOWN');
     setShowBetDialog(true);
   };
 

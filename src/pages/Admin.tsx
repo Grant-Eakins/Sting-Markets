@@ -16,8 +16,8 @@ import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAccount } from 'wagmi';
 import { TOKEN_SYMBOL, TOKEN_DECIMALS } from '@/config/contract';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useWithdrawFees, useProtocolFees } from '@/hooks/useContract';
-import { formatUnits } from 'viem';
+import { useWithdrawFees, useProtocolFees, useMaxBetSize, useSetMaxBetSize, useBurnConfig, useConfigureBurn } from '@/hooks/useContract';
+import { formatUnits, parseUnits } from 'viem';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
@@ -109,9 +109,25 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  // Contract configuration state
+  const [newMaxBetInput, setNewMaxBetInput] = useState('');
+  const [burnConfigInput, setBurnConfigInput] = useState({
+    utilityToken: '',
+    router: '',
+    enabled: false,
+  });
+
   // Protocol fees hooks
   const { feesCollected, isLoading: feesLoading, refetch: refetchFees } = useProtocolFees();
   const { withdrawFees, isPending: isWithdrawing, isConfirming, isConfirmed, error: withdrawError } = useWithdrawFees();
+
+  // Max bet size hooks
+  const { maxBetSize, isLoading: maxBetLoading, refetch: refetchMaxBet } = useMaxBetSize();
+  const { setMaxBetSize, isPending: isSettingMaxBet, isConfirming: isConfirmingMaxBet, isConfirmed: isMaxBetConfirmed, error: maxBetError, reset: resetMaxBet } = useSetMaxBetSize();
+
+  // Burn config hooks
+  const { burnEnabled, totalBurned, utilityToken, uniswapRouter, isLoading: burnConfigLoading, refetch: refetchBurnConfig } = useBurnConfig();
+  const { configureBurn, isPending: isConfiguringBurn, isConfirming: isConfirmingBurn, isConfirmed: isBurnConfigured, error: burnError, reset: resetBurn } = useConfigureBurn();
 
   // Check if the connected wallet is an admin
   const addressLower = address?.toLowerCase();
@@ -560,6 +576,186 @@ export default function AdminPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Contract Configuration */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Max Bet Size Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  Max Bet Size
+                </CardTitle>
+                <CardDescription>
+                  Configure the maximum bet size allowed per transaction
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Current Max Bet</p>
+                      <p className="text-2xl font-bold">
+                        {maxBetLoading ? '...' : maxBetSize ? `$${(Number(maxBetSize) / 1e6).toFixed(2)} USDC` : 'Not set'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="newMaxBet">New Max Bet (USDC)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="newMaxBet"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={newMaxBetInput}
+                        onChange={(e) => setNewMaxBetInput(e.target.value)}
+                        placeholder="e.g., 100 for $100"
+                      />
+                      <Button
+                        onClick={async () => {
+                          if (!newMaxBetInput) return;
+                          try {
+                            await setMaxBetSize(parseUnits(newMaxBetInput, 6));
+                            setNewMaxBetInput('');
+                          } catch (err) {
+                            console.error('Failed to set max bet:', err);
+                          }
+                        }}
+                        disabled={isSettingMaxBet || isConfirmingMaxBet || !newMaxBetInput}
+                      >
+                        {isSettingMaxBet && 'Sending...'}
+                        {isConfirmingMaxBet && 'Confirming...'}
+                        {!isSettingMaxBet && !isConfirmingMaxBet && 'Update'}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {isMaxBetConfirmed && (
+                    <Alert>
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        ✅ Max bet size updated! Refresh to see new value.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  {maxBetError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Error: {maxBetError.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Burn Mechanism Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  🔥 Burn Mechanism
+                </CardTitle>
+                <CardDescription>
+                  Configure auto-swap and burn of utility tokens (1% of bets)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <p className={`text-lg font-bold ${burnEnabled ? 'text-green-500' : 'text-red-500'}`}>
+                        {burnConfigLoading ? '...' : burnEnabled ? '✅ Enabled' : '❌ Disabled'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Burned</p>
+                      <p className="text-lg font-bold">
+                        {burnConfigLoading ? '...' : totalBurned ? `${formatUnits(totalBurned, 18)}` : '0'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="utilityToken">Utility Token Address</Label>
+                      <Input
+                        id="utilityToken"
+                        value={burnConfigInput.utilityToken || (utilityToken && utilityToken !== '0x0000000000000000000000000000000000000000' ? utilityToken : '')}
+                        onChange={(e) => setBurnConfigInput({ ...burnConfigInput, utilityToken: e.target.value })}
+                        placeholder="0x..."
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="router">Uniswap Router Address</Label>
+                      <Input
+                        id="router"
+                        value={burnConfigInput.router || (uniswapRouter && uniswapRouter !== '0x0000000000000000000000000000000000000000' ? uniswapRouter : '')}
+                        onChange={(e) => setBurnConfigInput({ ...burnConfigInput, router: e.target.value })}
+                        placeholder="0x..."
+                      />
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="burnEnabled"
+                        checked={burnConfigInput.enabled}
+                        onCheckedChange={(checked) => setBurnConfigInput({ ...burnConfigInput, enabled: checked as boolean })}
+                      />
+                      <Label htmlFor="burnEnabled">Enable Burn Mechanism</Label>
+                    </div>
+                    
+                    <Button
+                      onClick={async () => {
+                        const tokenAddr = burnConfigInput.utilityToken || utilityToken || '';
+                        const routerAddr = burnConfigInput.router || uniswapRouter || '';
+                        
+                        if (burnConfigInput.enabled && (!tokenAddr || !routerAddr)) {
+                          alert('Please provide both token and router addresses to enable burn');
+                          return;
+                        }
+                        
+                        try {
+                          await configureBurn(tokenAddr, routerAddr, burnConfigInput.enabled);
+                        } catch (err) {
+                          console.error('Failed to configure burn:', err);
+                        }
+                      }}
+                      disabled={isConfiguringBurn || isConfirmingBurn}
+                      className="w-full"
+                    >
+                      {isConfiguringBurn && 'Sending...'}
+                      {isConfirmingBurn && 'Confirming...'}
+                      {!isConfiguringBurn && !isConfirmingBurn && 'Update Burn Config'}
+                    </Button>
+                  </div>
+                  
+                  {isBurnConfigured && (
+                    <Alert>
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        ✅ Burn configuration updated!
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  {burnError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Error: {burnError.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Statistics Dashboard */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-6 md:mb-8">

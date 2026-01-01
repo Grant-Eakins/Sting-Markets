@@ -220,6 +220,73 @@ export const PREDICTION_MARKET_ABI = [
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
+  },
+  // Max bet size functions
+  {
+    "inputs": [],
+    "name": "maxBetSize",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "newMaxBet", "type": "uint256" }
+    ],
+    "name": "setMaxBetSize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  // Burn mechanism functions
+  {
+    "inputs": [],
+    "name": "burnEnabled",
+    "outputs": [
+      { "internalType": "bool", "name": "", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalBurned",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "utilityToken",
+    "outputs": [
+      { "internalType": "address", "name": "", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "uniswapRouter",
+    "outputs": [
+      { "internalType": "address", "name": "", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_utilityToken", "type": "address" },
+      { "internalType": "address", "name": "_router", "type": "address" },
+      { "internalType": "bool", "name": "_enabled", "type": "bool" }
+    ],
+    "name": "configureBurn",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ] as const;
 
@@ -438,6 +505,14 @@ export const CONTRACT_ADDRESSES = {
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
   84532: '0xa36fA2A8Dc1be09e049FE468281D36bc12c2043F', // ProportionalMarketUSDC (MockUSDC + burn mechanism)
+} as const;
+
+// Dual Coin Market contract addresses (for coin battles)
+export const DUAL_COIN_CONTRACT_ADDRESSES = {
+  // Base Mainnet
+  8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
+  // Base Sepolia Testnet
+  84532: '0xBc6b9a31AB377D1FF73080F83E30D1e6868B2868', // ProportionalMarketDualCoin
 } as const;
 
 // USDC token contract addresses (used for betting)

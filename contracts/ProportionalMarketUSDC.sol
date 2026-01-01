@@ -244,13 +244,15 @@ contract ProportionalMarketMIND is Ownable, ReentrancyGuard, Pausable {
         uint256 burnFee = (amount * BURN_FEE_BPS) / 10000;
         uint256 netAmount = amount - protocolFee - burnFee;
         
-        protocolFeesCollected += protocolFee;
-        emit ProtocolFeeCollected(marketId, protocolFee);
+        // Add both fees to protocol (burn mechanism disabled until liquidity pool is set up)
+        protocolFeesCollected += protocolFee + burnFee;
+        emit ProtocolFeeCollected(marketId, protocolFee + burnFee);
         
+        // TODO: Re-enable burn mechanism after setting up USDC/Utility liquidity pool
         // Auto-swap and burn utility token (1% of bet)
-        if (burnFee > 0) {
-            _swapAndBurn(burnFee, marketId);
-        }
+        // if (burnFee > 0) {
+        //     _swapAndBurn(burnFee, marketId);
+        // }
         
         // Calculate shares with bonding curve (STEEPNESS = 10)
         // shares = netAmount * 1e18 / (1e18 + bucketLiquidity * 10)
