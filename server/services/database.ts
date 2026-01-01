@@ -276,21 +276,27 @@ export async function settleMarketInDb(
  * Delete a market
  */
 export async function deleteMarketFromDb(marketId: string): Promise<boolean> {
-  if (!supabase) return false;
+  if (!supabase) {
+    console.log('⚠️  Database not connected - cannot delete from DB');
+    return false;
+  }
 
   try {
+    console.log(`🗑️  Attempting to delete market from database: ${marketId}`);
     const { error } = await supabase
       .from('markets')
       .delete()
       .eq('id', marketId);
 
     if (error) {
-      console.error('❌ Error deleting market:', error.message);
+      console.error('❌ Error deleting market from database:', error.message);
+      console.error('   Market ID:', marketId);
       return false;
     }
+    console.log(`✅ Successfully deleted market from database: ${marketId}`);
     return true;
   } catch (error: any) {
-    console.error('❌ Error deleting market:', error.message);
+    console.error('❌ Error deleting market from database:', error.message);
     return false;
   }
 }

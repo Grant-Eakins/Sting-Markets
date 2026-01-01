@@ -224,6 +224,21 @@ export default function AdminPage() {
     },
   });
 
+  // Manual settle mutation for dual coin markets (uses auto-settlement logic)
+  const manualSettleDualCoin = useMutation({
+    mutationFn: async (marketId: string) => {
+      const response = await axios.post(`${API_BASE}/markets/${marketId}/settle-dual-coin`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-markets'] });
+      alert('✅ Dual coin market settled successfully!');
+    },
+    onError: (error: any) => {
+      alert(`❌ Error settling dual coin market: ${error.response?.data?.error || error.message}`);
+    },
+  });
+
   // Create market by contract address mutation
   const createByContract = useMutation({
     mutationFn: async (data: typeof contractData) => {
@@ -1204,11 +1219,11 @@ export default function AdminPage() {
                 Settle Market
               </CardTitle>
               <CardDescription>
-                Resolve a market with final interest score
+                Resolve a market with final price
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSettleMarket} className="space-y-4">
+              <div className="space-y-4">
                 <div>
                   <Label htmlFor="marketId">Market ID *</Label>
                   <Input
@@ -1216,37 +1231,74 @@ export default function AdminPage() {
                     value={settleData.marketId}
                     onChange={(e) => setSettleData({ ...settleData, marketId: e.target.value })}
                     placeholder="market-1234567890"
-                    required
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Copy from the markets list below
                   </p>
                 </div>
 
-                <div>
-                  <Label htmlFor="closingPrice">Closing Price (cents) *</Label>
-                  <Input
-                    id="closingPrice"
-                    type="number"
-                    min="1"
-                    value={settleData.closingPrice}
-                    onChange={(e) => handleSettleNumberChange(e.target.value)}
-                    placeholder="17800 = $178.00"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    In cents: ${(settleData.closingPrice / 100).toFixed(2)}. If closing ≥ opening: UP wins. If closing &lt; opening: DOWN wins.
-                  </p>
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={settleMarket.isPending}
-                >
-                  {settleMarket.isPending ? 'Settling...' : 'Settle Market'}
-                </Button>
-              </form>
+                {(() => {
+                  const selectedMarket = markets?.find((m: Market) => m.id === settleData.marketId);
+                  const isDualCoin = selectedMarket?.isDualCoin;
+                  
+                  if (selectedMarket) {
+                    if (isDualCoin) {
+                      return (
+                        <>
+                          <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                              ⚔️ Dual Coin Battle: {selectedMarket.coinASymbol} vs {selectedMarket.coinBSymbol}<br/>
+                              This market will automatically settle based on percentage changes.
+                            </AlertDescription>
+                          </Alert>
+                          <Button 
+                            type="button"
+                            onClick={() => manualSettleDualCoin.mutate(settleData.marketId)}
+                            className="w-full" 
+                            disabled={manualSettleDualCoin.isPending}
+                          >
+                            {manualSettleDualCoin.isPending ? 'Settling...' : 'Settle Dual Coin Market Now'}
+                          </Button>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <form onSubmit={handleSettleMarket} className="space-y-4">
+                          <div>
+                            <Label htmlFor="closingPrice">Closing Price (cents) *</Label>
+                            <Input
+                              id="closingPrice"
+                              type="number"
+                              min="1"
+                              value={settleData.closingPrice}
+                              onChange={(e) => handleSettleNumberChange(e.target.value)}
+                              placeholder="17800 = $178.00"
+                              required
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              In cents: ${(settleData.closingPrice / 100).toFixed(2)}. If closing ≥ opening: UP wins. If closing &lt; opening: DOWN wins.
+                            </p>
+                          </div>
+                          <Button 
+                            type="submit" 
+                            className="w-full" 
+                            disabled={settleMarket.isPending}
+                          >
+                            {settleMarket.isPending ? 'Settling...' : 'Settle Market'}
+                          </Button>
+                        </form>
+                      );
+                    }
+                  } else {
+                    return (
+                      <p className="text-sm text-muted-foreground">
+                        Enter a market ID to settle
+                      </p>
+                    );
+                  }
+                })()}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1444,12 +1496,17 @@ export default function AdminPage() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => handleDeleteMarket(market.id, market.stockSymbol)}
+                          onClick={() => {
+                            const symbol = market.isDualCoin 
+                              ? `${market.coinASymbol} vs ${market.coinBSymbol}`
+                              : market.stockSymbol;
+                            handleDeleteMarket(market.id, symbol);
+                          }}
                           disabled={deleteMarket.isPending}
                           className="flex items-center gap-1 w-full sm:w-auto"
                         >
                           <Trash2 className="w-4 h-4" />
-                          <span className="sm:inline">Delete</span>
+                          <span className="sm:inline">{deleteMarket.isPending ? 'Deleting...' : 'Delete'}</span>
                         </Button>
                       </div>
                     </div>

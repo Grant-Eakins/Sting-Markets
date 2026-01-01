@@ -22,6 +22,7 @@ import { getCryptoQuote } from '../services/cryptoApi';
 import { getTokenByAddress, searchTokens, getTokenHistory } from '../services/dexScreenerApi';
 import { saveMarket, deleteMarketFromDb } from '../services/database';
 import { getScheduledMarkets } from '../services/scheduledMarketActivation';
+import { settleDualCoinMarket } from '../services/marketSettlement';
 
 const router = express.Router();
 
@@ -717,6 +718,59 @@ router.post('/:id/settle', async (req, res) => {
 });
 
 /**
+ * POST /api/markets/:id/settle-dual-coin
+ * Manually settle a dual coin market using automated settlement logic
+ */
+router.post('/:id/settle-dual-coin', async (req, res) => {
+  try {
+    const market = getMarket(req.params.id);
+    
+    if (!market) {
+      return res.status(404).json({
+        success: false,
+        error: 'Market not found',
+      });
+    }
+    
+    if (!market.isDualCoin) {
+      return res.status(400).json({
+        success: false,
+        error: 'This endpoint is only for dual coin markets. Use /settle for regular markets.',
+      });
+    }
+    
+    if (market.status === 'SETTLED') {
+      return res.status(400).json({
+        success: false,
+        error: 'Market already settled',
+      });
+    }
+    
+    // Use the dual coin settlement function
+    const result = await settleDualCoinMarket(market);
+    
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to settle dual coin market - could not fetch token prices',
+      });
+    }
+    
+    res.json({
+      success: true,
+      market: getMarket(req.params.id),
+      message: `Dual coin market settled. Winner: ${result.winner}`,
+      settlementResult: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * POST /api/markets/:id/blockchain-id
  * Update the blockchainMarketId for a market (used by sync script)
  */
@@ -1108,18 +1162,30 @@ router.post('/symbol/:symbol/resume', async (req, res) => {
  */
 router.delete('/settled', async (req, res) => {
   try {
+    console.log('🗑️  Admin request: Delete all settled markets');
     const markets = getAllMarkets();
     const settledMarkets = markets.filter(m => m.status === MarketStatus.SETTLED);
     
+    console.log(`   Found ${settledMarkets.length} settled markets to delete`);
+    
     let deleteCount = 0;
     for (const market of settledMarkets) {
-      await deleteMarketFromDb(market.id);
+      const displayName = market.stockSymbol || `${market.coinASymbol} vs ${market.coinBSymbol}`;
+      console.log(`   Deleting: ${displayName} (${market.id})`);
+      
+      const dbDeleted = await deleteMarketFromDb(market.id);
       const { deleteMarketById } = await import('../services/marketService');
-      const deleted = await deleteMarketById(market.id);
-      if (deleted) deleteCount++;
+      const memoryDeleted = await deleteMarketById(market.id);
+      
+      if (dbDeleted || memoryDeleted) {
+        deleteCount++;
+        console.log(`     ✅ Deleted`);
+      } else {
+        console.log(`     ⚠️  Failed to delete`);
+      }
     }
     
-    console.log(`🗑️ Deleted ${deleteCount} settled markets`);
+    console.log(`✅ Deleted ${deleteCount} of ${settledMarkets.length} settled markets`);
     
     res.json({
       success: true,
@@ -1152,25 +1218,30 @@ router.delete('/:id', async (req, res) => {
       });
     }
     
-    // Delete from database
+    console.log(`🗑️  Admin delete request for market: ${market.stockSymbol || market.coinASymbol + ' vs ' + market.coinBSymbol} (${id})`);
+    
+    // Delete from database first
     const dbDeleted = await deleteMarketFromDb(id);
+    console.log(`   Database deletion: ${dbDeleted ? '✅ Success' : '❌ Failed'}`);
     
     // Delete from memory using the service function
     const { deleteMarketById } = await import('../services/marketService');
     const memoryDeleted = await deleteMarketById(id);
+    console.log(`   Memory deletion: ${memoryDeleted ? '✅ Success' : '❌ Failed'}`);
     
     if (!memoryDeleted && !dbDeleted) {
       return res.status(404).json({
         success: false,
-        error: 'Market not found',
+        error: 'Market not found in database or memory',
       });
     }
     
-    console.log(`🗑️ Deleted market: ${market.stockSymbol} (${id})`);
+    const displayName = market.stockSymbol || `${market.coinASymbol} vs ${market.coinBSymbol}`;
+    console.log(`✅ Market deleted successfully: ${displayName}`);
     
     res.json({
       success: true,
-      message: `Market ${market.stockSymbol} deleted successfully`,
+      message: `Market ${displayName} deleted successfully`,
       marketId: id,
     });
   } catch (error: any) {

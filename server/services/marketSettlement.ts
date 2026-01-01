@@ -191,8 +191,7 @@ export async function checkAndSettleMarkets(): Promise<void> {
 /**
  * Settle a dual-coin head-to-head market by comparing percentage changes
  */
-
-async function settleDualCoinMarket(market: Market): Promise<any> {
+export async function settleDualCoinMarket(market: Market): Promise<any> {
   if (!market.isDualCoin || !market.coinAAddress || !market.coinBAddress) {
     throw new Error('Not a dual-coin market');
   }

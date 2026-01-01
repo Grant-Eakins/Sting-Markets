@@ -62,27 +62,34 @@ export function createMarket(request: CreateMarketRequest): Market {
   const id = `market-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const now = new Date();
   
-  // Determine if this should be a scheduled market (dual-coin battles)
-  const isScheduled = request.isDualCoin === true;
-  
   let startTime: Date | undefined;
   let lockTime: Date;
   let settleTime: Date;
   let status: MarketStatus;
   
-  if (isScheduled) {
-    // SCHEDULED MARKET: Activate at next noon/midnight
-    startTime = getNextMarketStartTime();
-    lockTime = calculateLockTime(startTime);
-    settleTime = calculateSettleTime(startTime);
-    status = MarketStatus.SCHEDULED;
-    
-    console.log(`📅 Scheduling market for ${startTime.toLocaleString()}`);
-  } else if (request.lockTime && request.settleTime) {
-    // Direct timestamps provided - use them (legacy)
+  if (request.lockTime && request.settleTime) {
+    // Direct timestamps provided - use them
     lockTime = request.lockTime;
     settleTime = request.settleTime;
-    status = MarketStatus.ACTIVE;
+    
+    // For dual coin markets: if lock time is now or in the past, it's ACTIVE. Otherwise SCHEDULED.
+    if (request.isDualCoin) {
+      const lockInFuture = lockTime.getTime() > now.getTime() + 60000; // More than 1 minute in future
+      
+      if (lockInFuture) {
+        // SCHEDULED: Will start in the future
+        startTime = lockTime;
+        status = MarketStatus.SCHEDULED;
+        console.log(`📅 Scheduling market for ${startTime.toLocaleString()}`);
+      } else {
+        // ACTIVE: Starts now
+        status = MarketStatus.ACTIVE;
+        console.log(`⚡ Creating ACTIVE market (starts immediately)`);
+      }
+    } else {
+      // Regular markets are always ACTIVE when created with explicit times
+      status = MarketStatus.ACTIVE;
+    }
   } else {
     // Calculate from hours (legacy behavior for single-coin markets)
     const lockHours = request.lockHours || (request.isAfterHours ? 8 : 2);
@@ -134,7 +141,8 @@ export function createMarket(request: CreateMarketRequest): Market {
   // Save to database asynchronously
   saveMarket(market).catch(err => console.error('Failed to save market to DB:', err));
   
-  if (isScheduled) {
+  // Log appropriate message based on status
+  if (status === MarketStatus.SCHEDULED) {
     console.log(`✅ Market scheduled: ${market.stockSymbol} - Starts at ${startTime?.toLocaleString()}`);
   } else {
     console.log(`✅ Market created: ${market.stockSymbol} @ $${(request.openingPrice / 100).toFixed(2)} (${request.isAfterHours ? 'After-Hours' : 'Trading Hours'})`);
