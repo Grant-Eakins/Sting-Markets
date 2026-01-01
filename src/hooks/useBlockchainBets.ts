@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { baseSepolia } from 'viem/chains';
 
-// MIND token uses 18 decimals
+// Token decimals from config (USDC uses 6 decimals)
 const DECIMALS_DIVISOR = 10 ** TOKEN_DECIMALS;
 
 // Create a public client for reading events with a proper RPC
@@ -210,8 +210,8 @@ export function useBlockchainBets() {
       const activeBets: BlockchainBet[] = [];
       
       // Dust threshold: positions with less than 0.0001 tokens worth are considered fully sold
-      // Lowered from 0.01 to handle bonding curve creating very small share amounts
-      const DUST_THRESHOLD = BigInt(100000000000000); // 0.0001 * 1e18
+      // Uses TOKEN_DECIMALS to handle both USDC (6 decimals) and MIND (18 decimals)
+      const DUST_THRESHOLD = BigInt(Math.floor(0.0001 * DECIMALS_DIVISOR));
       
       console.log(`📊 Processing ${positionMap.size} positions...`);
       

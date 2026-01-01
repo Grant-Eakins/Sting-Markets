@@ -51,19 +51,21 @@ export async function activateScheduledMarkets(): Promise<number> {
         ]);
 
         if (tokenA && tokenB) {
-          // Update opening prices at activation time
-          market.coinAOpeningPrice = tokenA.price < 0.01 
-            ? Math.round(tokenA.price * 100_000_000) 
-            : Math.round(tokenA.price * 100);
-          
-          market.coinBOpeningPrice = tokenB.price < 0.01 
-            ? Math.round(tokenB.price * 100_000_000) 
-            : Math.round(tokenB.price * 100);
+          // Store RAW USD prices (no encoding for exact display)
+          market.coinAOpeningPrice = tokenA.price;
+          market.coinBOpeningPrice = tokenB.price;
+          market.openingPrice = tokenA.price; // Use coin A as reference
 
-          market.openingPrice = market.coinAOpeningPrice; // Use coin A as reference
+          // Encode prices for blockchain
+          const coinAPriceEncoded = tokenA.price < 0.01 
+            ? Math.floor(tokenA.price * 100_000_000) 
+            : Math.floor(tokenA.price * 100);
 
-          console.log(`   ${market.coinASymbol}: $${(market.coinAOpeningPrice / 100).toFixed(2)}`);
-          console.log(`   ${market.coinBSymbol}: $${(market.coinBOpeningPrice / 100).toFixed(2)}`);
+          // Store encoded price for blockchain creation
+          (market as any).encodedOpeningPrice = coinAPriceEncoded;
+
+          console.log(`   ${market.coinASymbol}: $${tokenA.price < 0.01 ? tokenA.price.toFixed(8) : tokenA.price.toFixed(4)}`);
+          console.log(`   ${market.coinBSymbol}: $${tokenB.price < 0.01 ? tokenB.price.toFixed(8) : tokenB.price.toFixed(4)}`);
         }
       }
 
@@ -71,9 +73,10 @@ export async function activateScheduledMarkets(): Promise<number> {
       try {
         const numOutcomes = market.isDualCoin ? 2 : 42; // 2 outcomes for dual-coin battles
         const symbol = market.isDualCoin ? `${market.coinASymbol}vs${market.coinBSymbol}` : market.stockSymbol;
+        const referencePrice = (market as any).encodedOpeningPrice || market.openingPrice; // Use encoded price if available
         const blockchainMarketId = await createOnChainMarket(
           symbol,
-          market.openingPrice,
+          referencePrice,
           newLockTime,
           newSettleTime,
           false, // isAfterHours

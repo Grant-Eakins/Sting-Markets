@@ -391,7 +391,7 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
           <Button
             onClick={handlePlaceBet}
             disabled={!isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming || approvalJustConfirmed}
-            className={position === 'UP' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
+            className='bg-green-500 hover:bg-green-600'
           >
             {isApproving ? `Approving ${TOKEN_SYMBOL}...` :
              isApprovalConfirming ? 'Confirming Approval...' :

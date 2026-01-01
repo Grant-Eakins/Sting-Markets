@@ -107,6 +107,10 @@ export async function saveMarket(market: Market): Promise<boolean> {
       return false;
     }
     console.log(`✅ Market saved to database: ${market.id} (isDualCoin: ${market.isDualCoin})`);
+    if (market.isDualCoin) {
+      console.log(`   Coin A opening price (stored): ${market.coinAOpeningPrice}`);
+      console.log(`   Coin B opening price (stored): ${market.coinBOpeningPrice}`);
+    }
     return true;
   } catch (error: any) {
     console.error('❌ Error saving market:', error.message);
@@ -581,11 +585,17 @@ function dbMarketToMarket(row: any): Market {
     coinBChangePercent: row.coin_b_change_percent,
     autoRecreate: row.auto_recreate ?? false,
   };
+  
+  // Debug log for dual coin markets
+  if (row.is_dual_coin) {
+    console.log(`🔍 Loaded dual coin market: ${row.stock_symbol}`);
+    console.log(`   Coin A opening from DB: ${row.coin_a_opening_price} (type: ${typeof row.coin_a_opening_price})`);
+    console.log(`   Coin B opening from DB: ${row.coin_b_opening_price} (type: ${typeof row.coin_b_opening_price})`);
+  }
+  
+  return market;
 }
 
-/**
- * Convert database row to Bet object
- */
 function dbBetToBet(row: any): Bet {
   return {
     id: row.id,

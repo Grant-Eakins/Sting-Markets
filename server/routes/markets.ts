@@ -500,15 +500,27 @@ router.post('/create-dual-coin', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Token B not found on DexScreener. Make sure it has liquidity on a Base DEX.' });
     }
     
-    // Store prices as micro-units for tiny prices
+    // Store RAW USD prices without encoding (for exact display)
     const priceAUsd = tokenA.price;
     const priceBUsd = tokenB.price;
-    const coinAPrice = priceAUsd < 0.01 ? Math.round(priceAUsd * 100_000_000) : Math.round(priceAUsd * 100);
-    const coinBPrice = priceBUsd < 0.01 ? Math.round(priceBUsd * 100_000_000) : Math.round(priceBUsd * 100);
+    const coinAPrice = priceAUsd; // Store raw price for display
+    const coinBPrice = priceBUsd; // Store raw price for display
+    
+    // Encode prices for blockchain (reference price needs to be integer)
+    const coinAPriceEncoded = priceAUsd < 0.01 ? Math.floor(priceAUsd * 100_000_000) : Math.floor(priceAUsd * 100);
+    const coinBPriceEncoded = priceBUsd < 0.01 ? Math.floor(priceBUsd * 100_000_000) : Math.floor(priceBUsd * 100);
     
     console.log(`\n🆚 Creating dual-coin market: ${tokenA.symbol} vs ${tokenB.symbol}`);
-    console.log(`   ${tokenA.symbol}: $${priceAUsd < 0.01 ? priceAUsd.toFixed(8) : priceAUsd.toFixed(4)}`);
-    console.log(`   ${tokenB.symbol}: $${priceBUsd < 0.01 ? priceBUsd.toFixed(8) : priceBUsd.toFixed(4)}`);
+    console.log(`   ${tokenA.symbol}:`);
+    console.log(`      Raw USD price: ${priceAUsd}`);
+    console.log(`      Display: $${priceAUsd < 0.01 ? priceAUsd.toFixed(8) : priceAUsd.toFixed(4)}`);
+    console.log(`      Stored value: ${coinAPrice}`);
+    console.log(`      Blockchain encoded: ${coinAPriceEncoded}`);
+    console.log(`   ${tokenB.symbol}:`);
+    console.log(`      Raw USD price: ${priceBUsd}`);
+    console.log(`      Display: $${priceBUsd < 0.01 ? priceBUsd.toFixed(8) : priceBUsd.toFixed(4)}`);
+    console.log(`      Stored value: ${coinBPrice}`);
+    console.log(`      Blockchain encoded: ${coinBPriceEncoded}`);
     console.log(`   Session: ${sessionLabel}`);
     
     // Create market
@@ -539,7 +551,7 @@ router.post('/create-dual-coin', async (req, res) => {
     try {
       const blockchainMarketId = await createOnChainMarket(
         `${tokenA.symbol}vs${tokenB.symbol}`,
-        coinAPrice,
+        coinAPriceEncoded, // Use encoded price for blockchain
         market.lockTime,
         market.settleTime,
         false,

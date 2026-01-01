@@ -134,8 +134,9 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   const isActive = market.status === 'ACTIVE';
 
   // Convert opening prices from storage format to USD
-  const coinAOpeningPrice = convertPriceToUSD(market.coinAOpeningPrice);
-  const coinBOpeningPrice = convertPriceToUSD(market.coinBOpeningPrice);
+  // Opening prices are now stored as raw USD values (no encoding/decoding needed)
+  const coinAOpeningPrice = market.coinAOpeningPrice;
+  const coinBOpeningPrice = market.coinBOpeningPrice;
 
   // Use live prices when available (already in USD from API), fall back to market data
   const coinAPrice = (coinAData?.price !== undefined && coinAData?.price !== null)
@@ -161,17 +162,29 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
     : ((coinBPrice - coinBOpeningPrice) / coinBOpeningPrice) * 100;
 
   const handleBet = (coin: 'A' | 'B') => {
-    // Coin A = bucket 0 (UP position), Coin B = bucket 1 (DOWN position)
-    setSelectedPosition(coin === 'A' ? 'UP' : 'DOWN');
+    // Both coins bet UP - bucket 0 = Coin A, bucket 1 = Coin B
+    setSelectedPosition('UP');
     setShowBetDialog(true);
   };
 
   const formatPrice = (price: number | undefined) => {
     if (!price || price === 0) return '$0.00';
-    if (price < 0.01) {
-      return `$${price.toFixed(8)}`;
+    
+    // Use toPrecision for significant figures, then clean up trailing zeros
+    let formatted: string;
+    if (price < 0.00001) {
+      formatted = price.toPrecision(4); // 4 significant figures for tiny prices
+    } else if (price < 0.001) {
+      formatted = price.toPrecision(5); // 5 significant figures
+    } else if (price < 1) {
+      formatted = price.toPrecision(6); // 6 significant figures
+    } else {
+      formatted = price.toPrecision(7); // 7 significant figures for prices $1+
     }
-    return `$${price.toFixed(4)}`;
+    
+    // Remove trailing zeros and unnecessary decimal point
+    formatted = parseFloat(formatted).toString();
+    return `$${formatted}`;
   };
 
   const formatTimeRemaining = (targetTime: string) => {
@@ -278,10 +291,10 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                   {/* Price Information */}
                   <div className="mt-2 space-y-1">
                     <div className="text-xs text-muted-foreground">
-                      Open: ${coinAOpeningPrice.toFixed(coinAOpeningPrice < 0.01 ? 6 : 4)}
+                      Open: {formatPrice(coinAOpeningPrice)}
                     </div>
                     <div className="text-sm font-semibold text-foreground">
-                      Now: ${coinAPrice.toFixed(coinAPrice < 0.01 ? 6 : 4)}
+                      Now: {formatPrice(coinAPrice)}
                     </div>
                   </div>
                 </div>
@@ -403,10 +416,10 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                   {/* Price Information */}
                   <div className="mt-2 space-y-1">
                     <div className="text-xs text-muted-foreground">
-                      Open: ${coinBOpeningPrice.toFixed(coinBOpeningPrice < 0.01 ? 6 : 4)}
+                      Open: {formatPrice(coinBOpeningPrice)}
                     </div>
                     <div className="text-sm font-semibold text-foreground">
-                      Now: ${coinBPrice.toFixed(coinBPrice < 0.01 ? 6 : 4)}
+                      Now: {formatPrice(coinBPrice)}
                     </div>
                   </div>
                 </div>
