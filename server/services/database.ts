@@ -52,6 +52,16 @@ export async function saveMarket(market: Market): Promise<boolean> {
   if (!supabase) return false;
 
   try {
+    // Debug log all price values being saved
+    console.log(`💾 Saving market ${market.id}:`);
+    console.log(`   openingPrice: ${market.openingPrice} (type: ${typeof market.openingPrice})`);
+    console.log(`   currentPrice: ${market.currentPrice} (type: ${typeof market.currentPrice})`);
+    console.log(`   closingPrice: ${market.closingPrice} (type: ${typeof market.closingPrice})`);
+    if (market.isDualCoin) {
+      console.log(`   coinAOpeningPrice: ${market.coinAOpeningPrice} (type: ${typeof market.coinAOpeningPrice})`);
+      console.log(`   coinBOpeningPrice: ${market.coinBOpeningPrice} (type: ${typeof market.coinBOpeningPrice})`);
+    }
+    
     const { error } = await supabase
       .from('markets')
       .upsert({

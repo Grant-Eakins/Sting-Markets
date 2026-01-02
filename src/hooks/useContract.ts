@@ -466,6 +466,8 @@ export function useSetMaxBetSize() {
   const chainId = useChainId();
   const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
+  console.log('🔧 useSetMaxBetSize: chainId=', chainId, 'contractAddress=', contractAddress);
+  
   const { data: hash, isPending, writeContractAsync, error, reset } = useWriteContract();
   
   const setMaxBetSize = async (newMaxBet: bigint) => {
@@ -474,6 +476,8 @@ export function useSetMaxBetSize() {
     }
     
     console.log('📝 Setting max bet size to:', newMaxBet.toString());
+    console.log('📝 Target contract:', contractAddress);
+    console.log('📝 Expected: 0xBc6b9a31AB377D1FF73080F83E30D1e6868B2868');
     return writeContractAsync({
       address: contractAddress as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
