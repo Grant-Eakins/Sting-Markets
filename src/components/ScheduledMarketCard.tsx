@@ -20,8 +20,40 @@ export function ScheduledMarketCard({
   onComplete,
 }: ScheduledMarketCardProps) {
   return (
-    <Card className="w-full bg-card border-2 border-yellow-500/50 shadow-lg hover:shadow-yellow-500/20 transition-all duration-300">
-      <div className="p-3 sm:p-6">
+    <Card className="w-full bg-card border-2 border-yellow-500/50 shadow-lg hover:shadow-yellow-500/20 transition-all duration-300 overflow-hidden relative">
+      {/* Large Faded Background Images */}
+      {coinAImage && (
+        <div 
+          className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-64 h-64 sm:w-80 sm:h-80 pointer-events-none"
+          style={{
+            maskImage: 'linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)',
+          }}
+        >
+          <img
+            src={coinAImage}
+            alt=""
+            className="w-full h-full object-cover opacity-40"
+          />
+        </div>
+      )}
+      {coinBImage && (
+        <div 
+          className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-64 h-64 sm:w-80 sm:h-80 pointer-events-none"
+          style={{
+            maskImage: 'linear-gradient(to left, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to left, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)',
+          }}
+        >
+          <img
+            src={coinBImage}
+            alt=""
+            className="w-full h-full object-cover opacity-40"
+          />
+        </div>
+      )}
+
+      <div className="p-3 sm:p-6 relative z-10">
         {/* Header */}
         <div className="text-center mb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500/20 rounded-full border border-yellow-500/50">
