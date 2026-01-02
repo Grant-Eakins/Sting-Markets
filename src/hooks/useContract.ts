@@ -438,7 +438,7 @@ export function useProtocolFees() {
  */
 export function useMaxBetSize() {
   const chainId = useChainId();
-  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: contractAddress as `0x${string}`,
@@ -464,7 +464,7 @@ export function useMaxBetSize() {
  */
 export function useSetMaxBetSize() {
   const chainId = useChainId();
-  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
   const { data: hash, isPending, writeContractAsync, error, reset } = useWriteContract();
   

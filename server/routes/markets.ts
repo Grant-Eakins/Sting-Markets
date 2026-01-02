@@ -531,11 +531,9 @@ router.post('/create-dual-coin', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Token B not found on DexScreener. Make sure it has liquidity on a Base DEX.' });
     }
     
-    // Store RAW USD prices without encoding (for exact display)
+    // Store RAW USD prices (NUMERIC columns now support decimals)
     const priceAUsd = tokenA.price;
     const priceBUsd = tokenB.price;
-    const coinAPrice = priceAUsd; // Store raw price for display
-    const coinBPrice = priceBUsd; // Store raw price for display
     
     // Encode prices for blockchain (reference price needs to be integer)
     const coinAPriceEncoded = priceAUsd < 0.01 ? Math.floor(priceAUsd * 100_000_000) : Math.floor(priceAUsd * 100);
@@ -543,14 +541,12 @@ router.post('/create-dual-coin', async (req, res) => {
     
     console.log(`\n🆚 Creating dual-coin market: ${tokenA.symbol} vs ${tokenB.symbol}`);
     console.log(`   ${tokenA.symbol}:`);
-    console.log(`      Raw USD price: ${priceAUsd}`);
-    console.log(`      Display: $${priceAUsd < 0.01 ? priceAUsd.toFixed(8) : priceAUsd.toFixed(4)}`);
-    console.log(`      Stored value: ${coinAPrice}`);
+    console.log(`      USD price: $${priceAUsd < 0.01 ? priceAUsd.toFixed(8) : priceAUsd.toFixed(4)}`);
+    console.log(`      Stored in DB: ${priceAUsd} (raw NUMERIC)`);
     console.log(`      Blockchain encoded: ${coinAPriceEncoded}`);
     console.log(`   ${tokenB.symbol}:`);
-    console.log(`      Raw USD price: ${priceBUsd}`);
-    console.log(`      Display: $${priceBUsd < 0.01 ? priceBUsd.toFixed(8) : priceBUsd.toFixed(4)}`);
-    console.log(`      Stored value: ${coinBPrice}`);
+    console.log(`      USD price: $${priceBUsd < 0.01 ? priceBUsd.toFixed(8) : priceBUsd.toFixed(4)}`);
+    console.log(`      Stored in DB: ${priceBUsd} (raw NUMERIC)`);
     console.log(`      Blockchain encoded: ${coinBPriceEncoded}`);
     console.log(`   Session: ${sessionLabel}`);
     
@@ -559,7 +555,7 @@ router.post('/create-dual-coin', async (req, res) => {
       stockSymbol: `${tokenA.symbol}-${tokenB.symbol}`,
       stockName: `${tokenA.name} vs ${tokenB.name}`,
       description: `Which will perform better? ${tokenA.symbol} or ${tokenB.symbol}?`,
-      openingPrice: coinAPrice, // Legacy field
+      openingPrice: priceAUsd, // Store raw USD price (NUMERIC column)
       isAfterHours: false,
       lockTime: actualLockTime,
       settleTime: actualSettleTime,
@@ -569,12 +565,12 @@ router.post('/create-dual-coin', async (req, res) => {
       coinAName: tokenA.name,
       coinAAddress: contractAddressA,
       coinAImageUrl: tokenA.imageUrl,
-      coinAOpeningPrice: coinAPrice,
+      coinAOpeningPrice: priceAUsd, // Store raw USD price (NUMERIC column)
       coinBSymbol: tokenB.symbol,
       coinBName: tokenB.name,
       coinBAddress: contractAddressB,
       coinBImageUrl: tokenB.imageUrl,
-      coinBOpeningPrice: coinBPrice,
+      coinBOpeningPrice: priceBUsd, // Store raw USD price (NUMERIC column)
       autoRecreate: autoRecreate, // Controlled by autoRecreate parameter
     });
     
