@@ -21,7 +21,7 @@ export function MobileFooterNav() {
 
   return (
     <>
-      {/* Fixed bottom navigation bar for mobile */}
+      {/* Fixed bottom navigation bar for mobile - shows on all devices including Farcaster */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t z-50 safe-area-inset-bottom">
         <div className="flex items-center justify-around h-16 px-2">
           {/* Coin Battles */}
