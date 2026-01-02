@@ -448,13 +448,13 @@ export default function MyBets() {
         if (sellQuoteResult?.status === 'success' && sellQuoteResult.result) {
           // result is [grossPayout, netPayout, sellFee] - we want netPayout
           const netPayout = sellQuoteResult.result[1] as bigint;
-          liveSellValue = Number(netPayout) / TOKEN_DIVISOR; // MIND has 18 decimals
+          liveSellValue = Number(netPayout) / TOKEN_DIVISOR; // USDC has 6 decimals
         }
       }
     }
     
     // Calculate estimated payout and sell value based on current shares and market state
-    let potentialPayout = amountToken * 2; // Default fallback
+    let potentialPayout = amountToken; // Default: get your money back
     let currentValue = liveSellValue ?? amountToken; // Use live sell value if available, else cost basis
     let probability = 0;
     
@@ -463,9 +463,20 @@ export default function MyBets() {
       
       if (probability > 0 && marketData.totalLiquidity > 0) {
         // In proportional markets:
-        // If your bucket wins, you split the total pool with others in your bucket
-        // Estimated payout = totalPool * (yourShares / totalSharesInYourBucket)
-        potentialPayout = amountToken / probability;
+        // Potential payout = your investment + your share of the opposite pool
+        // Your share of opposite pool = (your shares / total shares in your bucket) * opposite pool size
+        // Simplified: totalLiquidity * (yourShares / totalSharesInYourBucket)
+        // Which equals: amountToken / probability (since probability = yourBucketSize / totalLiquidity)
+        // But we only want the PROFIT, not the principal
+        // So: profit = totalLiquidity * (1 - probability) * (yourShares / (totalLiquidity * probability))
+        // Simplified: profit = amountToken * (1 - probability) / probability
+        // Total payout = principal + profit = amountToken + amountToken * (1 - probability) / probability
+        // Which simplifies to: amountToken / probability
+        // BUT this assumes constant product, which is wrong for LMSR
+        // For a more accurate estimate, use: your bet + your proportional share of losing side
+        const yourShareOfWinningBucket = amountToken / (marketData.totalLiquidity * probability);
+        const losingBucketSize = marketData.totalLiquidity * (1 - probability);
+        potentialPayout = amountToken + (yourShareOfWinningBucket * losingBucketSize);
         
         // Cap at reasonable max (can't win more than total pool)
         potentialPayout = Math.min(potentialPayout, marketData.totalLiquidity);
@@ -724,10 +735,14 @@ export default function MyBets() {
                   if (marketData && marketData.probabilities && marketData.probabilities.length > bet.outcomeIndex) {
                     const yourProbability = marketData.probabilities[bet.outcomeIndex];
                     if (yourProbability > 0 && marketData.totalLiquidity > 0) {
-                      // Your share of winning bucket = your shares / (totalLiquidity * yourProbability)
-                      // Your winnings = (totalLiquidity * (1 - yourProbability)) * (your shares / (totalLiquidity * yourProbability))
-                      // Simplified: Your winnings = your shares * (1 - yourProbability) / yourProbability
-                      potentialWinnings = bet.sharesNum * (1 - yourProbability) / yourProbability;
+                      // Your proportional share of winning bucket
+                      const yourShareOfWinningBucket = bet.amountToken / (marketData.totalLiquidity * yourProbability);
+                      // Size of losing bucket
+                      const losingBucketSize = marketData.totalLiquidity * (1 - yourProbability);
+                      // Potential payout = your bet + your share of losing side
+                      potentialWinnings = bet.amountToken + (yourShareOfWinningBucket * losingBucketSize);
+                      // Cap at total liquidity
+                      potentialWinnings = Math.min(potentialWinnings, marketData.totalLiquidity);
                     }
                   }
                   

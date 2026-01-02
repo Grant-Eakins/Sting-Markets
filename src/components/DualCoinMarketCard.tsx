@@ -291,13 +291,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 
                 {/* Symbol and Name */}
                 <div className="text-center">
-                  <div 
-                    className="font-bold text-xl sm:text-2xl md:text-3xl"
-                    style={{
-                      color: '#fffd7e',
-                      textShadow: '0 0 10px #fffd7e, 0 0 20px #fffd7e'
-                    }}
-                  >{market.coinASymbol}</div>
+                  <div className="font-bold text-xl sm:text-2xl md:text-3xl text-white">{market.coinASymbol}</div>
                   {market.coinAName && (
                     <div className="text-xs sm:text-sm text-muted-foreground truncate mt-1">{market.coinAName}</div>
                   )}
@@ -313,13 +307,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 </div>
                 
                 {/* Pool Liquidity Percentage - Below Image */}
-                <div 
-                  className="text-4xl sm:text-5xl md:text-6xl font-bold"
-                  style={{
-                    color: '#fffd7e',
-                    textShadow: '0 0 10px #fffd7e, 0 0 20px #fffd7e'
-                  }}
-                >
+                <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white">
                   {coinAPoolPercent.toFixed(1)}%
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground">Pool Liquidity</div>
@@ -434,13 +422,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 
                 {/* Symbol and Name */}
                 <div className="text-center">
-                  <div 
-                    className="font-bold text-xl sm:text-2xl md:text-3xl"
-                    style={{
-                      color: '#fffd7e',
-                      textShadow: '0 0 10px #fffd7e, 0 0 20px #fffd7e'
-                    }}
-                  >{market.coinBSymbol}</div>
+                  <div className="font-bold text-xl sm:text-2xl md:text-3xl text-white">{market.coinBSymbol}</div>
                   {market.coinBName && (
                     <div className="text-xs sm:text-sm text-muted-foreground truncate mt-1">{market.coinBName}</div>
                   )}
@@ -456,13 +438,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 </div>
                 
                 {/* Pool Liquidity Percentage - Below Image */}
-                <div 
-                  className="text-4xl sm:text-5xl md:text-6xl font-bold"
-                  style={{
-                    color: '#fffd7e',
-                    textShadow: '0 0 10px #fffd7e, 0 0 20px #fffd7e'
-                  }}
-                >
+                <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white">
                   {coinBPoolPercent.toFixed(1)}%
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground">Pool Liquidity</div>
