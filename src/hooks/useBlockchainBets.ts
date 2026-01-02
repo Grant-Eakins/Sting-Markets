@@ -1,5 +1,5 @@
 import { useAccount } from 'wagmi';
-import { CONTRACT_ADDRESSES, TOKEN_DECIMALS } from '@/config/contract';
+import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_DECIMALS } from '@/config/contract';
 import { useState, useEffect } from 'react';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { baseSepolia } from 'viem/chains';
@@ -41,10 +41,11 @@ export function useBlockchainBets() {
   const [error, setError] = useState<Error | null>(null);
 
   const contractAddress = CONTRACT_ADDRESSES[84532];
+  const dualCoinContractAddress = DUAL_COIN_CONTRACT_ADDRESSES[84532];
 
   const fetchBets = async () => {
-    if (!address || !contractAddress) {
-      console.log('📊 useBlockchainBets: No address or contract', { address, contractAddress });
+    if (!address || (!contractAddress && !dualCoinContractAddress)) {
+      console.log('📊 useBlockchainBets: No address or contract', { address, contractAddress, dualCoinContractAddress });
       setBets([]);
       setIsLoading(false);
       return;
@@ -53,8 +54,9 @@ export function useBlockchainBets() {
     setIsLoading(true);
     setError(null);
 
-    console.log(`📊 Fetching bets for ${address} from contract ${contractAddress}`);
-    console.log(`   Contract: ${contractAddress}`);
+    console.log(`📊 Fetching bets for ${address}`);
+    console.log(`   MIND Contract: ${contractAddress}`);
+    console.log(`   Dual Coin Contract: ${dualCoinContractAddress}`);
 
     try {
       // Get current block number
@@ -73,49 +75,56 @@ export function useBlockchainBets() {
       const sellLogs: any[] = [];
       const claimLogs: any[] = [];
       
-      // Query in chunks for purchase, sell, and claim events
-      for (let fromBlock = startBlock; fromBlock < currentBlock; fromBlock += CHUNK_SIZE) {
-        const toBlock = fromBlock + CHUNK_SIZE - 1n > currentBlock ? currentBlock : fromBlock + CHUNK_SIZE - 1n;
+      // Query from BOTH contracts
+      const contractsToQuery = [contractAddress, dualCoinContractAddress].filter(Boolean);
+      
+      for (const contract of contractsToQuery) {
+        console.log(`📊 Querying contract: ${contract}`);
         
-        console.log(`📊 Querying chunk: ${fromBlock} to ${toBlock}`);
-        
-        // Fetch SharesPurchased events
-        const purchases = await publicClient.getLogs({
-          address: contractAddress as `0x${string}`,
-          event: parseAbiItem('event SharesPurchased(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 cost)'),
-          args: {
-            user: address,
-          },
-          fromBlock: fromBlock,
-          toBlock: toBlock,
-        });
-        
-        // Fetch SharesSold events
-        const sells = await publicClient.getLogs({
-          address: contractAddress as `0x${string}`,
-          event: parseAbiItem('event SharesSold(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 payout)'),
-          args: {
-            user: address,
-          },
-          fromBlock: fromBlock,
-          toBlock: toBlock,
-        });
-        
-        // Fetch PayoutClaimed events to track claimed status
-        const claims = await publicClient.getLogs({
-          address: contractAddress as `0x${string}`,
-          event: parseAbiItem('event PayoutClaimed(uint256 indexed marketId, address indexed user, uint256 payout)'),
-          args: {
-            user: address,
-          },
-          fromBlock: fromBlock,
-          toBlock: toBlock,
-        });
-        
-        purchaseLogs.push(...purchases);
-        sellLogs.push(...sells);
-        claimLogs.push(...claims);
-        console.log(`📊 Found ${purchases.length} purchases, ${sells.length} sells, ${claims.length} claims in chunk`);
+        // Query in chunks for purchase, sell, and claim events
+        for (let fromBlock = startBlock; fromBlock < currentBlock; fromBlock += CHUNK_SIZE) {
+          const toBlock = fromBlock + CHUNK_SIZE - 1n > currentBlock ? currentBlock : fromBlock + CHUNK_SIZE - 1n;
+          
+          console.log(`📊 Querying chunk: ${fromBlock} to ${toBlock}`);
+          
+          // Fetch SharesPurchased events
+          const purchases = await publicClient.getLogs({
+            address: contract as `0x${string}`,
+            event: parseAbiItem('event SharesPurchased(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 cost)'),
+            args: {
+              user: address,
+            },
+            fromBlock: fromBlock,
+            toBlock: toBlock,
+          });
+          
+          // Fetch SharesSold events
+          const sells = await publicClient.getLogs({
+            address: contract as `0x${string}`,
+            event: parseAbiItem('event SharesSold(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 payout)'),
+            args: {
+              user: address,
+            },
+            fromBlock: fromBlock,
+            toBlock: toBlock,
+          });
+          
+          // Fetch PayoutClaimed events to track claimed status
+          const claims = await publicClient.getLogs({
+            address: contract as `0x${string}`,
+            event: parseAbiItem('event PayoutClaimed(uint256 indexed marketId, address indexed user, uint256 payout)'),
+            args: {
+              user: address,
+            },
+            fromBlock: fromBlock,
+            toBlock: toBlock,
+          });
+          
+          purchaseLogs.push(...purchases);
+          sellLogs.push(...sells);
+          claimLogs.push(...claims);
+          console.log(`📊 Found ${purchases.length} purchases, ${sells.length} sells, ${claims.length} claims in chunk from ${contract}`);
+        }
       }
 
       console.log(`📊 Total: ${purchaseLogs.length} purchases, ${sellLogs.length} sells, ${claimLogs.length} claims for ${address}`);
