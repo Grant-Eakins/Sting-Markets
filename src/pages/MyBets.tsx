@@ -714,84 +714,61 @@ export default function MyBets() {
             <div>
               <h2 className="text-xl sm:text-2xl font-bold mb-4">Active Bets</h2>
               <div className="space-y-3">
-                {activeBets.map((bet) => (
-                  <Card key={bet.betId.toString()}>
-                    <CardContent className="p-4 sm:p-6">
-                      {/* Mobile: Stack vertically, Desktop: Side by side */}
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          {/* Header row with badge and market name */}
-                          <div className="flex items-center gap-2 mb-3 flex-wrap">
-                            {bet.isUpBet ? (
-                              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 shrink-0" />
-                            ) : (
-                              <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
-                            )}
-                            <Badge variant="secondary" className="font-mono text-xs">
-                              {bet.market?.isDualCoin 
-                                ? (bet.outcomeIndex === 0 ? bet.market.coinASymbol : bet.market.coinBSymbol)
-                                : bet.bucketLabel
-                              }
-                            </Badge>
-                            <span className="font-semibold text-sm sm:text-base truncate">{bet.marketName}</span>
-                            {/* Mobile: Show Active badge inline */}
-                            <Badge variant="outline" className="sm:hidden ml-auto">Active</Badge>
-                          </div>
-                          {/* Stats grid - single column on mobile, 2 cols on desktop */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Staked:</span>
-                              <span className="font-bold sm:ml-2">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</span>
-                            </div>
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Shares:</span>
-                              <span className="font-bold text-blue-500 sm:ml-2">{bet.sharesNum.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Current Odds:</span>
-                              <span className="font-bold sm:ml-2">{bet.probability}%</span>
-                            </div>
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Your Avg Cost:</span>
-                              <span className="font-bold text-blue-500 sm:ml-2">{(bet.amountToken / bet.sharesNum).toFixed(2)} {TOKEN_SYMBOL}/share</span>
-                            </div>
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Potential Win:</span>
-                              <span className="font-bold text-green-500 sm:ml-2">~{bet.potentialPayout.toFixed(2)} {TOKEN_SYMBOL}</span>
-                            </div>
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Sell Value:</span>
-                              {bet.liveSellValue !== null ? (
-                                <span className={`font-bold sm:ml-2 ${bet.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  {bet.liveSellValue.toFixed(2)} {TOKEN_SYMBOL} ({bet.pnl >= 0 ? '+' : ''}{bet.pnlPercent.toFixed(1)}%)
-                                </span>
+                {activeBets.map((bet) => {
+                  // Calculate potential winnings based on share ratio * opposite bucket liquidity
+                  // This requires fetching pool data from the contract
+                  const marketData = getBetMarketData(bet.marketId);
+                  let potentialWinnings = bet.potentialPayout;
+                  
+                  // If we have market data with probabilities, calculate more accurately
+                  if (marketData && marketData.probabilities && marketData.probabilities.length > bet.outcomeIndex) {
+                    const yourProbability = marketData.probabilities[bet.outcomeIndex];
+                    if (yourProbability > 0 && marketData.totalLiquidity > 0) {
+                      // Your share of winning bucket = your shares / (totalLiquidity * yourProbability)
+                      // Your winnings = (totalLiquidity * (1 - yourProbability)) * (your shares / (totalLiquidity * yourProbability))
+                      // Simplified: Your winnings = your shares * (1 - yourProbability) / yourProbability
+                      potentialWinnings = bet.sharesNum * (1 - yourProbability) / yourProbability;
+                    }
+                  }
+                  
+                  return (
+                    <Card key={bet.betId.toString()}>
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="flex-1 space-y-2">
+                            {/* Coin/Market Name */}
+                            <div className="flex items-center gap-2">
+                              {bet.isUpBet ? (
+                                <TrendingUp className="w-5 h-5 text-green-500 shrink-0" />
                               ) : (
-                                <span className="font-bold text-muted-foreground sm:ml-2">Loading...</span>
+                                <TrendingDown className="w-5 h-5 text-red-500 shrink-0" />
                               )}
+                              <span className="font-bold text-lg">{bet.marketName}</span>
+                              <Badge variant="secondary" className="font-mono text-xs">
+                                {bet.market?.isDualCoin 
+                                  ? (bet.outcomeIndex === 0 ? bet.market.coinASymbol : bet.market.coinBSymbol)
+                                  : bet.bucketLabel
+                                }
+                              </Badge>
+                            </div>
+                            
+                            {/* Simple stats */}
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Amount Bet:</span>
+                                <p className="font-bold text-lg">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Potential Win:</span>
+                                <p className="font-bold text-lg text-green-500">{potentialWinnings.toFixed(2)} {TOKEN_SYMBOL}</p>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        {/* Action buttons - full width row on mobile, column on desktop */}
-                        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0">
-                          <Badge variant="outline" className="hidden sm:inline-flex">Active</Badge>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openSellDialog(bet)}
-                            disabled={sellingBetId === bet.betId || isSellPending || isSellConfirming}
-                            className="border-orange-500 text-orange-500 hover:bg-orange-500/10"
-                          >
-                            <ArrowRightLeft className="w-3 h-3 mr-1" />
-                            {sellingBetId === bet.betId ? (isSellConfirming ? 'Confirming...' : 'Selling...') : 'Sell'}
-                          </Button>
-                          <a href={`https://sepolia.basescan.org/tx/${bet.txHash}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline">
-                            View Tx
-                          </a>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -804,79 +781,46 @@ export default function MyBets() {
                 {settledBets.map((bet) => (
                   <Card key={bet.betId.toString()} className={bet.won ? 'border-green-500' : 'border-red-500/30'}>
                     <CardContent className="p-4 sm:p-6">
-                      {/* Mobile: Stack vertically, Desktop: Side by side */}
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          {/* Header row */}
-                          <div className="flex items-center gap-2 mb-3 flex-wrap">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          {/* Coin/Market Name with result icon */}
+                          <div className="flex items-center gap-2">
                             {bet.won ? (
-                              <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 shrink-0" />
+                              <Trophy className="w-5 h-5 text-green-500 shrink-0" />
                             ) : (
-                              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" />
+                              <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
                             )}
+                            <span className="font-bold text-lg">{bet.marketName}</span>
                             <Badge variant="secondary" className="font-mono text-xs">
                               {bet.market?.isDualCoin 
                                 ? (bet.outcomeIndex === 0 ? bet.market.coinASymbol : bet.market.coinBSymbol)
                                 : bet.bucketLabel
                               }
                             </Badge>
-                            <span className="font-semibold text-sm sm:text-base truncate">{bet.marketName}</span>
-                            {/* Mobile: Show Won/Lost badge inline */}
                             {bet.won ? (
-                              <Badge variant="outline" className="border-green-500 text-green-500 sm:hidden ml-auto">Won</Badge>
+                              <Badge variant="outline" className="border-green-500 text-green-500 ml-auto">Won</Badge>
                             ) : (
-                              <Badge variant="outline" className="border-red-500 text-red-500 sm:hidden ml-auto">Lost</Badge>
+                              <Badge variant="outline" className="border-red-500 text-red-500 ml-auto">Lost</Badge>
                             )}
                           </div>
-                          {/* Stats grid */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Staked:</span>
-                              <span className="font-bold sm:ml-2">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</span>
+                          
+                          {/* Simple stats */}
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Amount Bet:</span>
+                              <p className="font-bold text-lg">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</p>
                             </div>
-                            <div className="flex justify-between sm:block">
-                              <span className="text-muted-foreground">Shares:</span>
-                              <span className="font-bold text-blue-500 sm:ml-2">{bet.sharesNum.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between sm:block">
+                            <div>
                               <span className="text-muted-foreground">Result:</span>
-                              <span className={`font-bold sm:ml-2 ${bet.won ? 'text-green-500' : 'text-red-500'}`}>
-                                {bet.won ? `Won ~${bet.potentialPayout.toFixed(2)} ${TOKEN_SYMBOL}` : 'Lost'}
-                              </span>
+                              <p className={`font-bold text-lg ${bet.won ? 'text-green-500' : 'text-red-500'}`}>
+                                {bet.won ? `${bet.potentialPayout.toFixed(2)} ${TOKEN_SYMBOL}` : 'Lost'}
+                              </p>
                             </div>
-                            {/* Settlement Info */}
-                            {bet.priceChangePercent !== null && (
-                              <div className="flex justify-between sm:block">
-                                <span className="text-muted-foreground">Price Change:</span>
-                                <span className={`font-bold sm:ml-2 ${bet.priceChangePercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                  {bet.priceChangePercent >= 0 ? '+' : ''}{bet.priceChangePercent.toFixed(2)}%
-                                </span>
-                              </div>
-                            )}
-                            {bet.winningBucketLabel && (
-                              <div className="flex justify-between sm:block sm:col-span-2">
-                                <span className="text-muted-foreground">
-                                  {bet.market?.isDualCoin ? 'Winning Coin:' : 'Winning Bucket:'}
-                                </span>
-                                <Badge variant="outline" className="font-mono text-xs sm:ml-2">
-                                  {bet.market?.isDualCoin 
-                                    ? (bet.winningBucketLabel === 'UP' || bet.outcomeIndex === 0 
-                                        ? bet.market.coinASymbol 
-                                        : bet.market.coinBSymbol)
-                                    : bet.winningBucketLabel
-                                  }
-                                </Badge>
-                              </div>
-                            )}
                           </div>
                         </div>
+                        
                         {/* Action buttons */}
-                        <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0">
-                          {bet.won ? (
-                            <Badge variant="outline" className="border-green-500 text-green-500 hidden sm:inline-flex">Won</Badge>
-                          ) : (
-                            <Badge variant="outline" className="border-red-500 text-red-500 hidden sm:inline-flex">Lost</Badge>
-                          )}
+                        <div className="flex sm:flex-col gap-2">
                           {bet.won && !bet.claimed && (
                             <Button
                               size="sm"
@@ -895,7 +839,7 @@ export default function MyBets() {
                               className="text-muted-foreground hover:text-foreground"
                             >
                               <History className="w-3 h-3 mr-1" />
-                              Move to History
+                              Archive
                             </Button>
                           )}
                           {!bet.won && (
@@ -904,14 +848,10 @@ export default function MyBets() {
                               variant="ghost"
                               onClick={() => handleArchiveBet(bet)}
                               className="text-muted-foreground hover:text-red-500"
-                              title="Dismiss"
                             >
                               <X className="w-4 h-4" />
                             </Button>
                           )}
-                          <a href={`https://sepolia.basescan.org/tx/${bet.txHash}`} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline">
-                            View Tx
-                          </a>
                         </div>
                       </div>
                     </CardContent>
