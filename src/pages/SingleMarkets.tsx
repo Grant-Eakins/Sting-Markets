@@ -10,7 +10,6 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Menu, X, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MarketCardSkeleton } from '@/components/ui/skeleton';
-import { Footer } from '@/components/Footer';
 import { useAccount } from 'wagmi';
 
 // Authorized admin wallet addresses (lowercase for comparison)
@@ -137,8 +136,6 @@ export default function SingleMarkets() {
         )}
         </div>
       </div>
-      
-      <Footer />
     </div>
   );
 }

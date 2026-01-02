@@ -13,7 +13,6 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MarketCardSkeleton, StatCardSkeleton } from '@/components/ui/skeleton';
-import { Footer } from '@/components/Footer';
 import { useAggregateMarketStats } from '@/hooks/useAggregateMarketStats';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
@@ -266,8 +265,6 @@ export default function Markets() {
         )}
         </div>
       </div>
-      
-      <Footer />
     </div>
   );
 }

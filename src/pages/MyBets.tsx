@@ -27,7 +27,6 @@ import { toast } from 'sonner';
 import { useBlockchainBets, type BlockchainBet } from '@/hooks/useBlockchainBets';
 import { useSellShares } from '@/hooks/useContract';
 import { BetCardSkeleton, StatCardSkeleton } from '@/components/ui/skeleton';
-import { Footer } from '@/components/Footer';
 
 // Token divisor (18 decimals for MIND)
 const TOKEN_DIVISOR = 10 ** TOKEN_DECIMALS;
@@ -1113,8 +1112,6 @@ export default function MyBets() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <Footer />
     </div>
   );
 }
