@@ -22,7 +22,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
-import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
+import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL, DUAL_COIN_CONTRACT_ADDRESSES } from '@/config/contract';
 import { toast } from 'sonner';
 import { useBlockchainBets, type BlockchainBet } from '@/hooks/useBlockchainBets';
 import { useSellShares } from '@/hooks/useContract';
@@ -150,20 +150,93 @@ export default function MyBets() {
     return [...new Set(bets.map(bet => bet.marketId))];
   }, [bets]);
 
-  const { data: marketsData } = useReadContracts({
-    contracts: marketIds.map((marketId) => ({
+  // Determine which markets are dual coin (need to query dual coin contract)
+  const marketIdsToDualCoin = useMemo(() => {
+    const map = new Map<string, boolean>();
+    if (!markets) return map;
+    
+    const marketsList = Array.isArray(markets) ? markets : [];
+    for (const market of marketsList) {
+      if (market.blockchainMarketId) {
+        map.set(market.blockchainMarketId.toString(), !!(market as any).isDualCoin);
+      }
+    }
+    console.log('📊 Market to contract mapping:', Object.fromEntries(map));
+    return map;
+  }, [markets]);
+
+  // Split market IDs by contract type
+  const { stdMarketIds, dualMarketIds } = useMemo(() => {
+    const std: bigint[] = [];
+    const dual: bigint[] = [];
+    
+    for (const marketId of marketIds) {
+      const isDual = marketIdsToDualCoin.get(marketId.toString());
+      if (isDual) {
+        dual.push(marketId);
+      } else {
+        std.push(marketId);
+      }
+    }
+    
+    console.log(`📊 Split markets: ${std.length} standard (MIND), ${dual.length} dual coin (USDC)`);
+    return { stdMarketIds: std, dualMarketIds: dual };
+  }, [marketIds, marketIdsToDualCoin]);
+
+  // Query standard MIND contract for standard markets
+  const { data: stdMarketsData } = useReadContracts({
+    contracts: stdMarketIds.map((marketId) => ({
       address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'getMarket',
       args: [marketId],
     })) as any,
     query: {
-      enabled: marketIds.length > 0,
-      refetchInterval: false, // Only refresh manually
+      enabled: stdMarketIds.length > 0,
+      refetchInterval: false,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     },
   } as any);
+
+  // Query dual coin USDC contract for dual coin markets
+  const { data: dualMarketsData } = useReadContracts({
+    contracts: dualMarketIds.map((marketId) => ({
+      address: DUAL_COIN_CONTRACT_ADDRESSES[84532] as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'getMarket',
+      args: [marketId],
+    })) as any,
+    query: {
+      enabled: dualMarketIds.length > 0,
+      refetchInterval: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    },
+  } as any);
+
+  // Merge market data from both contracts
+  const marketsData = useMemo(() => {
+    if (!stdMarketsData && !dualMarketsData) return undefined;
+    
+    const merged: any[] = [];
+    for (const marketId of marketIds) {
+      const isDual = marketIdsToDualCoin.get(marketId.toString());
+      if (isDual) {
+        const index = dualMarketIds.indexOf(marketId);
+        if (index !== -1 && dualMarketsData?.[index]) {
+          merged.push(dualMarketsData[index]);
+        }
+      } else {
+        const index = stdMarketIds.indexOf(marketId);
+        if (index !== -1 && stdMarketsData?.[index]) {
+          merged.push(stdMarketsData[index]);
+        }
+      }
+    }
+    console.log(`📊 Merged ${merged.length} market data results from both contracts`);
+    return merged.length > 0 ? merged : undefined;
+  }, [marketIds, stdMarketIds, dualMarketIds, stdMarketsData, dualMarketsData, marketIdsToDualCoin]);
 
   // Debug: Log markets data
   useEffect(() => {
@@ -174,45 +247,61 @@ export default function MyBets() {
   }, [marketsData, marketIds]);
 
   // Fetch probabilities for each market to calculate estimated payouts
-  const { data: probabilitiesData } = useReadContracts({
-    contracts: marketIds.map((marketId) => ({
+  // Query standard markets
+  const { data: stdProbabilitiesData } = useReadContracts({
+    contracts: stdMarketIds.map((marketId) => ({
       address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'getProbabilities',
       args: [marketId],
     })) as any,
     query: {
-      enabled: marketIds.length > 0,
-      refetchInterval: 60000, // 1 minute for probabilities (subtle background update)
+      enabled: stdMarketIds.length > 0,
+      refetchInterval: 60000,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     },
   } as any);
 
-  // Fetch live sell quotes for each bet position (only for active/locked markets)
-  const activeBetsForSellQuotes = bets.filter(bet => {
-    const index = marketIds.indexOf(bet.marketId);
-    if (index === -1 || !marketsData?.[index]) return false;
-    const marketResult: any = marketsData[index];
-    if (marketResult.status !== 'success' || !marketResult.result) return false;
-    const status = marketResult.result[2]; // status is index 2 in tuple
-    return status === 0 || status === 1; // 0=ACTIVE, 1=LOCKED
-  });
-
-  const { data: sellQuotesData } = useReadContracts({
-    contracts: activeBetsForSellQuotes.map((bet) => ({
-      address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
+  // Query dual coin markets
+  const { data: dualProbabilitiesData } = useReadContracts({
+    contracts: dualMarketIds.map((marketId) => ({
+      address: DUAL_COIN_CONTRACT_ADDRESSES[84532] as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
-      functionName: 'getSellQuote',
-      args: [bet.marketId, bet.outcomeIndex, bet.shares],
+      functionName: 'getProbabilities',
+      args: [marketId],
     })) as any,
     query: {
-      enabled: bets.length > 0,
-      refetchInterval: 60000, // 1 minute for sell quotes (subtle background update)
+      enabled: dualMarketIds.length > 0,
+      refetchInterval: 60000,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     },
   } as any);
+
+  // Merge probabilities data
+  const probabilitiesData = useMemo(() => {
+    if (!stdProbabilitiesData && !dualProbabilitiesData) return undefined;
+    
+    const merged: any[] = [];
+    for (const marketId of marketIds) {
+      const isDual = marketIdsToDualCoin.get(marketId.toString());
+      if (isDual) {
+        const index = dualMarketIds.indexOf(marketId);
+        if (index !== -1 && dualProbabilitiesData?.[index]) {
+          merged.push(dualProbabilitiesData[index]);
+        }
+      } else {
+        const index = stdMarketIds.indexOf(marketId);
+        if (index !== -1 && stdProbabilitiesData?.[index]) {
+          merged.push(stdProbabilitiesData[index]);
+        }
+      }
+    }
+    return merged.length > 0 ? merged : undefined;
+  }, [marketIds, stdMarketIds, dualMarketIds, stdProbabilitiesData, dualProbabilitiesData, marketIdsToDualCoin]);
+
+  // Sell feature disabled - no sell quotes needed
 
   const isLoading = isLoadingBets || isLoadingMarkets;
 
@@ -438,24 +527,11 @@ export default function MyBets() {
     
     console.log(`📊 Bet ${index} result: isSettled=${isSettled}, won=${won}, outcomeIndex=${bet.outcomeIndex}, winningOutcome=${marketData?.winningOutcome}, isDualCoin=${market?.isDualCoin}`);
     
-    // Get live sell value for active positions (selling is disabled for settled markets)
-    let liveSellValue: number | null = null;
-    if (!isSettled && sellQuotesData) {
-      // Map bet to sellQuotesData index (since we filtered bets for sell quotes)
-      const sellQuoteIndex = activeBetsForSellQuotes.findIndex(b => b.betId === bet.betId);
-      if (sellQuoteIndex !== -1) {
-        const sellQuoteResult: any = sellQuotesData[sellQuoteIndex];
-        if (sellQuoteResult?.status === 'success' && sellQuoteResult.result) {
-          // result is [grossPayout, netPayout, sellFee] - we want netPayout
-          const netPayout = sellQuoteResult.result[1] as bigint;
-          liveSellValue = Number(netPayout) / TOKEN_DIVISOR; // USDC has 6 decimals
-        }
-      }
-    }
+    // Selling disabled - no live sell value
     
-    // Calculate estimated payout and sell value based on current shares and market state
+    // Calculate estimated payout based on current shares and market state
     let potentialPayout = amountToken; // Default: get your money back
-    let currentValue = liveSellValue ?? amountToken; // Use live sell value if available, else cost basis
+    let currentValue = amountToken; // Cost basis
     let probability = 0;
     
     if (marketData && marketData.probabilities && marketData.probabilities.length > bet.outcomeIndex) {
