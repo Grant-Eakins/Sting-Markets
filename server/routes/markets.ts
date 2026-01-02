@@ -496,15 +496,12 @@ router.post('/create-dual-coin', async (req, res) => {
     // Determine if market should be scheduled or immediate
     // If custom times provided, default to 'now', otherwise default to 'scheduled'
     const actualCreateTiming = createTiming || (lockMinutes || settleMinutes ? 'now' : 'scheduled');
-    const actualLockMinutes = lockMinutes || 720;
-    const actualSettleMinutes = settleMinutes || 720.05;
     const isScheduled = actualCreateTiming === 'scheduled';
-    const now = new Date();
     
-    // If 'now', create as ACTIVE immediately and use custom lock/settle times from minutes params
-    // If 'scheduled', create as SCHEDULED for next cycle
-    const actualLockTime = isScheduled ? lockTime : new Date(now.getTime() + actualLockMinutes * 60 * 1000);
-    const actualSettleTime = isScheduled ? settleTime : new Date(now.getTime() + actualSettleMinutes * 60 * 1000);
+    // BOTH 'now' and 'scheduled' use the sync schedule times
+    // The only difference is 'now' = ACTIVE immediately, 'scheduled' = SCHEDULED for later
+    const actualLockTime = lockTime;
+    const actualSettleTime = settleTime;
     const marketStatus = isScheduled ? 'SCHEDULED' : 'ACTIVE';
     
     console.log(`   Timing: ${actualCreateTiming === 'now' ? 'CREATE NOW' : 'SCHEDULED'}`);
