@@ -219,6 +219,10 @@ router.post('/create', async (req, res) => {
       
       if (blockchainMarketId !== null) {
         market.blockchainMarketId = blockchainMarketId;
+        // Save market to database with blockchain ID
+        await saveMarket(market);
+      } else {
+        throw new Error('Failed to get blockchain market ID');
       }
       
       res.json({
