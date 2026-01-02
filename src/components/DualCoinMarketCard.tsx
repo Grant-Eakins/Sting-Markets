@@ -492,6 +492,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
             upPool: market.upPool,
             downPool: market.downPool,
             probabilities: market.probabilities, // Pass LMSR probabilities
+            isDualCoin: true, // CRITICAL: Mark as dual coin market to use correct contract
           } as any}
           position={selectedPosition}
           odds={2.0} // Placeholder - actual odds calculated from probabilities
