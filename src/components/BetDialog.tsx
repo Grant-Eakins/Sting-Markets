@@ -22,8 +22,10 @@ interface BetDialogProps {
 }
 
 export function BetDialog({ market, position, odds, bucketIndex, coinName, onClose, onBetPlaced }: BetDialogProps) {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected, chain } = useAccount();
+  const chainIdFromHook = useChainId();
+  // Fallback to chain.id from useAccount if useChainId fails
+  const chainId = chainIdFromHook || chain?.id;
   const [amount, setAmount] = useState('5'); // Default 5 tokens
   const [error, setError] = useState<string | null>(null);
   const [useDemoMode, setUseDemoMode] = useState(false);

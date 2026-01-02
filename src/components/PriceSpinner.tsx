@@ -105,8 +105,10 @@ export function PriceSpinner({
   }, []);
 
   // Wallet and contract hooks
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected, chain } = useAccount();
+  const chainIdFromHook = useChainId();
+  // Fallback to chain.id from useAccount if useChainId fails
+  const chainId = chainIdFromHook || chain?.id;
   const { placeBet: placeBetOnChain, isPending, isConfirming, isConfirmed, error: contractError, hash: txHash } = usePlaceBet();
   
   const activeChainId = chainId || 84532;
