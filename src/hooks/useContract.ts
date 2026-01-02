@@ -293,11 +293,13 @@ export function useSellShares() {
 /**
  * Hook to get probabilities for all outcomes in a market
  */
-export function useMarketProbabilities(marketId: number | undefined) {
+export function useMarketProbabilities(marketId: number | undefined, isDualCoin: boolean = false) {
   const chainId = useChainId();
   // Default to Base Sepolia if not connected
   const activeChainId = chainId || 84532;
-  const contractAddress = CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
+  const contractAddress = isDualCoin 
+    ? DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES]
+    : CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: contractAddress as `0x${string}`,

@@ -63,7 +63,7 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
   const contractError = isDualCoin ? dualContractError : stdContractError;
 
   // Get live probabilities to calculate bucket-specific odds
-  const { probabilities } = useMarketProbabilities(market.blockchainMarketId);
+  const { probabilities } = useMarketProbabilities(market.blockchainMarketId, isDualCoin);
   
   // Get bucket liquidity for share calculation - use dual coin version for dual coin markets
   const { liquidity: stdBucketLiquidity } = useBucketLiquidity(

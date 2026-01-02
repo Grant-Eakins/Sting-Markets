@@ -673,9 +673,9 @@ export default function MyBets() {
       isSettled,
       won,
       currentValue,
-      liveSellValue, // Live sell value from contract (null if not available)
-      pnl: liveSellValue !== null ? liveSellValue - amountToken : 0,
-      pnlPercent: liveSellValue !== null && amountToken > 0 ? ((liveSellValue - amountToken) / amountToken) * 100 : 0,
+      liveSellValue: null, // Sell feature disabled
+      pnl: 0,
+      pnlPercent: 0,
       isUpBet, // Correctly determined UP or DOWN
       settlementPrice,
       referencePrice,
