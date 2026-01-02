@@ -26,11 +26,11 @@ export interface CryptoQuote {
 
 /**
  * Top cryptos for prediction markets
- * Start with just XRP, expand as user base grows
+ * DISABLED - XRP auto-creation removed
  */
-export const POPULAR_CRYPTOS = [
-  { symbol: 'XRP', name: 'XRP', coingeckoId: 'ripple' },
-  // Uncomment to add more markets:
+export const POPULAR_CRYPTOS: Array<{ symbol: string; name: string; coingeckoId: string }> = [
+  // Auto-creation disabled - use create-by-contract for meme coins instead
+  // { symbol: 'XRP', name: 'XRP', coingeckoId: 'ripple' },
   // { symbol: 'BTC', name: 'Bitcoin', coingeckoId: 'bitcoin' },
   // { symbol: 'ETH', name: 'Ethereum', coingeckoId: 'ethereum' },
   // { symbol: 'SOL', name: 'Solana', coingeckoId: 'solana' },
