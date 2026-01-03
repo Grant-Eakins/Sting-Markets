@@ -620,15 +620,15 @@ export async function getOnChainMarketStatus(blockchainMarketId: number, isDualC
     });
 
     // getMarket returns: [stockSymbol, sessionType, status, numOutcomes, referencePrice, finalPrice, lockTime, settleTime, settled, winningOutcome, totalLiquidity]
-    // For dual coin: [coinASymbol, coinBSymbol, status, lockTime, settleTime, settled, coinAWon]
+    // For dual coin: [coinASymbol, coinBSymbol, status, coinAPool, coinBPool, totalPool, lockTime, settleTime, settled, coinAWon]
     const data = result as any[];
     
     if (isDualCoin) {
       // Dual coin contract has different return structure
       return {
-        settled: data[5] as boolean,
+        settled: data[8] as boolean,
         status: Number(data[2]),
-        winningOutcome: data[6] ? 0 : 1, // coinAWon = true means UP/outcome 0
+        winningOutcome: data[9] ? 0 : 1, // coinAWon = true means UP/outcome 0
         finalPrice: BigInt(0), // Not applicable for dual coin
       };
     } else {
