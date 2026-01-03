@@ -598,7 +598,7 @@ export async function syncAllMarketPools(markets: Array<{ id: string; blockchain
  * Get market status from blockchain
  * Returns { settled, status, winningOutcome } or null if not found
  */
-export async function getOnChainMarketStatus(blockchainMarketId: number): Promise<{
+export async function getOnChainMarketStatus(blockchainMarketId: number, isDualCoin: boolean = false): Promise<{
   settled: boolean;
   status: number;
   winningOutcome: number;
@@ -608,22 +608,37 @@ export async function getOnChainMarketStatus(blockchainMarketId: number): Promis
     return null;
   }
 
+  const contractAddress = isDualCoin ? DUAL_COIN_CONTRACT_ADDRESS : CONTRACT_ADDRESS;
+  const contractAbi = isDualCoin ? DUAL_COIN_ABI : ABI;
+
   try {
     const result = await publicClient.readContract({
-      address: CONTRACT_ADDRESS,
-      abi: ABI,
+      address: contractAddress,
+      abi: contractAbi,
       functionName: 'getMarket',
       args: [BigInt(blockchainMarketId)]
     });
 
     // getMarket returns: [stockSymbol, sessionType, status, numOutcomes, referencePrice, finalPrice, lockTime, settleTime, settled, winningOutcome, totalLiquidity]
+    // For dual coin: [coinASymbol, coinBSymbol, status, lockTime, settleTime, settled, coinAWon]
     const data = result as any[];
-    return {
-      settled: data[8] as boolean,
-      status: Number(data[2]),
-      winningOutcome: Number(data[9]),
-      finalPrice: data[5] as bigint,
-    };
+    
+    if (isDualCoin) {
+      // Dual coin contract has different return structure
+      return {
+        settled: data[5] as boolean,
+        status: Number(data[2]),
+        winningOutcome: data[6] ? 0 : 1, // coinAWon = true means UP/outcome 0
+        finalPrice: BigInt(0), // Not applicable for dual coin
+      };
+    } else {
+      return {
+        settled: data[8] as boolean,
+        status: Number(data[2]),
+        winningOutcome: Number(data[9]),
+        finalPrice: data[5] as bigint,
+      };
+    }
   } catch (error: any) {
     console.error(`❌ Error getting on-chain status for market ${blockchainMarketId}:`, error.message);
     return null;
@@ -634,7 +649,7 @@ export async function getOnChainMarketStatus(blockchainMarketId: number): Promis
  * Sync settlement status from blockchain for all markets
  * Updates backend if blockchain shows market is settled but backend doesn't
  */
-export async function syncSettlementStatusFromChain(markets: Array<{ id: string; blockchainMarketId?: number; status: number }>): Promise<number> {
+export async function syncSettlementStatusFromChain(markets: Array<{ id: string; blockchainMarketId?: number; status: number; isDualCoin?: boolean }>): Promise<number> {
   if (!isInitialized || !publicClient) {
     console.log('⚠️  Blockchain not initialized - skipping settlement sync');
     return 0;
@@ -651,7 +666,7 @@ export async function syncSettlementStatusFromChain(markets: Array<{ id: string;
     if (market.status === SETTLED_STATUS) continue;
 
     try {
-      const onChainStatus = await getOnChainMarketStatus(market.blockchainMarketId);
+      const onChainStatus = await getOnChainMarketStatus(market.blockchainMarketId, market.isDualCoin || false);
       
       if (onChainStatus && onChainStatus.settled && onChainStatus.status === SETTLED_STATUS) {
         // Blockchain says settled, backend doesn't - sync it!

@@ -122,7 +122,8 @@ export async function checkAndSettleMarkets(): Promise<void> {
     const marketsWithBlockchainId = allMarkets.map(m => ({
       id: m.id,
       blockchainMarketId: m.blockchainMarketId,
-      status: Number(m.status)  // Convert enum to number
+      status: Number(m.status),  // Convert enum to number
+      isDualCoin: m.isDualCoin || false
     }));
     const synced = await syncSettlementStatusFromChain(marketsWithBlockchainId);
     

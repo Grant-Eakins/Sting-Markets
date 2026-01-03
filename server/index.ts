@@ -327,7 +327,8 @@ app.listen(PORT, async () => {
     const marketsWithBlockchainId = allMarkets.map(m => ({
       id: m.id,
       blockchainMarketId: m.blockchainMarketId,
-      status: Number(m.status)  // Convert enum to number
+      status: Number(m.status),  // Convert enum to number
+      isDualCoin: m.isDualCoin || false
     }));
     await syncSettlementStatusFromChain(marketsWithBlockchainId);
     
