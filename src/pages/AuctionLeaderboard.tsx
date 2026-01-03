@@ -13,6 +13,8 @@ import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAuctionTokenAllowance, useAuctionTokenApproval, useSubmitAuctionBid } from '@/hooks/useContract';
 import { formatUnits } from 'viem';
 
+const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
+
 interface Bid {
   id: string;
   walletAddress: string;
@@ -102,8 +104,8 @@ export default function AuctionLeaderboard() {
   const loadData = async () => {
     try {
       const [configRes, leaderboardRes] = await Promise.all([
-        fetch('http://localhost:3001/api/auction/config'),
-        fetch('http://localhost:3001/api/auction/leaderboard'),
+        fetch(`${API_BASE}/auction/config`),
+        fetch(`${API_BASE}/auction/leaderboard`),
       ]);
 
       const configData = await configRes.json();

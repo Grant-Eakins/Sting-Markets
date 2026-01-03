@@ -438,8 +438,8 @@ export default function AdminPage() {
   const loadAuctionData = async () => {
     try {
       const [configRes, leaderboardRes] = await Promise.all([
-        fetch('http://localhost:3001/api/auction/config'),
-        fetch('http://localhost:3001/api/auction/leaderboard'),
+        fetch(`${API_BASE}/auction/config`),
+        fetch(`${API_BASE}/auction/leaderboard`),
       ]);
       const configData = await configRes.json();
       const leaderboardData = await leaderboardRes.json();
@@ -459,7 +459,7 @@ export default function AdminPage() {
   const handleStartAuction = async () => {
     if (!address) return;
     try {
-      const response = await fetch('http://localhost:3001/api/auction/start', {
+      const response = await fetch(`${API_BASE}/auction/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -481,7 +481,7 @@ export default function AdminPage() {
   const handleStopAuction = async () => {
     if (!address) return;
     try {
-      const response = await fetch('http://localhost:3001/api/auction/stop', {
+      const response = await fetch(`${API_BASE}/auction/stop`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
@@ -498,7 +498,7 @@ export default function AdminPage() {
   const handleFinalizeAuction = async () => {
     if (!address) return;
     try {
-      const response = await fetch('http://localhost:3001/api/auction/finalize', {
+      const response = await fetch(`${API_BASE}/auction/finalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
@@ -518,7 +518,7 @@ export default function AdminPage() {
   const handleUpdateAuctionConfig = async () => {
     if (!address) return;
     try {
-      const response = await fetch('http://localhost:3001/api/auction/config', {
+      const response = await fetch(`${API_BASE}/auction/config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
