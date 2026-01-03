@@ -6,17 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Trash2, RefreshCw, TrendingUp, Search, Filter, DollarSign } from 'lucide-react';
+import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Trash2, RefreshCw, TrendingUp, Search, Filter, DollarSign, Trophy, Play, StopCircle, CheckCircle2 } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAccount } from 'wagmi';
 import { TOKEN_SYMBOL, TOKEN_DECIMALS } from '@/config/contract';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useWithdrawFees, useProtocolFees, useMaxBetSize, useSetMaxBetSize, useBurnConfig, useConfigureBurn } from '@/hooks/useContract';
+import { useWithdrawFees, useProtocolFees, useMaxBetSize, useSetMaxBetSize, useBurnConfig, useConfigureBurn, useWithdrawAuctionFunds } from '@/hooks/useContract';
 import { formatUnits, parseUnits } from 'viem';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
@@ -109,6 +110,14 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  // Auction management state
+  const [auctionConfig, setAuctionConfig] = useState<any>(null);
+  const [auctionLeaderboard, setAuctionLeaderboard] = useState<any[]>([]);
+  const [auctionMinMarketCap, setAuctionMinMarketCap] = useState('');
+  const [auctionMaxMarketCap, setAuctionMaxMarketCap] = useState('');
+  const [auctionMinBid, setAuctionMinBid] = useState('');
+  const [auctionDuration, setAuctionDuration] = useState('24');
+
   // Contract configuration state
   const [newMaxBetInput, setNewMaxBetInput] = useState('');
   const [burnConfigInput, setBurnConfigInput] = useState({
@@ -120,6 +129,9 @@ export default function AdminPage() {
   // Protocol fees hooks
   const { feesCollected, isLoading: feesLoading, refetch: refetchFees } = useProtocolFees();
   const { withdrawFees, isPending: isWithdrawing, isConfirming, isConfirmed, error: withdrawError } = useWithdrawFees();
+  
+  // Auction fees hooks
+  const { withdrawAuctionFunds, isPending: isWithdrawingAuction, isConfirming: isConfirmingAuction, isConfirmed: isAuctionConfirmed, error: auctionWithdrawError, auctionAddress } = useWithdrawAuctionFunds();
 
   // Max bet size hooks
   const { maxBetSize, isLoading: maxBetLoading, refetch: refetchMaxBet } = useMaxBetSize();
@@ -422,6 +434,109 @@ export default function AdminPage() {
     }
   };
 
+  // Auction management handlers
+  const loadAuctionData = async () => {
+    try {
+      const [configRes, leaderboardRes] = await Promise.all([
+        fetch('http://localhost:3001/api/auction/config'),
+        fetch('http://localhost:3001/api/auction/leaderboard'),
+      ]);
+      const configData = await configRes.json();
+      const leaderboardData = await leaderboardRes.json();
+      setAuctionConfig(configData);
+      setAuctionLeaderboard(leaderboardData);
+      // Always update the input fields with latest values from server
+      if (configData) {
+        setAuctionMinMarketCap(String(configData.minMarketCap));
+        setAuctionMaxMarketCap(String(configData.maxMarketCap));
+        setAuctionMinBid(String(configData.minBidAmount));
+      }
+    } catch (error) {
+      console.error('Error loading auction data:', error);
+    }
+  };
+
+  const handleStartAuction = async () => {
+    if (!address) return;
+    try {
+      const response = await fetch('http://localhost:3001/api/auction/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          walletAddress: address,
+          durationHours: parseInt(auctionDuration)
+        }),
+      });
+      if (response.ok) {
+        alert('✅ Auction started!');
+        loadAuctionData();
+      } else {
+        throw new Error('Failed to start auction');
+      }
+    } catch (error: any) {
+      alert(`❌ Error: ${error.message}`);
+    }
+  };
+
+  const handleStopAuction = async () => {
+    if (!address) return;
+    try {
+      const response = await fetch('http://localhost:3001/api/auction/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: address }),
+      });
+      if (response.ok) {
+        alert('🛑 Auction stopped');
+        loadAuctionData();
+      }
+    } catch (error: any) {
+      alert(`❌ Error: ${error.message}`);
+    }
+  };
+
+  const handleFinalizeAuction = async () => {
+    if (!address) return;
+    try {
+      const response = await fetch('http://localhost:3001/api/auction/finalize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: address }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert(`🏆 Auction finalized! Winners: ${data.winners.map((w: any) => w.coinSymbol).join(' vs ')}`);
+        loadAuctionData();
+      } else {
+        throw new Error('Failed to finalize');
+      }
+    } catch (error: any) {
+      alert(`❌ Error: ${error.message}`);
+    }
+  };
+
+  const handleUpdateAuctionConfig = async () => {
+    if (!address) return;
+    try {
+      const response = await fetch('http://localhost:3001/api/auction/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          walletAddress: address,
+          minMarketCap: parseFloat(auctionMinMarketCap),
+          maxMarketCap: parseFloat(auctionMaxMarketCap),
+          minBidAmount: parseFloat(auctionMinBid),
+        }),
+      });
+      if (response.ok) {
+        alert('✅ Auction config updated!');
+        loadAuctionData();
+      }
+    } catch (error: any) {
+      alert(`❌ Error: ${error.message}`);
+    }
+  };
+
   // Filter markets based on search and status
   const filteredMarkets = markets.filter(market => {
     const matchesSearch = searchQuery === '' || 
@@ -522,7 +637,10 @@ export default function AdminPage() {
               <Link to="/my-bets">
                 <Button variant="ghost" size="sm">My Bets</Button>
               </Link>
-              <Link to="/admin">
+              <Link to="/auction">
+                <Button variant="ghost" size="sm">Auction</Button>
+              </Link>
+              <Link to="/admin-167">
                 <Button variant="ghost" size="sm">Admin</Button>
               </Link>
             </nav>
@@ -548,14 +666,14 @@ export default function AdminPage() {
                 Protocol Fees
               </CardTitle>
               <CardDescription>
-                Collect accumulated protocol fees (2% of all bets)
+                Collect accumulated protocol fees (2% of all bets) and auction funds (80% of winning bids)
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                   <div>
-                    <p className="text-sm text-muted-foreground">Fees Available</p>
+                    <p className="text-sm text-muted-foreground">Market Fees Available</p>
                     <p className="text-2xl font-bold">
                       {feesLoading ? '...' : feesCollected ? `${formatUnits(feesCollected, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}` : '0 ' + TOKEN_SYMBOL}
                     </p>
@@ -567,26 +685,175 @@ export default function AdminPage() {
                   >
                     {isWithdrawing && 'Initiating...'}
                     {isConfirming && 'Confirming...'}
-                    {!isWithdrawing && !isConfirming && 'Collect Fees'}
+                    {!isWithdrawing && !isConfirming && 'Collect Market Fees'}
                   </Button>
                 </div>
                 
-                {isConfirmed && (
+                {auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000' && (
+                  <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Auction Funds</p>
+                      <p className="text-lg font-bold">Available after finalization</p>
+                    </div>
+                    <Button
+                      onClick={() => withdrawAuctionFunds()}
+                      disabled={isWithdrawingAuction || isConfirmingAuction}
+                      size="lg"
+                      variant="secondary"
+                    >
+                      {isWithdrawingAuction && 'Initiating...'}
+                      {isConfirmingAuction && 'Confirming...'}
+                      {!isWithdrawingAuction && !isConfirmingAuction && 'Collect Auction Funds'}
+                    </Button>
+                  </div>
+                )}
+                
+                {(isConfirmed || isAuctionConfirmed) && (
                   <Alert>
                     <CheckCircle className="h-4 w-4" />
                     <AlertDescription>
-                      ✅ Fees successfully collected!
+                      ✅ {isConfirmed && 'Market fees'}{isConfirmed && isAuctionConfirmed && ' and '}{isAuctionConfirmed && 'auction funds'} successfully collected!
                     </AlertDescription>
                   </Alert>
                 )}
                 
-                {withdrawError && (
+                {(withdrawError || auctionWithdrawError) && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Error: {withdrawError.message}
+                      Error: {withdrawError?.message || auctionWithdrawError?.message}
                     </AlertDescription>
                   </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Listing Auction Management */}
+          <Card className="mb-6 border-yellow-500/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" />
+                Listing Auction Management
+              </CardTitle>
+              <CardDescription>
+                Control coin listing auctions - Start, stop, and finalize auctions for dual coin market creation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Load auction data button */}
+                <Button onClick={loadAuctionData} variant="outline" className="w-full">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Load Auction Data
+                </Button>
+
+                {/* Auction Status */}
+                {auctionConfig && (
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-medium">Auction Status</p>
+                      <Badge className={auctionConfig.isActive ? "bg-green-500" : ""} variant={auctionConfig.isActive ? "default" : "secondary"}>
+                        {auctionConfig.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Min Market Cap:</span>
+                        <p className="font-medium">${auctionConfig.minMarketCap?.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Max Market Cap:</span>
+                        <p className="font-medium">${auctionConfig.maxMarketCap?.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Min Bid:</span>
+                        <p className="font-medium">{auctionConfig.minBidAmount} USDC</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Total Bids:</span>
+                        <p className="font-medium">{auctionLeaderboard.length}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Admin Controls */}
+                <div className="p-4 bg-red-500/5 rounded-lg border border-red-500/20">
+                  <p className="text-sm font-medium mb-3 text-red-600">Admin Controls</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                    <Input 
+                      placeholder="Min Market Cap" 
+                      value={auctionMinMarketCap}
+                      onChange={(e) => setAuctionMinMarketCap(e.target.value)}
+                      type="number"
+                    />
+                    <Input 
+                      placeholder="Max Market Cap" 
+                      value={auctionMaxMarketCap}
+                      onChange={(e) => setAuctionMaxMarketCap(e.target.value)}
+                      type="number"
+                    />
+                    <Input 
+                      placeholder="Min Bid (USDC)" 
+                      value={auctionMinBid}
+                      onChange={(e) => setAuctionMinBid(e.target.value)}
+                      type="number"
+                    />
+                    <Input 
+                      placeholder="Duration (hours)" 
+                      value={auctionDuration}
+                      onChange={(e) => setAuctionDuration(e.target.value)}
+                      type="number"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={handleUpdateAuctionConfig} variant="outline" size="sm">
+                      Update Config
+                    </Button>
+                    {!auctionConfig?.isActive ? (
+                      <Button onClick={handleStartAuction} className="bg-green-600" size="sm">
+                        <Play className="h-4 w-4 mr-2" />
+                        Start Auction
+                      </Button>
+                    ) : (
+                      <>
+                        <Button onClick={handleStopAuction} variant="destructive" size="sm">
+                          <StopCircle className="h-4 w-4 mr-2" />
+                          Stop Auction
+                        </Button>
+                        <Button onClick={handleFinalizeAuction} className="bg-yellow-600" size="sm">
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Finalize & Create Market
+                        </Button>
+                      </>
+                    )}
+                    <Link to="/auction">
+                      <Button variant="outline" size="sm">
+                        <Trophy className="h-4 w-4 mr-2" />
+                        View Auction Page
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Leaderboard Preview */}
+                {auctionLeaderboard.length > 0 && (
+                  <div className="p-4 bg-muted/50 rounded-lg border">
+                    <p className="text-sm font-medium mb-3">Top Bids</p>
+                    <div className="space-y-2">
+                      {auctionLeaderboard.slice(0, 5).map((bid, index) => (
+                        <div key={bid.id} className="flex items-center justify-between text-sm p-2 bg-background rounded">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold">{index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}</span>
+                            <span>{bid.coinSymbol}</span>
+                            <Badge variant="outline" className="text-xs">{bid.chain.toUpperCase()}</Badge>
+                          </div>
+                          <span className="font-medium">{bid.bidAmount} USDC</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </CardContent>

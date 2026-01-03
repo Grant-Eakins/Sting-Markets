@@ -1,6 +1,6 @@
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount as useWagmiAccount } from 'wagmi';
 import { parseUnits } from 'viem';
-import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_ADDRESSES, ERC20_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
+import { PREDICTION_MARKET_ABI, CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_ADDRESSES, ERC20_ABI, TOKEN_DECIMALS, TOKEN_SYMBOL, LISTING_AUCTION_ADDRESSES, LISTING_AUCTION_ABI, MIND_TOKEN_ADDRESSES } from '@/config/contract';
 import { useChainId, useAccount } from 'wagmi';
 import { useState, useCallback, useEffect } from 'react';
 
@@ -410,6 +410,44 @@ export function useWithdrawFees() {
 }
 
 /**
+ * Hook to withdraw from ListingAuction contract (admin only)
+ */
+export function useWithdrawAuctionFunds() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const withdrawAuctionFunds = () => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    console.log('💰 Withdrawing auction funds to treasury...');
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'emergencyWithdraw',
+      args: [],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    withdrawAuctionFunds,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+    auctionAddress,
+  };
+}
+
+/**
  * Hook to read protocol fees collected
  */
 export function useProtocolFees() {
@@ -718,7 +756,7 @@ export function useDualCoinPlaceBet() {
       address: contractAddress as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'buyShares',
-      args: [BigInt(marketId), outcomeIndex, amountInToken, maxCost],
+      args: [BigInt(marketId), BigInt(outcomeIndex), amountInToken, maxCost],
     } as any);
   };
   
@@ -734,6 +772,134 @@ export function useDualCoinPlaceBet() {
     isConfirmed,
     error,
     reset,
+  };
+}
+
+/**
+ * Hook to check MIND token allowance for auction contract
+ */
+export function useAuctionTokenAllowance() {
+  const chainId = useChainId();
+  const { address } = useAccount();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const mindTokenAddress = MIND_TOKEN_ADDRESSES[chainId as keyof typeof MIND_TOKEN_ADDRESSES];
+  
+  const { data: allowance, refetch } = useReadContract({
+    address: mindTokenAddress as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: address && auctionAddress ? [address, auctionAddress as `0x${string}`] : undefined,
+    query: {
+      enabled: !!address && !!auctionAddress && !!mindTokenAddress,
+    },
+  });
+  
+  return {
+    allowance: allowance as bigint | undefined,
+    refetch,
+  };
+}
+
+/**
+ * Hook to approve MIND tokens for auction contract
+ */
+export function useAuctionTokenApproval() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const mindTokenAddress = MIND_TOKEN_ADDRESSES[chainId as keyof typeof MIND_TOKEN_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const approve = (amount: string) => {
+    if (!auctionAddress || !mindTokenAddress) {
+      throw new Error('Auction or MIND token address not found');
+    }
+    
+    const amountInToken = parseUnits(amount, 18); // MIND has 18 decimals
+    
+    console.log(`✅ Approving ${amount} MIND for auction contract`);
+    writeContract({
+      address: mindTokenAddress as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [auctionAddress as `0x${string}`, amountInToken],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    approve,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
+ * Hook to submit auction bid on-chain
+ */
+export function useSubmitAuctionBid() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const submitBid = (coinAddress: string, chain: string, amount: string) => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    const amountInToken = parseUnits(amount, 18); // MIND has 18 decimals
+    
+    console.log(`🏆 Submitting auction bid: ${coinAddress} (${chain}) - ${amount} MIND`);
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'submitBid',
+      args: [coinAddress, chain, amountInToken],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    submitBid,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
+ * Hook to read auction config from contract
+ */
+export function useAuctionConfig() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: auctionAddress as `0x${string}`,
+    abi: LISTING_AUCTION_ABI,
+    functionName: 'config',
+    query: {
+      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000',
+    },
+  });
+  
+  return {
+    config: data as any,
+    isLoading,
+    error,
+    refetch,
   };
 }
 

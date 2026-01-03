@@ -3,13 +3,20 @@
  * Manages coin listing bids for dual coin market creation
  */
 
-import { supabase } from './database';
+import { getSupabase } from './database';
 import { getTokenByAddress } from './dexScreenerApi';
+
+const getDb = () => {
+  const db = getSupabase();
+  if (!db) throw new Error('Database not initialized');
+  return db;
+};
 
 export interface ListingBid {
   id: string;
   walletAddress: string;
   coinContractAddress: string;
+  chain: 'base' | 'solana';
   coinSymbol: string;
   coinName?: string;
   marketCap?: number;
@@ -35,6 +42,7 @@ export interface AuctionConfig {
  * Get current auction configuration
  */
 export async function getAuctionConfig(): Promise<AuctionConfig | null> {
+  const supabase = getDb();
   const { data, error } = await supabase
     .from('auction_config')
     .select('*')
@@ -61,6 +69,7 @@ export async function getAuctionConfig(): Promise<AuctionConfig | null> {
  * Update auction configuration (admin only)
  */
 export async function updateAuctionConfig(config: Partial<AuctionConfig>): Promise<boolean> {
+  const supabase = getDb();
   const updateData: any = {
     updated_at: new Date().toISOString(),
   };
@@ -116,13 +125,14 @@ export async function stopAuction(): Promise<boolean> {
  */
 export async function validateCoinEligibility(
   coinAddress: string,
+  chain: 'base' | 'solana',
   config: AuctionConfig
 ): Promise<{ eligible: boolean; reason?: string; token?: any }> {
   try {
     const token = await getTokenByAddress(coinAddress);
     
     if (!token) {
-      return { eligible: false, reason: 'Token not found on DexScreener' };
+      return { eligible: false, reason: `Token not found on DexScreener (${chain})` };
     }
 
     const marketCap = token.marketCap || 0;
@@ -153,6 +163,7 @@ export async function validateCoinEligibility(
 export async function submitBid(
   walletAddress: string,
   coinContractAddress: string,
+  chain: 'base' | 'solana',
   bidAmount: number,
   txHash?: string
 ): Promise<{ success: boolean; error?: string; bid?: ListingBid }> {
@@ -173,7 +184,7 @@ export async function submitBid(
   }
 
   // Validate coin eligibility
-  const validation = await validateCoinEligibility(coinContractAddress, config);
+  const validation = await validateCoinEligibility(coinContractAddress, chain, config);
   if (!validation.eligible) {
     return { success: false, error: validation.reason };
   }
@@ -181,11 +192,13 @@ export async function submitBid(
   const token = validation.token!;
 
   // Insert bid
+  const supabase = getDb();
   const { data, error } = await supabase
     .from('listing_bids')
     .insert({
       wallet_address: walletAddress,
       coin_contract_address: coinContractAddress,
+      chain: chain,
       coin_symbol: token.symbol,
       coin_name: token.name,
       market_cap: token.marketCap,
@@ -201,7 +214,7 @@ export async function submitBid(
     return { success: false, error: 'Failed to submit bid' };
   }
 
-  console.log(`💰 New bid: ${token.symbol} - ${bidAmount} USDC from ${walletAddress}`);
+  console.log(`💰 New bid: ${token.symbol} (${chain}) - ${bidAmount} USDC from ${walletAddress}`);
 
   return { 
     success: true, 
@@ -209,6 +222,7 @@ export async function submitBid(
       id: data.id,
       walletAddress: data.wallet_address,
       coinContractAddress: data.coin_contract_address,
+      chain: data.chain,
       coinSymbol: data.coin_symbol,
       coinName: data.coin_name,
       marketCap: parseFloat(data.market_cap),
@@ -225,6 +239,7 @@ export async function submitBid(
  * Get auction leaderboard
  */
 export async function getLeaderboard(limit: number = 50): Promise<ListingBid[]> {
+  const supabase = getDb();
   const { data, error } = await supabase
     .from('auction_leaderboard')
     .select('*')
@@ -239,6 +254,7 @@ export async function getLeaderboard(limit: number = 50): Promise<ListingBid[]> 
   return data.map((row: any) => ({
     id: row.id,
     walletAddress: row.wallet_address,
+    chain: row.chain,
     coinContractAddress: row.coin_contract_address,
     coinSymbol: row.coin_symbol,
     coinName: row.coin_name,
@@ -273,6 +289,8 @@ export async function finalizeAuction(): Promise<{ success: boolean; winners?: L
     return { success: false };
   }
 
+  const supabase = getDb();
+
   // Mark winners
   for (const winner of winners) {
     await supabase
@@ -300,6 +318,7 @@ export async function finalizeAuction(): Promise<{ success: boolean; winners?: L
  * Get user's bids
  */
 export async function getUserBids(walletAddress: string): Promise<ListingBid[]> {
+  const supabase = getDb();
   const { data, error } = await supabase
     .from('listing_bids')
     .select('*')
@@ -314,6 +333,7 @@ export async function getUserBids(walletAddress: string): Promise<ListingBid[]> 
   return data.map((row: any) => ({
     id: row.id,
     walletAddress: row.wallet_address,
+    chain: row.chain,
     coinContractAddress: row.coin_contract_address,
     coinSymbol: row.coin_symbol,
     coinName: row.coin_name,

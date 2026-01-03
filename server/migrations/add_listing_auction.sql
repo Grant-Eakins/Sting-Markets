@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS listing_bids (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   wallet_address TEXT NOT NULL,
   coin_contract_address TEXT NOT NULL,
+  chain TEXT NOT NULL DEFAULT 'base', -- 'base' or 'solana'
   coin_symbol TEXT NOT NULL,
   coin_name TEXT,
   market_cap NUMERIC(20, 2),

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Swords, TrendingUp, Wallet, Menu } from 'lucide-react';
+import { Swords, TrendingUp, Wallet, Menu, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import {
   Sheet,
@@ -77,6 +77,12 @@ export function MobileFooterNav() {
                 </SheetDescription>
               </SheetHeader>
               <div className="flex flex-col gap-2 mt-6">
+                <Link to="/auction" onClick={() => setIsMoreOpen(false)}>
+                  <Button variant="outline" className="w-full justify-start" size="lg">
+                    <Trophy className="h-4 w-4 mr-2" />
+                    Listing Auction
+                  </Button>
+                </Link>
                 <Link to="/how-it-works" onClick={() => setIsMoreOpen(false)}>
                   <Button variant="outline" className="w-full justify-start" size="lg">
                     How It Works

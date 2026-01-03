@@ -139,13 +139,17 @@ router.patch('/config', async (req: Request, res: Response) => {
  */
 router.post('/bid', async (req: Request, res: Response) => {
   try {
-    const { walletAddress, coinContractAddress, bidAmount, txHash } = req.body;
+    const { walletAddress, coinContractAddress, chain = 'base', bidAmount, txHash } = req.body;
 
-    if (!walletAddress || !coinContractAddress || !bidAmount) {
+    if (!walletAddress || !coinContractAddress || !bidAmount || !chain) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const result = await submitBid(walletAddress, coinContractAddress, bidAmount, txHash);
+    if (!['base', 'solana'].includes(chain)) {
+      return res.status(400).json({ error: 'Chain must be "base" or "solana"' });
+    }
+
+    const result = await submitBid(walletAddress, coinContractAddress, chain, bidAmount, txHash);
     
     if (result.success) {
       res.json({ success: true, bid: result.bid });

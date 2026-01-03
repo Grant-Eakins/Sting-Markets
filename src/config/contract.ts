@@ -515,12 +515,28 @@ export const DUAL_COIN_CONTRACT_ADDRESSES = {
   84532: '0xBc6b9a31AB377D1FF73080F83E30D1e6868B2868', // ProportionalMarketDualCoin
 } as const;
 
+// Listing Auction contract addresses
+export const LISTING_AUCTION_ADDRESSES = {
+  // Base Mainnet
+  8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
+  // Base Sepolia Testnet
+  84532: '0xBD1A3880C174D9aE8831BF28880e6E4E9A5090b5', // ListingAuction
+} as const;
+
 // USDC token contract addresses (used for betting)
 export const TOKEN_ADDRESSES = {
   // Base Mainnet
   8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Real USDC on Base mainnet
   // Base Sepolia Testnet
   84532: '0x2A9A8eb5a722053AeF8E98A5E1f0dfDC9CaE5f50', // MockUSDC (testnet)
+} as const;
+
+// MIND token contract addresses (used for auction bids)
+export const MIND_TOKEN_ADDRESSES = {
+  // Base Mainnet
+  8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy MIND to mainnet
+  // Base Sepolia Testnet
+  84532: '0x2A9A8eb5a722053AeF8E98A5E1f0dfDC9CaE5f50', // Using MockUSDC as MIND for testnet
 } as const;
 
 // USDC token has 6 decimals
@@ -564,5 +580,93 @@ export const ERC20_ABI = [
     "outputs": [{ "internalType": "uint8", "name": "", "type": "uint8" }],
     "stateMutability": "view",
     "type": "function"
+  }
+] as const;
+
+// ListingAuction ABI (for coin listing auction)
+export const LISTING_AUCTION_ABI = [
+  {
+    "inputs": [
+      { "internalType": "string", "name": "coinAddress", "type": "string" },
+      { "internalType": "string", "name": "chain", "type": "string" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "submitBid",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "limit", "type": "uint256" }
+    ],
+    "name": "getLeaderboard",
+    "outputs": [
+      { "internalType": "uint256[]", "name": "bidIds", "type": "uint256[]" },
+      { "internalType": "address[]", "name": "bidders", "type": "address[]" },
+      { "internalType": "string[]", "name": "coinAddresses", "type": "string[]" },
+      { "internalType": "string[]", "name": "chains", "type": "string[]" },
+      { "internalType": "uint256[]", "name": "amounts", "type": "uint256[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getTotalBids",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawToTreasury",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "emergencyWithdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "config",
+    "outputs": [
+      { "internalType": "bool", "name": "isActive", "type": "bool" },
+      { "internalType": "uint256", "name": "minBidAmount", "type": "uint256" },
+      { "internalType": "uint256", "name": "auctionStart", "type": "uint256" },
+      { "internalType": "uint256", "name": "auctionEnd", "type": "uint256" },
+      { "internalType": "uint256", "name": "minMarketCap", "type": "uint256" },
+      { "internalType": "uint256", "name": "maxMarketCap", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "biddingToken",
+    "outputs": [
+      { "internalType": "contract IERC20", "name": "", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "bidder", "type": "address" },
+      { "indexed": true, "internalType": "uint256", "name": "bidId", "type": "uint256" },
+      { "indexed": false, "internalType": "string", "name": "coinAddress", "type": "string" },
+      { "indexed": false, "internalType": "string", "name": "chain", "type": "string" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "BidSubmitted",
+    "type": "event"
   }
 ] as const;

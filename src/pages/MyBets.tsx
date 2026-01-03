@@ -711,6 +711,9 @@ export default function MyBets() {
               <Link to="/my-bets">
                 <Button variant="ghost" size="sm">My Bets</Button>
               </Link>
+              <Link to="/auction">
+                <Button variant="ghost" size="sm">Auction</Button>
+              </Link>
               {isAdmin && (
                 <Link to="/admin-167">
                   <Button variant="ghost" size="sm">Admin</Button>

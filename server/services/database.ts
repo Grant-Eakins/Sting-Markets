@@ -8,6 +8,13 @@ import { Market, MarketStatus, Bet, Position } from '../types/market';
 let supabase: SupabaseClient | null = null;
 
 /**
+ * Get Supabase client instance
+ */
+export function getSupabase(): SupabaseClient | null {
+  return supabase;
+}
+
+/**
  * Initialize Supabase client
  */
 export function initializeDatabase(): boolean {
