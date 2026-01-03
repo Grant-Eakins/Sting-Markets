@@ -22,6 +22,7 @@ import NotFound from "./pages/NotFound";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import RiskDisclaimer from "./pages/RiskDisclaimer";
+import AuctionLeaderboard from "./pages/AuctionLeaderboard";
 
 import "@rainbow-me/rainbowkit/styles.css";
 
@@ -50,6 +51,7 @@ const App = () => (
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/risk-disclaimer" element={<RiskDisclaimer />} />
+                  <Route path="/auction" element={<AuctionLeaderboard />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

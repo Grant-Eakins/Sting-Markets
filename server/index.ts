@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import marketsRouter from './routes/markets';
+import auctionRouter from './routes/auction';
 import { syncCryptoMarkets, initializePausedSymbols } from './services/cryptoSync';
 import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/marketSettlement';
 import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain } from './services/blockchainSync';
@@ -169,6 +170,7 @@ app.use(express.static(distPath));
 
 // Routes
 app.use('/api/markets', marketsRouter);
+app.use('/api/auction', auctionRouter);
 
 // Health check
 app.get('/health', (req, res) => {
