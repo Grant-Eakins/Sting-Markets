@@ -415,6 +415,39 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
+     * @notice Get complete market data for backend sync
+     * @dev Returns all market info needed for settlement tracking
+     */
+    function getMarket(uint256 marketId) external view returns (
+        string memory coinASymbol,
+        string memory coinBSymbol,
+        uint8 status,
+        uint256 coinAPool,
+        uint256 coinBPool,
+        uint256 totalPool,
+        uint256 lockTime,
+        uint256 settleTime,
+        bool settled,
+        uint8 winningOutcome
+    ) {
+        Market storage market = markets[marketId];
+        require(market.marketId == marketId, "Market does not exist");
+        
+        return (
+            market.coinASymbol,
+            market.coinBSymbol,
+            uint8(market.status),
+            market.bucketLiquidity[0], // Coin A pool
+            market.bucketLiquidity[1], // Coin B pool
+            market.totalLiquidity,
+            market.lockTime,
+            market.settleTime,
+            market.settled,
+            market.winningOutcome
+        );
+    }
+    
+    /**
      * @notice Update oracle address
      */
     function updateOracle(address newOracle) external onlyOwner {

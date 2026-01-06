@@ -12,7 +12,7 @@ dotenv.config();
 const CONTRACT_ADDRESS = '0xa36fA2A8Dc1be09e049FE468281D36bc12c2043F'; // ProportionalMarketUSDC (MockUSDC + burn mechanism)
 
 // ProportionalMarketDualCoin contract address
-const DUAL_COIN_CONTRACT_ADDRESS = '0x5924B8Cec58e7cc5fEc23F8c162AA9Ff3C83E340'; // DualCoin head-to-head battles (with getProbabilities)
+const DUAL_COIN_CONTRACT_ADDRESS = '0xeB3a2bd6201638d1E5C7C2CF95C03E95AA4Cf5f7'; // DualCoin head-to-head battles (with getProbabilities + getMarket)
 
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)
