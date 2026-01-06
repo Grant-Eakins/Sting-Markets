@@ -597,23 +597,27 @@ router.post('/create-dual-coin', async (req, res) => {
         // NOW save market to database with blockchain ID
         await saveMarket(market);
         console.log(`✅ Market saved successfully: ${market.id} (status: ${market.status})`);
+        
+        // Send success response
+        return res.json({
+          success: true,
+          market,
+          tokenA,
+          tokenB,
+          blockchainMarketId,
+          message: `Dual-coin market created: ${tokenA.symbol} vs ${tokenB.symbol}`,
+        });
       } else {
-        throw new Error('Failed to get blockchain market ID');
+        console.error('❌ Blockchain market creation returned null');
+        throw new Error('Failed to get blockchain market ID - blockchain may not be initialized');
       }
-      
-      res.json({
-        success: true,
-        market,
-        tokenA,
-        tokenB,
-        blockchainMarketId,
-        message: `Dual-coin market created: ${tokenA.symbol} vs ${tokenB.symbol}`,
-      });
     } catch (error: any) {
-      console.error('❌ Error in dual-coin creation:', error);
-      res.status(500).json({
+      console.error('❌ Error in dual-coin blockchain creation:', error);
+      console.error('   Stack:', error.stack);
+      return res.status(500).json({
         success: false,
-        error: `Failed to create on-chain market: ${error.message}`,
+        error: `Failed to create on-chain market: ${error.message || 'Unknown error'}`,
+        details: error.stack,
       });
     }
   } catch (error: any) {
