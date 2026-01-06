@@ -170,12 +170,16 @@ export default function MyBets() {
     const dual: bigint[] = [];
     
     for (const marketId of marketIds) {
-      const isDual = marketIdsToDualCoin.get(marketId.toString());
-      if (isDual) {
+      const marketIdStr = marketId.toString();
+      const isDual = marketIdsToDualCoin.get(marketIdStr);
+      console.log(`📊 Checking marketId ${marketIdStr}: isDual=${isDual}, has mapping=${marketIdsToDualCoin.has(marketIdStr)}`);
+      
+      if (isDual === true) {
         dual.push(marketId);
-      } else {
+      } else if (isDual === false) {
         std.push(marketId);
       }
+      // Skip if undefined (market not found in API yet)
     }
     
     console.log(`📊 Split markets: ${std.length} standard (MIND), ${dual.length} dual coin (USDC)`);
@@ -664,9 +668,24 @@ export default function MyBets() {
     
     // For dual-coin markets, construct the full "Coin A vs Coin B" market name
     let displayMarketName = marketData?.stockSymbol || market?.stockSymbol || market?.stockName || `Market #${bet.marketId}`;
-    if (market?.isDualCoin && marketData?.numOutcomes === 2) {
-      // Show both coins in the format "WOJAK vs 67"
-      displayMarketName = `${market.coinASymbol || 'Coin A'} vs ${market.coinBSymbol || 'Coin B'}`;
+    if (market?.isDualCoin) {
+      // Try to get coin symbols from market data
+      let coinASymbol = market.coinASymbol;
+      let coinBSymbol = market.coinBSymbol;
+      
+      // Fallback: Parse from symbol field if individual fields missing (e.g., "fish-BULLISH" → "fish" vs "BULLISH")
+      if ((!coinASymbol || !coinBSymbol) && (market as any).symbol) {
+        const parts = (market as any).symbol.split('-');
+        if (parts.length === 2) {
+          coinASymbol = coinASymbol || parts[0];
+          coinBSymbol = coinBSymbol || parts[1];
+        }
+      }
+      
+      // Always show both coins for dual coin markets
+      if (coinASymbol && coinBSymbol) {
+        displayMarketName = `${coinASymbol} vs ${coinBSymbol}`;
+      }
     }
     
     return {
@@ -847,7 +866,9 @@ export default function MyBets() {
                               <span className="font-bold text-lg">{bet.marketName}</span>
                               <Badge variant="secondary" className="font-mono text-xs">
                                 {bet.market?.isDualCoin 
-                                  ? (bet.outcomeIndex === 0 ? bet.market.coinASymbol : bet.market.coinBSymbol)
+                                  ? (bet.outcomeIndex === 0 
+                                      ? (bet.market.coinASymbol || ((bet.market as any).symbol?.split('-')[0]) || 'Coin A')
+                                      : (bet.market.coinBSymbol || ((bet.market as any).symbol?.split('-')[1]) || 'Coin B'))
                                   : bet.bucketLabel
                                 }
                               </Badge>
@@ -894,7 +915,9 @@ export default function MyBets() {
                             <span className="font-bold text-lg">{bet.marketName}</span>
                             <Badge variant="secondary" className="font-mono text-xs">
                               {bet.market?.isDualCoin 
-                                ? (bet.outcomeIndex === 0 ? bet.market.coinASymbol : bet.market.coinBSymbol)
+                                ? (bet.outcomeIndex === 0 
+                                    ? (bet.market.coinASymbol || ((bet.market as any).symbol?.split('-')[0]) || 'Coin A')
+                                    : (bet.market.coinBSymbol || ((bet.market as any).symbol?.split('-')[1]) || 'Coin B'))
                                 : bet.bucketLabel
                               }
                             </Badge>
