@@ -640,6 +640,11 @@ export async function getOnChainMarketStatus(blockchainMarketId: number, isDualC
       };
     }
   } catch (error: any) {
+    // Gracefully handle markets that don't exist on chain (e.g., from old contract deployments)
+    if (error.message?.includes('Market does not exist')) {
+      // Silently skip - this is expected for markets from old contract versions
+      return null;
+    }
     console.error(`❌ Error getting on-chain status for market ${blockchainMarketId}:`, error.message);
     return null;
   }
@@ -649,7 +654,7 @@ export async function getOnChainMarketStatus(blockchainMarketId: number, isDualC
  * Sync settlement status from blockchain for all markets
  * Updates backend if blockchain shows market is settled but backend doesn't
  */
-export async function syncSettlementStatusFromChain(markets: Array<{ id: string; blockchainMarketId?: number; status: number; isDualCoin?: boolean }>): Promise<number> {
+export async function syncSettlementStatusFromChain(markets: Array<{ id: string; blockchainMarketId?: number; status: string | number; isDualCoin?: boolean }>): Promise<number> {
   if (!isInitialized || !publicClient) {
     console.log('⚠️  Blockchain not initialized - skipping settlement sync');
     return 0;
@@ -663,7 +668,8 @@ export async function syncSettlementStatusFromChain(markets: Array<{ id: string;
   for (const market of markets) {
     // Only check markets that have a blockchain ID and aren't already settled in backend
     if (market.blockchainMarketId === undefined || market.blockchainMarketId === null) continue;
-    if (market.status === SETTLED_STATUS) continue;
+    // Skip if already settled (handle both string enum and number status)
+    if (market.status === 'SETTLED' || market.status === MarketStatus.SETTLED || market.status === SETTLED_STATUS) continue;
 
     try {
       const onChainStatus = await getOnChainMarketStatus(market.blockchainMarketId, market.isDualCoin || false);
