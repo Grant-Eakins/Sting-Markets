@@ -390,6 +390,31 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
+     * @notice Get current probabilities for each outcome (0=CoinA, 1=CoinB)
+     * @dev Returns array of probabilities as basis points (10000 = 100%)
+     */
+    function getProbabilities(uint256 marketId) external view returns (uint256[] memory) {
+        Market storage market = markets[marketId];
+        require(market.marketId == marketId, "Market does not exist");
+        
+        uint256[] memory probabilities = new uint256[](2);
+        
+        // If no liquidity yet, return 50/50
+        if (market.totalLiquidity == 0) {
+            probabilities[0] = 5000; // 50%
+            probabilities[1] = 5000; // 50%
+            return probabilities;
+        }
+        
+        // Calculate probabilities based on liquidity in each bucket
+        // Probability = (bucket liquidity / total liquidity) * 10000
+        probabilities[0] = (market.bucketLiquidity[0] * 10000) / market.totalLiquidity;
+        probabilities[1] = (market.bucketLiquidity[1] * 10000) / market.totalLiquidity;
+        
+        return probabilities;
+    }
+    
+    /**
      * @notice Update oracle address
      */
     function updateOracle(address newOracle) external onlyOwner {

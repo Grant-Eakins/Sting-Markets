@@ -512,7 +512,7 @@ export const DUAL_COIN_CONTRACT_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000', // TODO: Deploy to mainnet
   // Base Sepolia Testnet
-  84532: '0xBc6b9a31AB377D1FF73080F83E30D1e6868B2868', // ProportionalMarketDualCoin
+  84532: '0x5924B8Cec58e7cc5fEc23F8c162AA9Ff3C83E340', // ProportionalMarketDualCoin (with getProbabilities fix)
 } as const;
 
 // Listing Auction contract addresses

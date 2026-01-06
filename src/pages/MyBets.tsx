@@ -310,8 +310,16 @@ export default function MyBets() {
     
     setClaimingBetId(marketId);
     try {
+      // Determine if this is a dual coin market
+      const isDualCoin = marketIdsToDualCoin.get(marketId.toString()) || false;
+      const contractAddress = isDualCoin 
+        ? DUAL_COIN_CONTRACT_ADDRESSES[84532]
+        : CONTRACT_ADDRESSES[84532];
+      
+      console.log(`💰 Claiming payout for market ${marketId} (isDualCoin: ${isDualCoin}, contract: ${contractAddress})`);
+      
       const hash = await writeContractAsync({
-        address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
+        address: contractAddress as `0x${string}`,
         abi: PREDICTION_MARKET_ABI,
         functionName: 'claimPayout',
         args: [marketId],
