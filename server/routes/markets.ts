@@ -663,7 +663,17 @@ router.get('/', async (req, res) => {
         }
         
         if (market.blockchainMarketId !== undefined && market.blockchainMarketId !== null) {
-          console.log(`📊 Fetching probabilities for market ${market.stockSymbol} (ID: ${market.blockchainMarketId})`);
+          console.log(`📊 Fetching probabilities for market ${market.stockSymbol} (ID: ${market.blockchainMarketId}, isDualCoin: ${market.isDualCoin})`);
+          
+          // Dual coin markets need different probability fetching (2 outcomes only)
+          if (market.isDualCoin) {
+            // For dual coin, fetch from dual coin contract
+            // This will be implemented via getDualCoinMarketPools or a dedicated function
+            // For now, skip to avoid fetching from wrong contract
+            console.log(`   ⏭️  Skipping probability fetch for dual coin market (use getDualCoinMarketPools instead)`);
+            return market;
+          }
+          
           const probabilities = await getMarketProbabilities(market.blockchainMarketId);
           console.log(`   Probabilities:`, probabilities);
           return {
