@@ -280,7 +280,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                     <img 
                       src={market.coinAImage} 
                       alt={market.coinASymbol} 
-                      className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full border-4 border-muted shadow-lg" 
+                      className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full shadow-lg coin-gold-border" 
                     />
                   ) : (
                     <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full bg-blue-500/10 border-4 border-muted shadow-lg flex items-center justify-center text-4xl font-bold">
@@ -357,7 +357,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       <img 
                         src={market.coinAImage} 
                         alt={market.coinASymbol} 
-                        className="w-8 h-8 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full border-3 border-green-500 shadow-lg" 
+                        className="w-8 h-8 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full shadow-lg coin-gold-border" 
                       />
                     ) : (
                       <div className="w-8 h-8 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-3 border-green-500 shadow-lg flex items-center justify-center text-sm sm:text-xl font-bold">
@@ -369,7 +369,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                       <img 
                         src={market.coinBImage} 
                         alt={market.coinBSymbol} 
-                        className="w-8 h-8 sm:w-20 sm:h-20 rounded-full border-3 border-green-500 shadow-lg" 
+                        className="w-8 h-8 sm:w-20 sm:h-20 rounded-full shadow-lg coin-gold-border" 
                       />
                     ) : (
                       <div className="w-8 h-8 sm:w-20 sm:h-20 rounded-full bg-green-500/20 border-3 border-green-500 shadow-lg flex items-center justify-center text-sm sm:text-xl font-bold">
@@ -411,7 +411,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                     <img 
                       src={market.coinBImage} 
                       alt={market.coinBSymbol} 
-                      className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full border-4 border-muted shadow-lg" 
+                      className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full shadow-lg coin-gold-border" 
                     />
                   ) : (
                     <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full bg-purple-500/10 border-4 border-muted shadow-lg flex items-center justify-center text-4xl font-bold">
