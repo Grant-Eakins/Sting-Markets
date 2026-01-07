@@ -530,39 +530,31 @@ export default function MyBets() {
     
     const marketsList = Array.isArray(markets) ? markets : [];
     const market = marketsList.find((m: Market) => m.blockchainMarketId === Number(bet.marketId));
-    const amountToken = Number(bet.cost) / TOKEN_DIVISOR;  // Remaining cost basis after sells (18 decimals)
-    const sharesNum = Number(bet.shares) / TOKEN_DIVISOR; // Remaining shares after sells (18 decimals)
+    const isDualCoin = !!(market as any)?.isDualCoin;
+    
+    // For dual coin markets: cost is in USDC (6 decimals), shares are in 18 decimals
+    // For standard markets: both cost and shares are in 18 decimals (MIND token)
+    const amountToken = Number(bet.cost) / (isDualCoin ? 1e6 : TOKEN_DIVISOR);  // Cost in USDC (6 decimals) or MIND (18 decimals)
+    const sharesNum = Number(bet.shares) / 1e18; // Shares always 18 decimals on-chain
     
     // Calculate purchase probability from shares/cost ratio
-    // In bonding curve: shares = (netAmount * 1e18) / (1e18 + bucketLiquidity * 10)
-    // At low liquidity, shares ≈ netAmount, so purchaseProb ≈ 50%
-    // At high liquidity, shares < netAmount, so you paid a premium (higher prob = lower payout)
-    // Simple formula: purchaseProbability ≈ cost / (cost + expectedProfit)
-    // Where expectedProfit at fair odds = cost * (1 - prob) / prob
-    // Simplified: if sharesNum > amountToken, you got shares at below-average price (favorable odds)
-    // PurchaseProbability ≈ amountToken / potentialPayout (calculated at purchase time)
-    // Since shares represent your claim, and cost is what you paid:
-    // implied_payout_if_win ≈ shares (in parimutuel, your shares = your claim on the pool)
-    // But we need to account for the 3% fee: netAmount = amountToken * 0.97
     const netAmount = amountToken * 0.97; // 3% fee taken out
-    // purchaseProbability = what you paid / what you'd get if you win
-    // In a fair parimutuel, shares represent your payout claim
-    // But shares are scaled by bonding curve, so: purchaseProb ≈ netAmount / (netAmount + potentialProfit)
-    // Simpler: purchaseProb = netAmount / sharesNum (if shares > netAmount, you got favorable odds)
-    // This gives implied probability at purchase time
     let purchaseProbability = 0.5; // Default 50%
-    if (sharesNum > 0) {
-      // If you paid $10 (net $9.70) and got 19.4 shares, your purchase prob was ~50%
-      // If you paid $10 (net $9.70) and got 5 shares, your purchase prob was higher (~66%)
-      // Formula: purchaseProb = netAmount / (netAmount * 2) when shares = netAmount (50%)
-      // General: purchaseProb = 1 / (1 + sharesNum/netAmount) -> but this inverts the logic
-      // Actually: purchaseProb ≈ cost / potentialPayout
-      // potentialPayout = cost + profit, where profit comes from other side
-      // For 2-outcome markets: purchaseProb ≈ yourBucket / totalPool at purchase
-      // Since shares = netAmount when bucketLiquidity is 0, and shares decrease as liquidity grows
-      // purchaseProb ≈ 1 / (1 + (sharesNum / netAmount - 1)) when sharesNum > netAmount
-      // Simpler approximation: purchaseProb ≈ netAmount / sharesNum (capped at 0.99)
-      purchaseProbability = Math.min(0.99, Math.max(0.01, netAmount / sharesNum));
+    
+    if (sharesNum > 0 && netAmount > 0) {
+      if (isDualCoin) {
+        // DUAL COIN: shares = (netAmount * 1e18) / (probability * 1e6)
+        // Rearrange: probability = (netAmount * 1e18) / (sharesNum * 1e6)
+        // netAmount is in USDC, so netAmount in base units = netAmount * 1e6
+        // probability = (netAmount * 1e6 * 1e18) / (sharesNum * 1e6)
+        // probability = (netAmount * 1e18) / sharesNum
+        const netAmountInBaseUnits = netAmount * 1e6; // Convert USDC to base units
+        const sharePrice = (netAmountInBaseUnits * 1e18) / sharesNum; // Share price paid
+        purchaseProbability = Math.min(0.99, Math.max(0.01, sharePrice / 1e18)); // Normalize to 0-1
+      } else {
+        // BONDING CURVE (standard markets): reverse calculate from shares/netAmount ratio
+        purchaseProbability = Math.min(0.99, Math.max(0.01, netAmount / sharesNum));
+      }
     }
     
     const isSettled = marketData?.settled || false;
@@ -582,21 +574,25 @@ export default function MyBets() {
       probability = marketData.probabilities[bet.outcomeIndex];
       
       if (probability > 0 && marketData.totalLiquidity > 0) {
-        // In proportional markets:
-        // Potential payout = your investment + your share of the opposite pool
-        // Your share of opposite pool = (your shares / total shares in your bucket) * opposite pool size
-        // Simplified: totalLiquidity * (yourShares / totalSharesInYourBucket)
-        // Which equals: amountToken / probability (since probability = yourBucketSize / totalLiquidity)
-        // But we only want the PROFIT, not the principal
-        // So: profit = totalLiquidity * (1 - probability) * (yourShares / (totalLiquidity * probability))
-        // Simplified: profit = amountToken * (1 - probability) / probability
-        // Total payout = principal + profit = amountToken + amountToken * (1 - probability) / probability
-        // Which simplifies to: amountToken / probability
-        // BUT this assumes constant product, which is wrong for LMSR
-        // For a more accurate estimate, use: your bet + your proportional share of losing side
-        const yourShareOfWinningBucket = amountToken / (marketData.totalLiquidity * probability);
-        const losingBucketSize = marketData.totalLiquidity * (1 - probability);
-        potentialPayout = amountToken + (yourShareOfWinningBucket * losingBucketSize);
+        if (isDualCoin) {
+          // DUAL COIN MARKETS: Simple parimutuel - shares represent direct claim on pool
+          // Formula: payout = (yourShares / totalSharesInBucket) * totalPool
+          // We need to get totalShares from contract, but for estimate use: 
+          // totalSharesInBucket ≈ bucketLiquidity / averageSharePrice
+          // Since sharePrice = probability × 1e6 (for USDC 6 decimals)
+          // totalSharesInBucket ≈ (totalLiquidity × probability) / (probability × 1e6) × 1e18
+          // Simplified: totalSharesInBucket ≈ totalLiquidity × 1e12
+          const bucketLiquidity = marketData.totalLiquidity * probability;
+          const avgSharePrice = probability; // In USDC (normalized to 1.0)
+          const estimatedTotalShares = (bucketLiquidity / avgSharePrice); // Rough estimate
+          const yourShareOfBucket = sharesNum / estimatedTotalShares;
+          potentialPayout = marketData.totalLiquidity * yourShareOfBucket;
+        } else {
+          // STANDARD MARKETS: Bonding curve proportional payout
+          const yourShareOfWinningBucket = amountToken / (marketData.totalLiquidity * probability);
+          const losingBucketSize = marketData.totalLiquidity * (1 - probability);
+          potentialPayout = amountToken + (yourShareOfWinningBucket * losingBucketSize);
+        }
         
         // Cap at reasonable max (can't win more than total pool)
         potentialPayout = Math.min(potentialPayout, marketData.totalLiquidity);
