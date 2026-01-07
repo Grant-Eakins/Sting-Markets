@@ -581,6 +581,19 @@ export default function AdminPage() {
     }
   }, [isAdmin]);
 
+  // Auto-refresh burn vault and protocol fees every 10 seconds
+  useEffect(() => {
+    if (!isAdmin) return;
+    
+    const interval = setInterval(() => {
+      refetchBurnVault();
+      refetchFees();
+      refetchDualFees();
+    }, 10000); // 10 seconds
+    
+    return () => clearInterval(interval);
+  }, [isAdmin, refetchBurnVault, refetchFees, refetchDualFees]);
+
   // Watch for auction events and auto-create market (in useEffect to prevent repeated alerts)
   useEffect(() => {
     if (auctionStarted) {
@@ -1171,8 +1184,18 @@ export default function AdminPage() {
             {/* Burn Vault Collection */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  🔥 Burn Vault Collection
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    🔥 Burn Vault Collection
+                  </span>
+                  <Button 
+                    onClick={() => refetchBurnVault()} 
+                    variant="ghost" 
+                    size="sm"
+                    disabled={burnVaultLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${burnVaultLoading ? 'animate-spin' : ''}`} />
+                  </Button>
                 </CardTitle>
                 <CardDescription>
                   Accumulated USDC (1% of bets) for burning utility token on Solana
