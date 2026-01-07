@@ -13,7 +13,16 @@ import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain
 import { getAllMarkets, updateMarketPools, initializeMarketsFromDb } from './services/marketService';
 import { initializeDatabase, cleanupOldSettledMarkets, cleanupDuplicateActiveMarkets } from './services/database';
 import { activateScheduledMarkets } from './services/scheduledMarketActivation';
-import { initBurnScheduler, executeBurnCycle, getLastBurnResult, isBurnRunning } from './services/burnScheduler';
+
+// Dynamically import burn scheduler only if configured
+let burnScheduler: any = null;
+if (process.env.ADMIN_PRIVATE_KEY && process.env.SOLANA_PRIVATE_KEY && process.env.SOLANA_UTILITY_TOKEN_MINT) {
+  try {
+    burnScheduler = await import('./services/burnScheduler.js');
+  } catch (e) {
+    console.log('⚠️ Burn scheduler disabled: Missing dependencies or configuration');
+  }
+}
 
 // ES Module dirname workaround
 const __filename = fileURLToPath(import.meta.url);
@@ -180,20 +189,28 @@ const ADMIN_WALLETS = [
 ];
 
 app.get('/api/admin/burn-status', (req, res) => {
+  if (!burnScheduler) {
+    return res.json({ enabled: false, error: 'Burn scheduler not configured' });
+  }
   res.json({
-    isRunning: isBurnRunning(),
-    lastResult: getLastBurnResult(),
+    enabled: true,
+    isRunning: burnScheduler.isBurnRunning(),
+    lastResult: burnScheduler.getLastBurnResult(),
   });
 });
 
 app.post('/api/admin/trigger-burn', async (req, res) => {
+  if (!burnScheduler) {
+    return res.status(503).json({ error: 'Burn scheduler not configured' });
+  }
+  
   const adminWallet = req.headers['x-admin-wallet']?.toString().toLowerCase();
   
   if (!adminWallet || !ADMIN_WALLETS.includes(adminWallet)) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
   
-  if (isBurnRunning()) {
+  if (burnScheduler.isBurnRunning()) {
     return res.status(409).json({ error: 'Burn cycle already in progress' });
   }
   
@@ -201,7 +218,7 @@ app.post('/api/admin/trigger-burn', async (req, res) => {
   res.json({ message: 'Burn cycle started', status: 'pending' });
   
   // Execute async (don't await)
-  executeBurnCycle().then(result => {
+  burnScheduler.executeBurnCycle().then((result: any) => {
     console.log('Manual burn cycle result:', result);
   });
 });
@@ -352,8 +369,10 @@ app.listen(PORT, async () => {
   console.log(`🔗 Each market creates its own on-chain liquidity pool`);
   console.log(`📊 Top 6 cryptos with bonding curve pricing\n`);
   
-  // Initialize burn scheduler for weekly token burns
-  initBurnScheduler();
+  // Initialize burn scheduler for weekly token burns (if configured)
+  if (burnScheduler) {
+    burnScheduler.initBurnScheduler();
+  }
   
   // Load existing markets from database
   console.log('📂 Loading markets from database...');
