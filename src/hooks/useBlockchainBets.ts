@@ -66,10 +66,10 @@ export function useBlockchainBets() {
       
       // Query in chunks of 50,000 blocks (well under the 100k limit)
       const CHUNK_SIZE = 50000n;
-      const LOOKBACK_BLOCKS = 500000n; // ~12 days on Base Sepolia (increased from 200k)
+      const LOOKBACK_BLOCKS = 500000n; // ~12 days on Base Sepolia (2 sec/block) - balance between coverage and speed
       const startBlock = currentBlock > LOOKBACK_BLOCKS ? currentBlock - LOOKBACK_BLOCKS : 0n;
       
-      console.log(`📊 Querying blocks ${startBlock} to ${currentBlock} (looking back ${LOOKBACK_BLOCKS} blocks)`);
+      console.log(`📊 Querying blocks ${startBlock} to ${currentBlock} (looking back ${LOOKBACK_BLOCKS} blocks = ~${Number(LOOKBACK_BLOCKS) * 2 / 86400} days)`);
 
       const purchaseLogs: any[] = [];
       const sellLogs: any[] = [];
@@ -97,6 +97,10 @@ export function useBlockchainBets() {
               fromBlock: fromBlock,
               toBlock: toBlock,
             }).then(logs => ({ type: 'purchase', logs, contract, fromBlock, toBlock }))
+             .catch(err => {
+               console.warn(`⚠️ Purchase query failed for block range ${fromBlock}-${toBlock}:`, err.message);
+               return { type: 'purchase', logs: [], contract, fromBlock, toBlock };
+             })
           );
           
           allQueryPromises.push(
@@ -107,6 +111,10 @@ export function useBlockchainBets() {
               fromBlock: fromBlock,
               toBlock: toBlock,
             }).then(logs => ({ type: 'sell', logs, contract, fromBlock, toBlock }))
+             .catch(err => {
+               console.warn(`⚠️ Sell query failed for block range ${fromBlock}-${toBlock}:`, err.message);
+               return { type: 'sell', logs: [], contract, fromBlock, toBlock };
+             })
           );
           
           allQueryPromises.push(
@@ -117,14 +125,26 @@ export function useBlockchainBets() {
               fromBlock: fromBlock,
               toBlock: toBlock,
             }).then(logs => ({ type: 'claim', logs, contract, fromBlock, toBlock }))
+             .catch(err => {
+               console.warn(`⚠️ Claim query failed for block range ${fromBlock}-${toBlock}:`, err.message);
+               return { type: 'claim', logs: [], contract, fromBlock, toBlock };
+             })
           );
         }
       }
       
-      // Execute ALL queries in parallel
-      console.log(`📊 Executing ${allQueryPromises.length} queries in parallel...`);
+      // Execute queries in batches to avoid RPC rate limits
+      const BATCH_SIZE = 10; // Max 10 concurrent queries
+      console.log(`📊 Executing ${allQueryPromises.length} queries in batches of ${BATCH_SIZE}...`);
       const startTime = Date.now();
-      const results = await Promise.all(allQueryPromises);
+      
+      const results: any[] = [];
+      for (let i = 0; i < allQueryPromises.length; i += BATCH_SIZE) {
+        const batch = allQueryPromises.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(batch);
+        results.push(...batchResults);
+      }
+      
       const queryTime = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(`📊 ✅ All queries completed in ${queryTime}s`);
       
