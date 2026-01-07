@@ -5,7 +5,7 @@
     "moduleResolution": "node",
     "lib": ["ES2022"],
     "outDir": "../dist/server",
-    "rootDir": "./",
+    "rootDir": "../",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,6 +14,6 @@
     "allowSyntheticDefaultImports": true,
     "declaration": false
   },
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "../shared/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

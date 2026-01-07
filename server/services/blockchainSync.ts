@@ -5,14 +5,15 @@ import { createPublicClient, createWalletClient, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import dotenv from 'dotenv';
+import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES } from '../../shared/contracts';
 
 dotenv.config();
 
-// ProportionalMarketMIND contract address
-const CONTRACT_ADDRESS = '0xa36fA2A8Dc1be09e049FE468281D36bc12c2043F'; // ProportionalMarketUSDC (MockUSDC + burn mechanism)
+// ProportionalMarketUSDC contract address (Base Sepolia)
+const CONTRACT_ADDRESS = CONTRACT_ADDRESSES[84532];
 
-// ProportionalMarketDualCoin contract address
-const DUAL_COIN_CONTRACT_ADDRESS = '0xeB3a2bd6201638d1E5C7C2CF95C03E95AA4Cf5f7'; // DualCoin head-to-head battles (with getProbabilities + getMarket)
+// ProportionalMarketDualCoin contract address (Base Sepolia)
+const DUAL_COIN_CONTRACT_ADDRESS = DUAL_COIN_CONTRACT_ADDRESSES[84532];
 
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)
