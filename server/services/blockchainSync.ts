@@ -124,6 +124,17 @@ const DUAL_COIN_ABI = [
     "stateMutability": "nonpayable",
     "type": "function"
   },
+  // settleMarketManual(uint256 marketId, bool coinAWon) - bypasses time check for testing
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "marketId", "type": "uint256" },
+      { "internalType": "bool", "name": "coinAWon", "type": "bool" }
+    ],
+    "name": "settleMarketManual",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
   {
     "inputs": [],
     "name": "nextMarketId",
@@ -519,7 +530,7 @@ export async function settleDualCoinOnChain(blockchainMarketId: number, coinAWon
       await publicClient.simulateContract({
         address: DUAL_COIN_CONTRACT_ADDRESS,
         abi: DUAL_COIN_ABI,
-        functionName: 'settleMarket',
+        functionName: 'settleMarketManual',
         args: [BigInt(blockchainMarketId), coinAWon],
         account: walletClient.account.address,
       });
@@ -541,7 +552,7 @@ export async function settleDualCoinOnChain(blockchainMarketId: number, coinAWon
     const hash = await walletClient.writeContract({
       address: DUAL_COIN_CONTRACT_ADDRESS,
       abi: DUAL_COIN_ABI,
-      functionName: 'settleMarket',
+      functionName: 'settleMarketManual',
       args: [BigInt(blockchainMarketId), coinAWon]
     });
 
