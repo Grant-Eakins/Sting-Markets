@@ -13,6 +13,7 @@ import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain
 import { getAllMarkets, updateMarketPools, initializeMarketsFromDb } from './services/marketService';
 import { initializeDatabase, cleanupOldSettledMarkets, cleanupDuplicateActiveMarkets } from './services/database';
 import { activateScheduledMarkets } from './services/scheduledMarketActivation';
+import { initBurnScheduler, executeBurnCycle, getLastBurnResult, isBurnRunning } from './services/burnScheduler';
 
 // ES Module dirname workaround
 const __filename = fileURLToPath(import.meta.url);
@@ -172,6 +173,39 @@ app.use(express.static(distPath));
 app.use('/api/markets', marketsRouter);
 app.use('/api/auction', auctionRouter);
 
+// Burn scheduler routes (admin only)
+const ADMIN_WALLETS = [
+  '0x6b1b7e7b207ec756b8d9edc59db4b32184160b22',
+  '0xb0687ef6ea5906089ec3586f9997764650bf1934',
+];
+
+app.get('/api/admin/burn-status', (req, res) => {
+  res.json({
+    isRunning: isBurnRunning(),
+    lastResult: getLastBurnResult(),
+  });
+});
+
+app.post('/api/admin/trigger-burn', async (req, res) => {
+  const adminWallet = req.headers['x-admin-wallet']?.toString().toLowerCase();
+  
+  if (!adminWallet || !ADMIN_WALLETS.includes(adminWallet)) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+  
+  if (isBurnRunning()) {
+    return res.status(409).json({ error: 'Burn cycle already in progress' });
+  }
+  
+  // Start burn cycle in background
+  res.json({ message: 'Burn cycle started', status: 'pending' });
+  
+  // Execute async (don't await)
+  executeBurnCycle().then(result => {
+    console.log('Manual burn cycle result:', result);
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 
@@ -317,6 +351,9 @@ app.listen(PORT, async () => {
   console.log(`✅ Manual market creation: POST /api/markets/create`);
   console.log(`🔗 Each market creates its own on-chain liquidity pool`);
   console.log(`📊 Top 6 cryptos with bonding curve pricing\n`);
+  
+  // Initialize burn scheduler for weekly token burns
+  initBurnScheduler();
   
   // Load existing markets from database
   console.log('📂 Loading markets from database...');

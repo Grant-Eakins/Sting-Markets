@@ -1071,7 +1071,7 @@ export default function AdminPage() {
                   🔥 Burn Vault Collection
                 </CardTitle>
                 <CardDescription>
-                  Withdraw accumulated USDC (1% of bets) to bridge to Solana and burn utility token
+                  Accumulated USDC (1% of bets) for burning utility token on Solana
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1082,35 +1082,58 @@ export default function AdminPage() {
                       {burnVaultLoading ? '...' : burnVault ? `${formatUnits(burnVault, 6)} USDC` : '0 USDC'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Collected from 1% of all bets. Withdraw weekly to bridge to Solana.
+                      Auto-burns every Sunday at midnight UTC. Or trigger manually below.
                     </p>
                   </div>
                   
-                  <Button
-                    onClick={async () => {
-                      try {
-                        await withdrawBurnVault();
-                        // Refetch after a delay
-                        setTimeout(() => {
-                          refetchBurnVault();
-                        }, 3000);
-                      } catch (err) {
-                        console.error('Failed to withdraw burn vault:', err);
-                      }
-                    }}
-                    disabled={isWithdrawingBurnVault || isConfirmingBurnVault || !burnVault || burnVault === 0n}
-                    className="w-full"
-                  >
-                    {isWithdrawingBurnVault && '🔄 Sending...'}
-                    {isConfirmingBurnVault && '⏳ Confirming...'}
-                    {!isWithdrawingBurnVault && !isConfirmingBurnVault && '💰 Collect Burn Vault'}
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={async () => {
+                        try {
+                          await withdrawBurnVault();
+                          setTimeout(() => refetchBurnVault(), 3000);
+                        } catch (err) {
+                          console.error('Failed to withdraw burn vault:', err);
+                        }
+                      }}
+                      disabled={isWithdrawingBurnVault || isConfirmingBurnVault || !burnVault || burnVault === 0n}
+                      variant="outline"
+                    >
+                      {isWithdrawingBurnVault || isConfirmingBurnVault ? '⏳...' : '💰 Manual Withdraw'}
+                    </Button>
+                    
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`${API_BASE}/admin/trigger-burn`, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-wallet': address || '',
+                            },
+                          });
+                          const data = await response.json();
+                          if (response.ok) {
+                            alert('🔥 Burn cycle started! Check Discord for updates.');
+                          } else {
+                            alert(`Error: ${data.error}`);
+                          }
+                        } catch (err) {
+                          console.error('Failed to trigger burn:', err);
+                          alert('Failed to trigger burn cycle');
+                        }
+                      }}
+                      disabled={!burnVault || burnVault === 0n}
+                    >
+                      🔥 Auto Bridge & Burn
+                    </Button>
+                  </div>
                   
                   {isBurnVaultWithdrawn && (
                     <Alert>
                       <CheckCircle className="h-4 w-4" />
                       <AlertDescription>
-                        ✅ Burn vault collected! Now bridge USDC to Solana, buy your token, and burn it.
+                        ✅ Burn vault collected!
                       </AlertDescription>
                     </Alert>
                   )}
