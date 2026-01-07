@@ -38,7 +38,8 @@ interface EnrichedBet extends BlockchainBet {
   amountToken: number;
   sharesNum: number;
   potentialPayout: number;
-  probability: string;
+  probability: string;           // Current probability
+  purchaseProbability: string;   // Probability at time of purchase
   isSettled: boolean;
   won: boolean;
   currentValue: number;
@@ -532,6 +533,38 @@ export default function MyBets() {
     const amountToken = Number(bet.cost) / TOKEN_DIVISOR;  // Remaining cost basis after sells (18 decimals)
     const sharesNum = Number(bet.shares) / TOKEN_DIVISOR; // Remaining shares after sells (18 decimals)
     
+    // Calculate purchase probability from shares/cost ratio
+    // In bonding curve: shares = (netAmount * 1e18) / (1e18 + bucketLiquidity * 10)
+    // At low liquidity, shares ≈ netAmount, so purchaseProb ≈ 50%
+    // At high liquidity, shares < netAmount, so you paid a premium (higher prob = lower payout)
+    // Simple formula: purchaseProbability ≈ cost / (cost + expectedProfit)
+    // Where expectedProfit at fair odds = cost * (1 - prob) / prob
+    // Simplified: if sharesNum > amountToken, you got shares at below-average price (favorable odds)
+    // PurchaseProbability ≈ amountToken / potentialPayout (calculated at purchase time)
+    // Since shares represent your claim, and cost is what you paid:
+    // implied_payout_if_win ≈ shares (in parimutuel, your shares = your claim on the pool)
+    // But we need to account for the 3% fee: netAmount = amountToken * 0.97
+    const netAmount = amountToken * 0.97; // 3% fee taken out
+    // purchaseProbability = what you paid / what you'd get if you win
+    // In a fair parimutuel, shares represent your payout claim
+    // But shares are scaled by bonding curve, so: purchaseProb ≈ netAmount / (netAmount + potentialProfit)
+    // Simpler: purchaseProb = netAmount / sharesNum (if shares > netAmount, you got favorable odds)
+    // This gives implied probability at purchase time
+    let purchaseProbability = 0.5; // Default 50%
+    if (sharesNum > 0) {
+      // If you paid $10 (net $9.70) and got 19.4 shares, your purchase prob was ~50%
+      // If you paid $10 (net $9.70) and got 5 shares, your purchase prob was higher (~66%)
+      // Formula: purchaseProb = netAmount / (netAmount * 2) when shares = netAmount (50%)
+      // General: purchaseProb = 1 / (1 + sharesNum/netAmount) -> but this inverts the logic
+      // Actually: purchaseProb ≈ cost / potentialPayout
+      // potentialPayout = cost + profit, where profit comes from other side
+      // For 2-outcome markets: purchaseProb ≈ yourBucket / totalPool at purchase
+      // Since shares = netAmount when bucketLiquidity is 0, and shares decrease as liquidity grows
+      // purchaseProb ≈ 1 / (1 + (sharesNum / netAmount - 1)) when sharesNum > netAmount
+      // Simpler approximation: purchaseProb ≈ netAmount / sharesNum (capped at 0.99)
+      purchaseProbability = Math.min(0.99, Math.max(0.01, netAmount / sharesNum));
+    }
+    
     const isSettled = marketData?.settled || false;
     // Win if the user's bet bucket matches the winning outcome
     const won = isSettled && marketData?.winningOutcome === bet.outcomeIndex;
@@ -695,7 +728,8 @@ export default function MyBets() {
       amountToken,
       sharesNum,
       potentialPayout,
-      probability: (probability * 100).toFixed(1), // As percentage string
+      probability: (probability * 100).toFixed(1), // Current probability as percentage string
+      purchaseProbability: (purchaseProbability * 100).toFixed(1), // Purchase probability as percentage string
       isSettled,
       won,
       currentValue,
@@ -875,14 +909,18 @@ export default function MyBets() {
                             </div>
                             
                             {/* Simple stats */}
-                            <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div className="grid grid-cols-4 gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">Amount Bet:</span>
                                 <p className="font-bold text-lg">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Bet at:</span>
-                                <p className="font-bold text-lg text-blue-500">{bet.probability}%</p>
+                                <span className="text-muted-foreground">Shares:</span>
+                                <p className="font-bold text-lg text-purple-500">{bet.sharesNum.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Bought at:</span>
+                                <p className="font-bold text-lg text-blue-500">{bet.purchaseProbability}%</p>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Potential Win:</span>
@@ -933,10 +971,18 @@ export default function MyBets() {
                           </div>
                           
                           {/* Simple stats */}
-                          <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="grid grid-cols-4 gap-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">Amount Bet:</span>
                               <p className="font-bold text-lg">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Shares:</span>
+                              <p className="font-bold text-lg text-purple-500">{bet.sharesNum.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Bought at:</span>
+                              <p className="font-bold text-lg text-blue-500">{bet.purchaseProbability}%</p>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Result:</span>

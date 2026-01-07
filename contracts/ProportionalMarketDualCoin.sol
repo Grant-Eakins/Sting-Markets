@@ -84,7 +84,8 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
     uint256 public constant TOTAL_FEE_BPS = 300; // 3% total
     uint256 public constant MIN_BET_SIZE = 1 * 10**6; // 1 USDC
     uint256 public maxBetSize = 10 * 10**6; // 10 USDC (adjustable)
-    uint256 public constant BONDING_CURVE_STEEPNESS = 10;
+    uint256 public constant SEED_LIQUIDITY = 1 * 10**6; // $1 seed per side to avoid division by zero
+    uint256 public constant PRECISION = 1e18; // Share precision (18 decimals)
     uint256 public protocolFeesCollected;
     uint256 public burnVault; // USDC accumulated for manual bridge & burn on Solana
     uint256 public totalBurned; // Track total utility tokens burned
@@ -142,7 +143,7 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
-     * @notice Create a new dual-coin battle market
+     * @notice Create a new dual-coin battle market with seed liquidity
      */
     function createMarket(
         string memory coinASymbol,
@@ -164,18 +165,52 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
         market.settleTime = settleTime;
         market.settled = false;
         
+        // Seed with $1 each side to prevent division by zero
+        // Owner pays seed liquidity
+        token.safeTransferFrom(msg.sender, address(this), SEED_LIQUIDITY * 2);
+        market.bucketLiquidity[0] = SEED_LIQUIDITY;
+        market.bucketLiquidity[1] = SEED_LIQUIDITY;
+        market.totalLiquidity = SEED_LIQUIDITY * 2;
+        // Seed shares at 50/50 (1 share per $1 at 50% probability)
+        market.totalSharesPerBucket[0] = SEED_LIQUIDITY * PRECISION / (SEED_LIQUIDITY * 10**6 / SEED_LIQUIDITY);
+        market.totalSharesPerBucket[1] = SEED_LIQUIDITY * PRECISION / (SEED_LIQUIDITY * 10**6 / SEED_LIQUIDITY);
+        
         emit MarketCreated(marketId, coinASymbol, coinBSymbol, lockTime, settleTime);
         return marketId;
     }
     
     /**
-     * @notice Calculate shares using bonding curve
-     * @dev Pure function to avoid stack depth issues
+     * @notice Get current share price for an outcome
+     * @param marketId The market ID
+     * @param outcomeIndex 0 = Coin A, 1 = Coin B
+     * @return sharePrice Price per share in USDC (6 decimals, scaled by 1e6)
      */
-    function _calculateShares(uint256 netAmount, uint256 bucketLiquidity) private pure returns (uint256) {
-        uint256 divisor = 1e18 + (bucketLiquidity * BONDING_CURVE_STEEPNESS);
-        require(divisor > 0, "Divisor overflow");
-        uint256 shares = (netAmount * 1e18) / divisor;
+    function getSharePrice(uint256 marketId, uint8 outcomeIndex) public view returns (uint256) {
+        Market storage market = markets[marketId];
+        require(outcomeIndex <= 1, "Invalid outcome");
+        
+        if (market.totalLiquidity == 0) {
+            return 500000; // 50% = $0.50 per share
+        }
+        
+        // Share price = probability = pool for this outcome / total pool
+        // Result in USDC terms (6 decimals = 100%)
+        return (market.bucketLiquidity[outcomeIndex] * 10**6) / market.totalLiquidity;
+    }
+    
+    /**
+     * @notice Calculate shares using simple probability-based pricing
+     * @dev shares = netAmount / sharePrice (where sharePrice = probability)
+     */
+    function _calculateShares(uint256 marketId, uint8 outcomeIndex, uint256 netAmount) private view returns (uint256) {
+        uint256 sharePrice = getSharePrice(marketId, outcomeIndex);
+        require(sharePrice > 0, "Invalid share price");
+        
+        // Calculate shares: amount / probability
+        // shares = (netAmount * PRECISION) / sharePrice
+        // sharePrice is in 6 decimals (1e6 = 100%)
+        // We want shares in 18 decimals
+        uint256 shares = (netAmount * PRECISION) / sharePrice;
         require(shares > 0, "Shares too small");
         return shares;
     }
@@ -237,8 +272,8 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
         burnVault += burnFee;
         emit BurnVaultAccumulated(marketId, burnFee, burnVault);
         
-        // Calculate shares using bonding curve
-        uint256 shares = _calculateShares(net, market.bucketLiquidity[outcomeIndex]);
+        // Calculate shares using simple probability pricing (BEFORE updating liquidity)
+        uint256 shares = _calculateShares(marketId, outcomeIndex, net);
         
         // Update state
         _updatePosition(marketId, outcomeIndex, net, shares, amount);
@@ -261,6 +296,27 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
         require(market.status == MarketStatus.ACTIVE || market.status == MarketStatus.LOCKED, "Invalid status");
         require(!market.settled, "Already settled");
         require(block.timestamp >= market.settleTime, "Too early to settle");
+        
+        market.settled = true;
+        market.status = MarketStatus.SETTLED;
+        market.winningOutcome = coinAWon ? 0 : 1;
+        
+        string memory winningCoin = coinAWon ? market.coinASymbol : market.coinBSymbol;
+        emit MarketSettled(marketId, market.winningOutcome, winningCoin);
+    }
+    
+    /**
+     * @notice Manual settlement for testing (bypasses time check)
+     * @dev Admin only - use for testing settlements
+     */
+    function settleMarketManual(
+        uint256 marketId,
+        bool coinAWon
+    ) external onlyOwner {
+        Market storage market = markets[marketId];
+        require(market.status == MarketStatus.ACTIVE || market.status == MarketStatus.LOCKED, "Invalid status");
+        require(!market.settled, "Already settled");
+        // NO time check - allows immediate testing
         
         market.settled = true;
         market.status = MarketStatus.SETTLED;

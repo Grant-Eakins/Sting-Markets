@@ -469,6 +469,12 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
               </span>
             </div>
             <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Shares You'll Get:</span>
+              <span className="font-bold text-purple-500">
+                {sharesReceived > 0 ? (sharesReceived / 1e18).toFixed(2) : '0.00'}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Est. Multiplier:</span>
               <span className="font-bold text-green-500">{effectiveOdds.toFixed(2)}x</span>
             </div>
