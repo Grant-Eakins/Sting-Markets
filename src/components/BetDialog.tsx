@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Market, placeBet } from '@/lib/marketApi';
 import { useAccount, useChainId } from 'wagmi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -206,6 +206,11 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
   }, [contractError, approvalError]);
 
   const handlePlaceBet = async () => {
+    // Prevent double-clicks while processing
+    if (isPending || isConfirming || isApproving || isApprovalConfirming) {
+      return;
+    }
+    
     if (!isConnected || !address) {
       setError('Please connect your wallet first');
       return;
@@ -237,6 +242,9 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
     }
 
     setError(null);
+
+    // Detect mobile browser
+    const isMobile = /Mobile|Android|iPhone/i.test(navigator.userAgent);
 
     // Use blockchain if contract is deployed, otherwise demo mode
     if (isContractDeployed && !useDemoMode) {
@@ -276,15 +284,50 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
         
         if (needsApproval) {
           console.log(`🔓 Requesting ${TOKEN_SYMBOL} approval for ${amount} tokens...`);
+          
+          // Mobile: Give user clear guidance
+          if (isMobile) {
+            setError('📱 Opening wallet app... Approve the transaction and return to this page.');
+          }
+          
           // Approve the exact amount needed
           await approveToken(betAmountBigInt);
+          
+          // Mobile: Wait for wallet app to return
+          if (isMobile) {
+            await new Promise(resolve => setTimeout(resolve, 1500));
+          }
           return;
         }
         
         console.log(`🎯 Placing bet on bucket ${outcomeIndex} for market ${marketId}, amount=${amount} ${TOKEN_SYMBOL}`);
+        
+        // Mobile: Give user clear guidance
+        if (isMobile) {
+          setError('📱 Opening wallet app... Sign the transaction and return to this page.');
+        }
+        
         placeBetOnChain(marketId, outcomeIndex, amount);
+        
+        // Mobile: Wait for transaction to be initiated
+        if (isMobile) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          // Clear the guidance message after wallet opens
+          setError(null);
+        }
       } catch (err: any) {
-        setError(err.message || 'Failed to place bet');
+        console.error('Transaction error:', err);
+        
+        // Better error messages
+        if (err.message?.includes('User rejected') || err.message?.includes('user rejected')) {
+          setError('❌ Transaction cancelled');
+        } else if (err.message?.includes('insufficient funds')) {
+          setError('❌ Insufficient ETH for gas fees');
+        } else if (err.code === 'ACTION_REJECTED') {
+          setError('❌ Transaction rejected in wallet');
+        } else {
+          setError(`❌ ${err.message || 'Transaction failed'}`);
+        }
       }
     } else {
       // Demo mode: use off-chain API
@@ -367,11 +410,29 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
             </Alert>
           )}
 
-          {/* Error Display */}
-          {error && (
+          {/* Error Display - Cancelled/Rejected */}
+          {error && error.startsWith('❌') && (
+            <Alert variant="destructive" className="bg-orange-50 border-orange-200">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800">{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {/* Error Display - Other Errors */}
+          {error && !error.startsWith('📱') && !error.startsWith('❌') && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {/* Mobile Transaction Guidance */}
+          {error && error.startsWith('📱') && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                {error}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -389,6 +450,20 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
               <CheckCircle2 className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800">
                 <strong>Approval confirmed!</strong> Updating... Please wait then click "Bet" again.
+              </AlertDescription>
+            </Alert>
+          ) : isPending || isApproving ? (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+              <AlertDescription className="text-blue-800">
+                <strong>Waiting for wallet...</strong> Check your wallet to approve the transaction.
+              </AlertDescription>
+            </Alert>
+          ) : isConfirming || isApprovalConfirming ? (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+              <AlertDescription className="text-blue-800">
+                <strong>Processing...</strong> Transaction submitted, waiting for confirmation.
               </AlertDescription>
             </Alert>
           ) : isConfirmed ? (
@@ -424,13 +499,16 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
             disabled={!isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming || approvalJustConfirmed}
             className='bg-green-500 hover:bg-green-600'
           >
+            {(isApproving || isApprovalConfirming || isPending || isConfirming) && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             {isApproving ? `Approving ${TOKEN_SYMBOL}...` :
              isApprovalConfirming ? 'Confirming Approval...' :
              approvalJustConfirmed ? 'Updating Allowance...' :
              needsApproval ? `Approve ${TOKEN_SYMBOL}` :
              isPending ? 'Confirm in Wallet...' : 
              isConfirming ? 'Processing Transaction...' : 
-             isConfirmed ? 'Bet Placed!' : 
+             isConfirmed ? 'Bet Placed! ✅' : 
              `Bet ${amount} ${position}`}
           </Button>
         </DialogFooter>
