@@ -447,9 +447,6 @@ export async function settleDualCoinOnChain(blockchainMarketId: number, coinAWon
     console.log('⚠️  Blockchain not initialized - skipping on-chain settlement');
     return false;
   }
-
-  // Dual coin contract address
-  const DUAL_COIN_CONTRACT = '0x5924B8Cec58e7cc5fEc23F8c162AA9Ff3C83E340';
   
   const DUAL_COIN_ABI = [
     {
@@ -467,9 +464,10 @@ export async function settleDualCoinOnChain(blockchainMarketId: number, coinAWon
   try {
     console.log(`⛓️  Settling dual-coin market #${blockchainMarketId} on-chain`);
     console.log(`   Winner: ${coinAWon ? 'Coin A' : 'Coin B'}`);
+    console.log(`   Contract: ${DUAL_COIN_CONTRACT_ADDRESS}`);
 
     const hash = await walletClient.writeContract({
-      address: DUAL_COIN_CONTRACT,
+      address: DUAL_COIN_CONTRACT_ADDRESS,
       abi: DUAL_COIN_ABI,
       functionName: 'settleMarket',
       args: [BigInt(blockchainMarketId), coinAWon]

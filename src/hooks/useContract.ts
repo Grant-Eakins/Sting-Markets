@@ -373,7 +373,7 @@ export function useBucketLiquidity(marketId: number | undefined, outcomeIndex: n
 }
 
 /**
- * Hook to withdraw protocol fees (admin only)
+ * Hook to withdraw protocol fees from standard contract (admin only)
  */
 export function useWithdrawFees() {
   const chainId = useChainId();
@@ -386,7 +386,44 @@ export function useWithdrawFees() {
       throw new Error('Contract address not found');
     }
     
-    console.log('📤 Withdrawing protocol fees...');
+    console.log('📤 Withdrawing protocol fees from standard contract...');
+    writeContract({
+      address: contractAddress as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'withdrawFees',
+      args: [],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    withdrawFees,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
+ * Hook to withdraw protocol fees from dual coin contract (admin only)
+ */
+export function useWithdrawDualCoinFees() {
+  const chainId = useChainId();
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const withdrawFees = () => {
+    if (!contractAddress) {
+      throw new Error('Dual coin contract address not found');
+    }
+    
+    console.log('📤 Withdrawing protocol fees from dual coin contract...');
     writeContract({
       address: contractAddress as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
@@ -505,11 +542,37 @@ export function useWithdrawAuctionFunds() {
 }
 
 /**
- * Hook to read protocol fees collected
+ * Hook to read protocol fees collected from standard contract
  */
 export function useProtocolFees() {
   const chainId = useChainId();
   const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'protocolFeesCollected',
+    chainId: chainId || 84532,
+    query: {
+      enabled: !!contractAddress,
+      refetchInterval: 5000,
+    },
+  });
+  
+  return {
+    feesCollected: data as bigint | undefined,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook to read protocol fees collected from dual coin contract
+ */
+export function useDualCoinProtocolFees() {
+  const chainId = useChainId();
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: contractAddress as `0x${string}`,

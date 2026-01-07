@@ -17,7 +17,7 @@ import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAccount } from 'wagmi';
 import { TOKEN_SYMBOL, TOKEN_DECIMALS } from '@/config/contract';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useWithdrawFees, useProtocolFees, useMaxBetSize, useSetMaxBetSize, useBurnVault, useWithdrawBurnVault, useWithdrawAuctionFunds, useStartAuction, useStopAuction, useFinalizeAuction, useAuctionConfig, useAuctionLeaderboard, useUpdateAuctionConfig, useBiddingToken, useUpdateBiddingToken } from '@/hooks/useContract';
+import { useWithdrawFees, useProtocolFees, useDualCoinProtocolFees, useWithdrawDualCoinFees, useMaxBetSize, useSetMaxBetSize, useBurnVault, useWithdrawBurnVault, useWithdrawAuctionFunds, useStartAuction, useStopAuction, useFinalizeAuction, useAuctionConfig, useAuctionLeaderboard, useUpdateAuctionConfig, useBiddingToken, useUpdateBiddingToken } from '@/hooks/useContract';
 import { formatUnits, parseUnits } from 'viem';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
@@ -120,9 +120,13 @@ export default function AdminPage() {
   // Contract configuration state
   const [newMaxBetInput, setNewMaxBetInput] = useState('');
 
-  // Protocol fees hooks
+  // Protocol fees hooks - Standard contract
   const { feesCollected, isLoading: feesLoading, refetch: refetchFees } = useProtocolFees();
   const { withdrawFees, isPending: isWithdrawing, isConfirming, isConfirmed, error: withdrawError } = useWithdrawFees();
+  
+  // Protocol fees hooks - Dual coin contract
+  const { feesCollected: dualCoinFees, isLoading: dualFeesLoading, refetch: refetchDualFees } = useDualCoinProtocolFees();
+  const { withdrawFees: withdrawDualCoinFees, isPending: isWithdrawingDual, isConfirming: isConfirmingDual, isConfirmed: isConfirmedDual, error: withdrawDualError } = useWithdrawDualCoinFees();
   
   // Burn vault hooks
   const { burnVault, isLoading: burnVaultLoading, refetch: refetchBurnVault } = useBurnVault();
@@ -745,9 +749,10 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* Standard Contract Fees */}
                 <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                   <div>
-                    <p className="text-sm text-muted-foreground">Market Fees Available</p>
+                    <p className="text-sm text-muted-foreground">Standard Market Fees</p>
                     <p className="text-2xl font-bold">
                       {feesLoading ? '...' : feesCollected ? `${formatUnits(feesCollected, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}` : '0 ' + TOKEN_SYMBOL}
                     </p>
@@ -759,7 +764,26 @@ export default function AdminPage() {
                   >
                     {isWithdrawing && 'Initiating...'}
                     {isConfirming && 'Confirming...'}
-                    {!isWithdrawing && !isConfirming && 'Collect Market Fees'}
+                    {!isWithdrawing && !isConfirming && 'Collect Standard Fees'}
+                  </Button>
+                </div>
+                
+                {/* Dual Coin Contract Fees */}
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Coin Battle Fees</p>
+                    <p className="text-2xl font-bold">
+                      {dualFeesLoading ? '...' : dualCoinFees ? `${formatUnits(dualCoinFees, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}` : '0 ' + TOKEN_SYMBOL}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => withdrawDualCoinFees()}
+                    disabled={isWithdrawingDual || isConfirmingDual || !dualCoinFees || dualCoinFees === 0n}
+                    size="lg"
+                  >
+                    {isWithdrawingDual && 'Initiating...'}
+                    {isConfirmingDual && 'Confirming...'}
+                    {!isWithdrawingDual && !isConfirmingDual && 'Collect Battle Fees'}
                   </Button>
                 </div>
                 
@@ -782,20 +806,20 @@ export default function AdminPage() {
                   </div>
                 )}
                 
-                {(isConfirmed || isAuctionConfirmed) && (
+                {(isConfirmed || isConfirmedDual || isAuctionConfirmed) && (
                   <Alert>
                     <CheckCircle className="h-4 w-4" />
                     <AlertDescription>
-                      ✅ {isConfirmed && 'Market fees'}{isConfirmed && isAuctionConfirmed && ' and '}{isAuctionConfirmed && 'auction funds'} successfully collected!
+                      ✅ {isConfirmed && 'Standard fees'}{isConfirmed && (isConfirmedDual || isAuctionConfirmed) && ', '}{isConfirmedDual && 'battle fees'}{isConfirmedDual && isAuctionConfirmed && ', '}{isAuctionConfirmed && 'auction funds'} successfully collected!
                     </AlertDescription>
                   </Alert>
                 )}
                 
-                {(withdrawError || auctionWithdrawError) && (
+                {(withdrawError || withdrawDualError || auctionWithdrawError) && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Error: {withdrawError?.message || auctionWithdrawError?.message}
+                      Error: {withdrawError?.message || withdrawDualError?.message || auctionWithdrawError?.message}
                     </AlertDescription>
                   </Alert>
                 )}
