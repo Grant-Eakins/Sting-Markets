@@ -462,13 +462,80 @@ export async function settleDualCoinOnChain(blockchainMarketId: number, coinAWon
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "name": "markets",
+      "outputs": [
+        { "internalType": "string", "name": "coinASymbol", "type": "string" },
+        { "internalType": "string", "name": "coinBSymbol", "type": "string" },
+        { "internalType": "uint256", "name": "totalLiquidity", "type": "uint256" },
+        { "internalType": "uint256", "name": "createdAt", "type": "uint256" },
+        { "internalType": "uint256", "name": "lockTime", "type": "uint256" },
+        { "internalType": "uint256", "name": "settleTime", "type": "uint256" },
+        { "internalType": "bool", "name": "settled", "type": "bool" },
+        { "internalType": "uint8", "name": "winningOutcome", "type": "uint8" },
+        { "internalType": "enum ProportionalMarketDualCoin.MarketStatus", "name": "status", "type": "uint8" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     }
   ] as const;
 
   try {
+    // First, read the on-chain market status
+    try {
+      const marketData = await publicClient.readContract({
+        address: DUAL_COIN_CONTRACT_ADDRESS,
+        abi: DUAL_COIN_ABI,
+        functionName: 'markets',
+        args: [BigInt(blockchainMarketId)]
+      }) as any;
+      
+      console.log(`📊 On-chain market #${blockchainMarketId} status:`);
+      console.log(`   Coin A: ${marketData[0]}, Coin B: ${marketData[1]}`);
+      console.log(`   Total Liquidity: ${marketData[2]}`);
+      console.log(`   Lock Time: ${new Date(Number(marketData[4]) * 1000).toISOString()}`);
+      console.log(`   Settle Time: ${new Date(Number(marketData[5]) * 1000).toISOString()}`);
+      console.log(`   Already Settled: ${marketData[6]}`);
+      console.log(`   Status: ${marketData[8]} (0=ACTIVE, 1=LOCKED, 2=SETTLED)`);
+      console.log(`   Current Time: ${new Date().toISOString()}`);
+      
+      if (marketData[6] === true) {
+        console.log('   ⚠️  Market is already settled on-chain!');
+        return true; // Already settled is technically a success
+      }
+    } catch (readError: any) {
+      console.error('   ⚠️  Could not read market data:', readError.message);
+    }
+
     console.log(`⛓️  Settling dual-coin market #${blockchainMarketId} on-chain`);
     console.log(`   Winner: ${coinAWon ? 'Coin A' : 'Coin B'}`);
     console.log(`   Contract: ${DUAL_COIN_CONTRACT_ADDRESS}`);
+
+    // First, check if settlement is possible by simulating the call
+    try {
+      await publicClient.simulateContract({
+        address: DUAL_COIN_CONTRACT_ADDRESS,
+        abi: DUAL_COIN_ABI,
+        functionName: 'settleMarket',
+        args: [BigInt(blockchainMarketId), coinAWon],
+        account: walletClient.account.address,
+      });
+      console.log('   ✅ Simulation passed - proceeding with transaction');
+    } catch (simError: any) {
+      console.error('   ❌ Simulation failed:', simError.message);
+      if (simError.message?.includes('Too early')) {
+        console.error('   ⏰ Market settle time has not passed yet');
+      } else if (simError.message?.includes('Invalid status')) {
+        console.error('   ⚠️  Market is not in ACTIVE or LOCKED status');
+      } else if (simError.message?.includes('Already settled')) {
+        console.error('   ⚠️  Market is already settled on-chain');
+      } else if (simError.message?.includes('Not authorized')) {
+        console.error('   ⚠️  Wallet is not authorized (not oracle or owner)');
+      }
+      return false;
+    }
 
     const hash = await walletClient.writeContract({
       address: DUAL_COIN_CONTRACT_ADDRESS,
