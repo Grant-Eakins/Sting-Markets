@@ -453,11 +453,20 @@ export function useBurnVault() {
   const chainId = useChainId();
   const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
-  const { data, isLoading, refetch } = useReadContract({
+  // Check if contract address is valid (not zero address)
+  const isValidAddress = contractAddress && contractAddress !== '0x0000000000000000000000000000000000000000';
+  
+  const { data, isLoading, refetch, error } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'burnVault',
+    query: {
+      enabled: isValidAddress,
+    },
   });
+  
+  // Debug logging
+  console.log('🔥 useBurnVault:', { chainId, contractAddress, isValidAddress, data, isLoading, error: error?.message });
   
   return {
     burnVault: data as bigint | undefined,
