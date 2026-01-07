@@ -324,7 +324,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                     size="lg"
                   >
                     <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    BET UP
+                    Bet on {market.coinASymbol}
                   </Button>
                 )}
               </div>
@@ -455,7 +455,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                     size="lg"
                   >
                     <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    BET UP
+                    Bet on {market.coinBSymbol}
                   </Button>
                 )}
               </div>

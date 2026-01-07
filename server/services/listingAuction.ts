@@ -36,6 +36,8 @@ export interface AuctionConfig {
   auctionDurationHours: number;
   currentAuctionStart?: Date;
   currentAuctionEnd?: Date;
+  enableWalletBetLimit?: boolean;
+  maxBetPerWallet?: number;
 }
 
 /**
@@ -62,6 +64,8 @@ export async function getAuctionConfig(): Promise<AuctionConfig | null> {
     auctionDurationHours: data.auction_duration_hours,
     currentAuctionStart: data.current_auction_start ? new Date(data.current_auction_start) : undefined,
     currentAuctionEnd: data.current_auction_end ? new Date(data.current_auction_end) : undefined,
+    enableWalletBetLimit: data.enable_wallet_bet_limit ?? true,
+    maxBetPerWallet: data.max_bet_per_wallet ? parseFloat(data.max_bet_per_wallet) : 10,
   };
 }
 
@@ -78,6 +82,8 @@ export async function updateAuctionConfig(config: Partial<AuctionConfig>): Promi
   if (config.minMarketCap !== undefined) updateData.min_market_cap = config.minMarketCap;
   if (config.maxMarketCap !== undefined) updateData.max_market_cap = config.maxMarketCap;
   if (config.minBidAmount !== undefined) updateData.min_bid_amount = config.minBidAmount;
+  if (config.enableWalletBetLimit !== undefined) updateData.enable_wallet_bet_limit = config.enableWalletBetLimit;
+  if (config.maxBetPerWallet !== undefined) updateData.max_bet_per_wallet = config.maxBetPerWallet;
   if (config.auctionDurationHours !== undefined) updateData.auction_duration_hours = config.auctionDurationHours;
   if (config.currentAuctionStart !== undefined) updateData.current_auction_start = config.currentAuctionStart;
   if (config.currentAuctionEnd !== undefined) updateData.current_auction_end = config.currentAuctionEnd;

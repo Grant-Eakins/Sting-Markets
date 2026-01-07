@@ -1298,4 +1298,30 @@ router.get('/paused-symbols', (req, res) => {
   });
 });
 
+/**
+ * GET /api/markets/wallet-total/:marketId/:walletAddress
+ * Get total amount wallet has bet on a specific market (from database)
+ */
+router.get('/wallet-total/:marketId/:walletAddress', async (req, res) => {
+  try {
+    const { marketId, walletAddress } = req.params;
+    const bets = await getUserBetsForMarket(walletAddress, marketId);
+    const total = bets.reduce((sum, bet) => sum + bet.amount, 0);
+    
+    res.json({
+      success: true,
+      marketId,
+      walletAddress,
+      total,
+      betCount: bets.length,
+    });
+  } catch (error: any) {
+    console.error('Error getting wallet total:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router;

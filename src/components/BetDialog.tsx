@@ -10,6 +10,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance, useBucketLiquidity, useDualCoinPlaceBet, useDualCoinTokenAllowance, useDualCoinTokenApproval, useDualCoinBucketLiquidity, useMaxBetSize } from '@/hooks/useContract';
 import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { parseUnits } from 'viem';
+import axios from 'axios';
+
+const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
 interface BetDialogProps {
   market: Market;
@@ -31,6 +34,9 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
   const [useDemoMode, setUseDemoMode] = useState(false);
   const [needsApproval, setNeedsApproval] = useState(false);
   const [approvalJustConfirmed, setApprovalJustConfirmed] = useState(false);
+  const [walletBetLimitEnabled, setWalletBetLimitEnabled] = useState(true);
+  const [walletTotalBet, setWalletTotalBet] = useState(0);
+  const [checkingWalletTotal, setCheckingWalletTotal] = useState(false);
 
   // Detect if this is a dual coin market
   const isDualCoin = !!(market as any).isDualCoin;
@@ -65,16 +71,26 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
   // Get live probabilities to calculate bucket-specific odds
   const { probabilities } = useMarketProbabilities(market.blockchainMarketId, isDualCoin);
   
-  // Get bucket liquidity for share calculation - use dual coin version for dual coin markets
+  // Get bucket liquidity for BOTH buckets to calculate relative bonding curve advantage
   const { liquidity: stdBucketLiquidity } = useBucketLiquidity(
     isDualCoin ? undefined : market.blockchainMarketId,
     isDualCoin ? undefined : (bucketIndex !== undefined ? bucketIndex : (position === 'UP' ? 4 : 5))
   );
-  const { liquidity: dualBucketLiquidity } = useDualCoinBucketLiquidity(
+  
+  // For dual coin: get BOTH bucket liquidities
+  const { liquidity: dualBucketALiquidity } = useDualCoinBucketLiquidity(
     isDualCoin ? market.blockchainMarketId : undefined,
-    isDualCoin ? (bucketIndex !== undefined ? bucketIndex : (position === 'UP' ? 0 : 1)) : undefined
+    isDualCoin ? 0 : undefined
   );
-  const bucketLiquidity = isDualCoin ? dualBucketLiquidity : stdBucketLiquidity;
+  const { liquidity: dualBucketBLiquidity } = useDualCoinBucketLiquidity(
+    isDualCoin ? market.blockchainMarketId : undefined,
+    isDualCoin ? 1 : undefined
+  );
+  
+  // Your bucket liquidity
+  const yourBucketLiquidity = isDualCoin 
+    ? (bucketIndex === 0 ? dualBucketALiquidity : dualBucketBLiquidity)
+    : stdBucketLiquidity;
   
   // Get max bet size for dual coin markets
   const { maxBetSize } = useMaxBetSize();
@@ -88,50 +104,93 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
 
   // Calculate bucket-specific payout estimate for proportional/parimutuel market
   // Formula: If you win, payout = (yourShares / totalSharesInBucket) * totalPool
-  // Approximation: payout ≈ cost / bucketProbability
   let effectiveOdds = odds;
   let bucketProbability = 0;
   
   if (bucketIndex !== undefined && probabilities && probabilities.length > bucketIndex) {
     bucketProbability = probabilities[bucketIndex] / 100; // Convert from percentage to decimal
-    if (bucketProbability > 0) {
-      // Odds = 1 / probability (e.g., 5% probability = ~20x payout)
-      effectiveOdds = Math.min(1 / bucketProbability, 100); // Cap at 100x
-    } else {
-      // No liquidity in this bucket yet - first bet gets great odds!
-      const numBuckets = probabilities.length;
-      effectiveOdds = numBuckets; // Approx uniform odds if you're first
-    }
   }
-
-  const potentialWin = parseFloat(amount || '0') * effectiveOdds;
   
   // Calculate shares using on-chain bucket liquidity data
   // Contract formula: shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
-  const TOTAL_FEE_BPS = 300; // 3% total (2% protocol + 1% burn)
+  const TOTAL_FEE_BPS = isDualCoin ? 300 : 200; // 3% for dual coin (2% protocol + 1% burn), 2% for standard
   const STEEPNESS = 10; // Bonding curve steepness
   
   let sharesReceived = 0;
   const amountNum = parseFloat(amount || '0');
+  let bondingBonus = 1; // Default no bonus
   
-  if (bucketLiquidity !== undefined && amountNum > 0) {
+  if (yourBucketLiquidity !== undefined && amountNum > 0) {
     // Amount is in tokens (e.g. 5 USDC), convert to base units for calculation
     const amountInUnits = amountNum * Math.pow(10, TOKEN_DECIMALS);
     const totalFee = (amountInUnits * TOTAL_FEE_BPS) / 10000;
     const netAmount = amountInUnits - totalFee;
     
     // Use on-chain liquidity (already in base units)
-    const liquidityNum = Number(bucketLiquidity);
-    const divisor = Math.pow(10, TOKEN_DECIMALS) * 1e12 + (liquidityNum * STEEPNESS);
-    const sharesInUnits = (netAmount * 1e18) / divisor;
-    sharesReceived = sharesInUnits / 1e18; // Convert to readable number
+    const yourLiquidityNum = Number(yourBucketLiquidity);
+    
+    // Contract formula: shares = (netAmount * 1e18) / (1e18 + bucketLiquidity * STEEPNESS)
+    const yourDivisor = 1e18 + (yourLiquidityNum * STEEPNESS);
+    const yourShares = (netAmount * 1e18) / yourDivisor;
+    sharesReceived = yourShares;
+    
+    // Calculate bonding curve advantage (how many more shares you get vs a neutral pool)
+    // A neutral pool would have divisor of 1e18, giving 1 share per unit
+    // Smaller pools give more shares per USDC
+    const neutralShares = netAmount; // What you'd get with no bonding curve
+    bondingBonus = yourShares / neutralShares; // How much more you get due to bonding curve (usually > 0, < 1)
+    
+    // Base multiplier from pool probability (1 / probability)
+    // This is what you'd win if pools stay the same
+    const baseMultiplier = bucketProbability > 0 && bucketProbability < 1 
+      ? 1 / bucketProbability 
+      : 2;
+    
+    // The multiplier is just the base - bonding curve gives you more SHARES, 
+    // which means you own a larger % of the pool, but payout is still total_pool / winning_pool
+    effectiveOdds = Math.min(baseMultiplier, 100);
+    
+    console.log('🎰 Bonding curve calc:', { 
+      yourLiquidityNum, 
+      yourShares, 
+      bondingBonus: bondingBonus.toFixed(3),
+      baseMultiplier: baseMultiplier.toFixed(2), 
+      effectiveOdds: effectiveOdds.toFixed(2)
+    });
   } else if (amountNum > 0) {
-    // Fallback if liquidity not loaded: assume empty bucket
-    const amountInUnits = amountNum * Math.pow(10, TOKEN_DECIMALS);
-    const totalFee = (amountInUnits * TOTAL_FEE_BPS) / 10000;
-    const netAmount = amountInUnits - totalFee;
-    sharesReceived = netAmount / Math.pow(10, TOKEN_DECIMALS); // Max shares when bucket is empty
+    // Fallback: use simple probability-based multiplier
+    if (bucketProbability > 0 && bucketProbability < 1) {
+      effectiveOdds = 1 / bucketProbability;
+    } else {
+      effectiveOdds = 2; // First bet gets ~2x
+    }
+    effectiveOdds = Math.min(effectiveOdds, 100);
   }
+
+  const potentialWin = parseFloat(amount || '0') * effectiveOdds;
+
+  // Fetch wallet total for this market and wallet limit setting
+  useEffect(() => {
+    const fetchWalletData = async () => {
+      if (!address || !market.id) return;
+      setCheckingWalletTotal(true);
+      try {
+        // Fetch config to get wallet limit setting
+        const configRes = await axios.get(`${API_BASE}/auction/config`);
+        setWalletBetLimitEnabled(configRes.data?.enableWalletBetLimit ?? true);
+        
+        // Fetch wallet's total bets on this market
+        const totalRes = await axios.get(`${API_BASE}/markets/wallet-total/${market.id}/${address}`);
+        setWalletTotalBet(totalRes.data.total || 0);
+      } catch (error) {
+        console.error('Error fetching wallet data:', error);
+      } finally {
+        setCheckingWalletTotal(false);
+      }
+    };
+    
+    fetchWalletData();
+  }, [address, market.id]);
 
   // Auto-close on successful transaction
   useEffect(() => {
@@ -228,6 +287,15 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
     if (betAmount < 1) {
       setError(`Minimum bet is 1 ${TOKEN_SYMBOL}`);
       return;
+    }
+
+    // Check wallet bet limit (if enabled)
+    if (walletBetLimitEnabled) {
+      const newTotal = walletTotalBet + betAmount;
+      if (newTotal > 10) {
+        setError(`Wallet limit: You've already bet $${walletTotalBet.toFixed(2)} on this market. Max total is $10 per wallet.`);
+        return;
+      }
     }
 
     // Check max bet size for dual coin markets
@@ -356,8 +424,8 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-500" />
-            <span>Bet UP{coinName ? ` (${coinName})` : ''}</span>
+            {position === 'UP' ? <TrendingUp className="w-5 h-5 text-green-500" /> : <TrendingDown className="w-5 h-5 text-red-500" />}
+            <span>{coinName ? `Bet on ${coinName}` : `Bet ${position}`}</span>
           </DialogTitle>
           <DialogDescription className="line-clamp-2">
             {market.stockSymbol || market.stockName}
@@ -395,18 +463,18 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
           {/* Odds Display */}
           <div className="p-4 bg-muted rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Shares Received:</span>
+              <span className="text-muted-foreground">Current Pool:</span>
               <span className="font-bold text-blue-500">
-                {sharesReceived.toFixed(2)}
+                {(bucketProbability * 100).toFixed(1)}%
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Win Chance:</span>
-              <span className="font-bold">{(bucketProbability * 100).toFixed(1)}%</span>
+              <span className="text-muted-foreground">Est. Multiplier:</span>
+              <span className="font-bold text-green-500">{effectiveOdds.toFixed(2)}x</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Multiplier:</span>
-              <span className="font-bold">{effectiveOdds.toFixed(2)}x</span>
+              <span className="text-muted-foreground">Potential Win:</span>
+              <span className="font-bold text-green-500">${potentialWin.toFixed(2)}</span>
             </div>
           </div>
 
@@ -519,7 +587,7 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
              isPending ? 'Confirm in Wallet...' : 
              isConfirming ? 'Processing Transaction...' : 
              isConfirmed ? 'Bet Placed! ✅' : 
-             `Bet ${amount} ${position}`}
+             coinName ? `Bet ${amount} on ${coinName}` : `Bet ${amount} ${position}`}
           </Button>
         </DialogFooter>
       </DialogContent>

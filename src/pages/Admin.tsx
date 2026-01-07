@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Trash2, RefreshCw, TrendingUp, Search, Filter, DollarSign, Trophy, Play, StopCircle, CheckCircle2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Plus, Lock, ShieldX, Trash2, RefreshCw, TrendingUp, Search, Filter, DollarSign, Trophy, Play, StopCircle, CheckCircle2, Wallet } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
@@ -119,6 +119,8 @@ export default function AdminPage() {
 
   // Contract configuration state
   const [newMaxBetInput, setNewMaxBetInput] = useState('');
+  const [walletBetLimitEnabled, setWalletBetLimitEnabled] = useState(true);
+  const [togglingWalletLimit, setTogglingWalletLimit] = useState(false);
 
   // Protocol fees hooks - Standard contract
   const { feesCollected, isLoading: feesLoading, refetch: refetchFees } = useProtocolFees();
@@ -461,6 +463,35 @@ export default function AdminPage() {
     refetchAuctionLeaderboard();
   };
 
+  // Wallet bet limit handlers
+  const fetchWalletBetLimit = async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/auction/config`);
+      if (response.data) {
+        setWalletBetLimitEnabled(response.data.enableWalletBetLimit ?? true);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet bet limit:', error);
+    }
+  };
+
+  const toggleWalletBetLimit = async () => {
+    if (!address) return;
+    setTogglingWalletLimit(true);
+    try {
+      await axios.post(`${API_BASE}/auction/toggle-wallet-limit`, {
+        walletAddress: address,
+        enabled: !walletBetLimitEnabled,
+      });
+      setWalletBetLimitEnabled(!walletBetLimitEnabled);
+      alert(`✅ Wallet bet limit ${!walletBetLimitEnabled ? 'enabled' : 'disabled'}!`);
+    } catch (error: any) {
+      alert(`❌ Error: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setTogglingWalletLimit(false);
+    }
+  };
+
   const handleStartAuction = () => {
     if (!address) return;
     try {
@@ -542,6 +573,13 @@ export default function AdminPage() {
       alert(`❌ Error: ${error.message}`);
     }
   };
+
+  // Fetch wallet bet limit setting on mount
+  useEffect(() => {
+    if (isAdmin) {
+      fetchWalletBetLimit();
+    }
+  }, [isAdmin]);
 
   // Watch for auction events and auto-create market (in useEffect to prevent repeated alerts)
   useEffect(() => {
@@ -1088,6 +1126,48 @@ export default function AdminPage() {
               </CardContent>
             </Card>
 
+            {/* Wallet Bet Limit */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5" />
+                  Wallet Bet Limit
+                </CardTitle>
+                <CardDescription>
+                  Limit total bets per wallet per market (prevents whale manipulation)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium mb-1">Restrict wallets to max $10 per market</p>
+                      <p className="text-xs text-muted-foreground">
+                        When enabled, prevents any wallet from betting more than $10 total on a single market
+                      </p>
+                    </div>
+                    <Button
+                      variant={walletBetLimitEnabled ? "default" : "outline"}
+                      size="sm"
+                      onClick={toggleWalletBetLimit}
+                      disabled={togglingWalletLimit}
+                    >
+                      {togglingWalletLimit ? '...' : walletBetLimitEnabled ? 'Enabled' : 'Disabled'}
+                    </Button>
+                  </div>
+                  
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      This limit is checked in the frontend before placing bets. Helps prevent market manipulation by large wallets.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Burn Vault Collection */}
             <Card>
               <CardHeader>

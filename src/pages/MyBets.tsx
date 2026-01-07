@@ -875,10 +875,14 @@ export default function MyBets() {
                             </div>
                             
                             {/* Simple stats */}
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-3 gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">Amount Bet:</span>
                                 <p className="font-bold text-lg">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Bet at:</span>
+                                <p className="font-bold text-lg text-blue-500">{bet.probability}%</p>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">Potential Win:</span>

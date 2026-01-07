@@ -192,6 +192,32 @@ router.get('/winners', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/auction/toggle-wallet-limit
+ * Toggle wallet bet limit on/off (admin only)
+ */
+router.post('/toggle-wallet-limit', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress, enabled } = req.body;
+
+    if (!walletAddress || !isAdmin(walletAddress)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const success = await updateAuctionConfig({ enableWalletBetLimit: enabled });
+    
+    if (success) {
+      const config = await getAuctionConfig();
+      res.json({ success: true, config });
+    } else {
+      res.status(500).json({ error: 'Failed to update setting' });
+    }
+  } catch (error: any) {
+    console.error('Error toggling wallet limit:', error);
+    res.status(500).json({ error: 'Failed to toggle wallet limit' });
+  }
+});
+
+/**
  * GET /api/auction/my-bids
  * Get user's bids
  */
