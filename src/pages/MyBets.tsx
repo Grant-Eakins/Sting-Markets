@@ -543,16 +543,21 @@ export default function MyBets() {
     
     if (sharesNum > 0 && netAmount > 0) {
       if (isDualCoin) {
-        // DUAL COIN: shares = (netAmount * 1e18) / (probability * 1e6)
-        // Rearrange: probability = (netAmount * 1e18) / (sharesNum * 1e6)
-        // netAmount is in USDC, so netAmount in base units = netAmount * 1e6
-        // probability = (netAmount * 1e6 * 1e18) / (sharesNum * 1e6)
-        // probability = (netAmount * 1e18) / sharesNum
-        const netAmountInBaseUnits = netAmount * 1e6; // Convert USDC to base units
-        const sharePrice = (netAmountInBaseUnits * 1e18) / sharesNum; // Share price paid
-        purchaseProbability = Math.min(0.99, Math.max(0.01, sharePrice / 1e18)); // Normalize to 0-1
+        // DUAL COIN: shares = (netAmount_in_base * 1e18) / (probability * 1e6)
+        // When you get MORE shares than you paid, probability was LOW (good odds)
+        // When you get FEWER shares than you paid, probability was HIGH (bad odds)
+        // Example: bet $5 at 25% → get 5/0.25 = 20 shares (more shares = lower probability)
+        // Reverse formula: probability = netAmount / sharesNum
+        // BUT this gives the price you paid PER share, not the bucket probability
+        // Actually: sharesNum represents value in a different scale
+        // The purchase probability is: what % of pool was your bucket?
+        // Since pool distribution = probability, we need to extract it from the share price
+        // Simple approach: shares/netAmount ratio tells us the multiplier you got
+        // Lower probability = higher multiplier = more shares per dollar
+        // So: probability ≈ netAmount / sharesNum (clamped to reasonable range)
+        purchaseProbability = Math.min(0.99, Math.max(0.01, netAmount / sharesNum));
       } else {
-        // BONDING CURVE (standard markets): reverse calculate from shares/netAmount ratio
+        // BONDING CURVE (standard markets): different formula
         purchaseProbability = Math.min(0.99, Math.max(0.01, netAmount / sharesNum));
       }
     }
