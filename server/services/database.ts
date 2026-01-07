@@ -19,15 +19,15 @@ export function getSupabase(): SupabaseClient | null {
  */
 export function initializeDatabase(): boolean {
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
   console.log('🔍 Checking Supabase config...');
   console.log('   URL:', url ? `${url.substring(0, 30)}...` : 'NOT SET');
-  console.log('   KEY:', key ? `${key.substring(0, 20)}...` : 'NOT SET');
+  console.log('   KEY:', key ? `${key.substring(0, 20)}... (${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SERVICE' : 'ANON'})` : 'NOT SET');
 
   if (!url || !key) {
     console.log('⚠️  Supabase not configured - using in-memory storage only');
-    console.log('   Set SUPABASE_URL and SUPABASE_ANON_KEY in .env to enable persistence');
+    console.log('   Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env to enable persistence');
     return false;
   }
 
