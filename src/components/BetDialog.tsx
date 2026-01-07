@@ -129,6 +129,20 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
       // sharePrice = probability (in USDC with 6 decimals)
       const sharePrice = bucketProbability * 1e6; // Convert to 6 decimals (USDC units)
       sharesReceived = (netAmount * 1e18) / sharePrice; // Result in 18 decimals
+      
+      // Base multiplier from pool probability (1 / probability)
+      const baseMultiplier = bucketProbability > 0 && bucketProbability < 1 
+        ? 1 / bucketProbability 
+        : 2;
+      effectiveOdds = Math.min(baseMultiplier, 100);
+      
+      console.log('🎰 Simple share calc:', { 
+        bucketProbability,
+        sharePrice,
+        sharesReceived: (sharesReceived / 1e18).toFixed(4),
+        baseMultiplier: baseMultiplier.toFixed(2), 
+        effectiveOdds: effectiveOdds.toFixed(2)
+      });
     } else {
       // BONDING CURVE for standard markets
       const STEEPNESS = 10;
@@ -140,24 +154,19 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
       // Calculate bonding curve advantage
       const neutralShares = netAmount;
       bondingBonus = yourShares / neutralShares;
-    }
-    
-    // Base multiplier from pool probability (1 / probability)
-    // This is what you'd win if pools stay the same
-    const baseMultiplier = bucketProbability > 0 && bucketProbability < 1 
-      ? 1 / bucketProbability 
-      : 2;
-    
-    // The multiplier is just the base - bonding curve gives you more SHARES, 
-    // which means you own a larger % of the pool, but payout is still total_pool / winning_pool
-    effectiveOdds = Math.min(baseMultiplier, 100);
-    
-    console.log('🎰 Bonding curve calc:', { 
-      yourLiquidityNum, 
-      yourShares, 
-      bondingBonus: bondingBonus.toFixed(3),
-      baseMultiplier: baseMultiplier.toFixed(2), 
-      effectiveOdds: effectiveOdds.toFixed(2)
+      
+      // Base multiplier from pool probability (1 / probability)
+      const baseMultiplier = bucketProbability > 0 && bucketProbability < 1 
+        ? 1 / bucketProbability 
+        : 2;
+      effectiveOdds = Math.min(baseMultiplier, 100);
+      
+      console.log('🎰 Bonding curve calc:', { 
+        yourLiquidityNum, 
+        yourShares, 
+        bondingBonus: bondingBonus.toFixed(3),
+        baseMultiplier: baseMultiplier.toFixed(2), 
+        effectiveOdds: effectiveOdds.toFixed(2)
     });
   } else if (amountNum > 0) {
     // Fallback: use simple probability-based multiplier
