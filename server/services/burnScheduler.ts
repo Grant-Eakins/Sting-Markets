@@ -2,8 +2,33 @@ import cron from 'node-cron';
 import { ethers } from 'ethers';
 import { Connection, Keypair, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createBurnInstruction, TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { sendDiscordNotification } from './discordBot';
 import bs58 from 'bs58';
+
+// Simple Discord notification (optional - only if webhook is configured)
+async function sendDiscordNotification(title: string, message: string, color: number = 0x00ff00) {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) {
+    console.log(`[Discord] ${title}: ${message}`);
+    return;
+  }
+  
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          description: message,
+          color,
+          timestamp: new Date().toISOString(),
+        }],
+      }),
+    });
+  } catch (e) {
+    console.error('Failed to send Discord notification:', e);
+  }
+}
 
 // Contract ABI (minimal for burn vault)
 const BURN_VAULT_ABI = [
