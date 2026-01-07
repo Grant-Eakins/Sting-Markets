@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Loader2 } from 'lu
 import { Market, placeBet } from '@/lib/marketApi';
 import { useAccount, useChainId } from 'wagmi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance, useBucketLiquidity, useDualCoinPlaceBet, useDualCoinTokenAllowance, useDualCoinTokenApproval, useDualCoinBucketLiquidity } from '@/hooks/useContract';
+import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance, useBucketLiquidity, useDualCoinPlaceBet, useDualCoinTokenAllowance, useDualCoinTokenApproval, useDualCoinBucketLiquidity, useMaxBetSize } from '@/hooks/useContract';
 import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { parseUnits } from 'viem';
 
@@ -75,6 +75,9 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
     isDualCoin ? (bucketIndex !== undefined ? bucketIndex : (position === 'UP' ? 0 : 1)) : undefined
   );
   const bucketLiquidity = isDualCoin ? dualBucketLiquidity : stdBucketLiquidity;
+  
+  // Get max bet size for dual coin markets
+  const { maxBetSize } = useMaxBetSize();
   
   // Default to Base Sepolia (84532) if not connected
   const activeChainId = chainId || 84532;
@@ -227,7 +230,14 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
       return;
     }
 
-    if (betAmount > 10000) {
+    // Check max bet size for dual coin markets
+    if (isDualCoin && maxBetSize !== undefined) {
+      const maxBetFormatted = Number(maxBetSize) / 1e6;
+      if (betAmount > maxBetFormatted) {
+        setError(`Maximum bet is ${maxBetFormatted.toFixed(2)} ${TOKEN_SYMBOL}`);
+        return;
+      }
+    } else if (!isDualCoin && betAmount > 10000) {
       setError(`Maximum bet is 10,000 ${TOKEN_SYMBOL}`);
       return;
     }

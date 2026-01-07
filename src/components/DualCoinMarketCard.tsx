@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Clock, Lock, CheckCircle2 } from 'lucide-reac
 import { useState, useEffect } from 'react';
 import { BetDialog } from './BetDialog';
 import { useLiveCoinPrice } from '@/hooks/useLiveCoinPrice';
-import { useDualCoinBucketLiquidity } from '@/hooks/useContract';
+import { useDualCoinBucketLiquidity, useMaxBetSize } from '@/hooks/useContract';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { baseSepolia } from 'wagmi/chains';
 import { DUAL_COIN_CONTRACT_ADDRESSES } from '@/config/contract';
@@ -77,6 +77,9 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   // Fetch real-time on-chain pool liquidity for dynamic percentages (using dual coin contract)
   const { liquidity: coinALiquidity } = useDualCoinBucketLiquidity(market.blockchainMarketId, 0);
   const { liquidity: coinBLiquidity } = useDualCoinBucketLiquidity(market.blockchainMarketId, 1);
+
+  // Get max bet size
+  const { maxBetSize } = useMaxBetSize();
 
   // Fetch on-chain bet count
   useEffect(() => {
@@ -486,6 +489,12 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
                 ? ((Number(coinALiquidity) + Number(coinBLiquidity)) / 1e6).toFixed(2)
                 : (market.upPool + market.downPool).toLocaleString()
               } {coinALiquidity !== undefined && coinBLiquidity !== undefined ? 'USDC' : ''}
+            </span></div>
+            <div className="col-span-2">Max Bet: <span className="font-semibold">
+              {maxBetSize !== undefined 
+                ? `${(Number(maxBetSize) / 1e6).toFixed(2)} USDC`
+                : 'Loading...'
+              }
             </span></div>
           </div>
         </CardContent>

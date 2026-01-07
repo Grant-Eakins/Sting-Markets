@@ -314,8 +314,8 @@ async function waitForBridgeCompletion(messageHash: string): Promise<void> {
       );
       
       if (response.ok) {
-        const data = await response.json();
-        if (data.status === 'complete') {
+        const data = await response.json() as { status: string; attestation?: string };
+        if (data.status === 'complete' && data.attestation) {
           // Claim on Solana
           await claimUSDCOnSolana(data.attestation, messageHash);
           return;
@@ -364,7 +364,7 @@ async function swapUSDCToToken(usdcAmount: bigint): Promise<{ outputAmount: stri
     throw new Error(`Jupiter quote failed: ${await quoteResponse.text()}`);
   }
   
-  const quote = await quoteResponse.json();
+  const quote = await quoteResponse.json() as { outAmount: string; [key: string]: any };
   
   // Get swap transaction
   const swapResponse = await fetch(`${CONFIG.JUPITER_API_URL}/swap`, {
@@ -381,7 +381,7 @@ async function swapUSDCToToken(usdcAmount: bigint): Promise<{ outputAmount: stri
     throw new Error(`Jupiter swap failed: ${await swapResponse.text()}`);
   }
   
-  const { swapTransaction } = await swapResponse.json();
+  const { swapTransaction } = await swapResponse.json() as { swapTransaction: string };
   
   // Deserialize and sign
   const txBuffer = Buffer.from(swapTransaction, 'base64');
