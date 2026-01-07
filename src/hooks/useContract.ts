@@ -447,11 +447,11 @@ export function useWithdrawDualCoinFees() {
 }
 
 /**
- * Hook to read burn vault balance
+ * Hook to read burn vault balance (from dual coin contract)
  */
 export function useBurnVault() {
   const chainId = useChainId();
-  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
   const { data, isLoading, refetch } = useReadContract({
     address: contractAddress as `0x${string}`,
@@ -467,11 +467,11 @@ export function useBurnVault() {
 }
 
 /**
- * Hook to withdraw burn vault (admin only)
+ * Hook to withdraw burn vault (admin only - from dual coin contract)
  */
 export function useWithdrawBurnVault() {
   const chainId = useChainId();
-  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -480,7 +480,7 @@ export function useWithdrawBurnVault() {
       throw new Error('Contract address not found');
     }
     
-    console.log('🔥 Withdrawing burn vault...');
+    console.log('🔥 Withdrawing burn vault from dual coin contract...');
     writeContract({
       address: contractAddress as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,

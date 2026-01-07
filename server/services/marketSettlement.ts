@@ -233,18 +233,22 @@ export async function settleDualCoinMarket(market: Market): Promise<any> {
     if (market.blockchainMarketId !== undefined) {
       try {
         console.log(`   📡 Settling on-chain (dual coin contract)...`);
+        console.log(`   📍 Blockchain Market ID: ${market.blockchainMarketId}`);
         const coinAWon = winningPosition === Position.UP;
+        console.log(`   📍 Coin A Won: ${coinAWon} (winningPosition: ${winningPosition})`);
         const success = await settleDualCoinOnChain(market.blockchainMarketId, coinAWon);
         
         if (success) {
           console.log(`   ✅ Dual-coin market settled on-chain successfully`);
         } else {
-          console.log(`   ⚠️  On-chain settlement failed, but backend is settled`);
+          console.log(`   ⚠️  On-chain settlement returned false - check blockchain initialization`);
         }
       } catch (error) {
         console.error('❌ Failed to settle on-chain:', error);
         console.log('   Backend settlement will proceed anyway');
       }
+    } else {
+      console.log(`   ⚠️  No blockchainMarketId - skipping on-chain settlement`);
     }
     
     await saveMarket(market);

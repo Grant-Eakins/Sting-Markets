@@ -1878,19 +1878,27 @@ export default function AdminPage() {
                             )}
                           </div>
                           <div>
-                            <span className="text-muted-foreground text-xs">UP Pool:</span>
+                            <span className="text-muted-foreground text-xs">
+                              {market.isDualCoin && market.coinASymbol ? `${market.coinASymbol} Pool:` : 'UP Pool:'}
+                            </span>
                             <div className="font-medium text-green-500">{market.upPool.toFixed(2)}</div>
                           </div>
                           <div>
-                            <span className="text-muted-foreground text-xs">DOWN Pool:</span>
+                            <span className="text-muted-foreground text-xs">
+                              {market.isDualCoin && market.coinBSymbol ? `${market.coinBSymbol} Pool:` : 'DOWN Pool:'}
+                            </span>
                             <div className="font-medium text-red-500">{market.downPool.toFixed(2)}</div>
                           </div>
                           <div>
-                            <span className="text-muted-foreground text-xs">UP Bettors:</span>
+                            <span className="text-muted-foreground text-xs">
+                              {market.isDualCoin && market.coinASymbol ? `${market.coinASymbol} Bettors:` : 'UP Bettors:'}
+                            </span>
                             <div className="font-medium">{market.upBettors}</div>
                           </div>
                           <div>
-                            <span className="text-muted-foreground text-xs">DOWN Bettors:</span>
+                            <span className="text-muted-foreground text-xs">
+                              {market.isDualCoin && market.coinBSymbol ? `${market.coinBSymbol} Bettors:` : 'DOWN Bettors:'}
+                            </span>
                             <div className="font-medium">{market.downBettors}</div>
                           </div>
                         </div>

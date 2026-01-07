@@ -779,6 +779,8 @@ router.post('/:id/settle-dual-coin', async (req, res) => {
     }
     
     // Use the dual coin settlement function
+    console.log(`📍 Manual settle-dual-coin called for market ${req.params.id}`);
+    console.log(`📍 Market has blockchainMarketId: ${market.blockchainMarketId}`);
     const result = await settleDualCoinMarket(market);
     
     if (!result) {

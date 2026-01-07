@@ -443,8 +443,12 @@ export async function settleOnChainMarket(blockchainMarketId: number, closingPri
  * @param coinAWon True if Coin A won, false if Coin B won
  */
 export async function settleDualCoinOnChain(blockchainMarketId: number, coinAWon: boolean): Promise<boolean> {
+  console.log(`📍 settleDualCoinOnChain called - marketId: ${blockchainMarketId}, coinAWon: ${coinAWon}`);
+  console.log(`📍 isInitialized: ${isInitialized}, walletClient exists: ${!!walletClient}`);
+  
   if (!isInitialized || !walletClient) {
     console.log('⚠️  Blockchain not initialized - skipping on-chain settlement');
+    console.log(`   DEPLOYER_PRIVATE_KEY set: ${!!process.env.DEPLOYER_PRIVATE_KEY}`);
     return false;
   }
   
