@@ -1,0 +1,20 @@
+[package]
+name = "listing_auction"
+version = "0.1.0"
+description = "Solana Listing Auction - Port of EVM ListingAuction.sol"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "listing_auction"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.29.0"
+anchor-spl = "0.29.0"

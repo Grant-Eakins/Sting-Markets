@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,7 @@ import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { useAccount } from 'wagmi';
 import { TOKEN_SYMBOL, TOKEN_DECIMALS } from '@/config/contract';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useWithdrawFees, useProtocolFees, useMaxBetSize, useSetMaxBetSize, useBurnConfig, useConfigureBurn, useWithdrawAuctionFunds } from '@/hooks/useContract';
+import { useWithdrawFees, useProtocolFees, useMaxBetSize, useSetMaxBetSize, useBurnVault, useWithdrawBurnVault, useWithdrawAuctionFunds, useStartAuction, useStopAuction, useFinalizeAuction, useAuctionConfig, useAuctionLeaderboard, useUpdateAuctionConfig, useBiddingToken, useUpdateBiddingToken } from '@/hooks/useContract';
 import { formatUnits, parseUnits } from 'viem';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
@@ -111,35 +111,52 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Auction management state
-  const [auctionConfig, setAuctionConfig] = useState<any>(null);
-  const [auctionLeaderboard, setAuctionLeaderboard] = useState<any[]>([]);
-  const [auctionMinMarketCap, setAuctionMinMarketCap] = useState('');
-  const [auctionMaxMarketCap, setAuctionMaxMarketCap] = useState('');
-  const [auctionMinBid, setAuctionMinBid] = useState('');
   const [auctionDuration, setAuctionDuration] = useState('24');
+  const [auctionMinBid, setAuctionMinBid] = useState('100');
+  const [auctionMinMarketCap, setAuctionMinMarketCap] = useState('500000');
+  const [auctionMaxMarketCap, setAuctionMaxMarketCap] = useState('50000000');
+  const [newBiddingToken, setNewBiddingToken] = useState('');
 
   // Contract configuration state
   const [newMaxBetInput, setNewMaxBetInput] = useState('');
-  const [burnConfigInput, setBurnConfigInput] = useState({
-    utilityToken: '',
-    router: '',
-    enabled: false,
-  });
 
   // Protocol fees hooks
   const { feesCollected, isLoading: feesLoading, refetch: refetchFees } = useProtocolFees();
   const { withdrawFees, isPending: isWithdrawing, isConfirming, isConfirmed, error: withdrawError } = useWithdrawFees();
   
+  // Burn vault hooks
+  const { burnVault, isLoading: burnVaultLoading, refetch: refetchBurnVault } = useBurnVault();
+  const { withdrawBurnVault, isPending: isWithdrawingBurnVault, isConfirming: isConfirmingBurnVault, isConfirmed: isBurnVaultWithdrawn, error: burnVaultError } = useWithdrawBurnVault();
+  
   // Auction fees hooks
   const { withdrawAuctionFunds, isPending: isWithdrawingAuction, isConfirming: isConfirmingAuction, isConfirmed: isAuctionConfirmed, error: auctionWithdrawError, auctionAddress } = useWithdrawAuctionFunds();
+
+  // Auction hooks - read from contract
+  const { config: contractAuctionConfig, isLoading: auctionConfigLoading, refetch: refetchAuctionConfig } = useAuctionConfig();
+  const { leaderboard: contractAuctionLeaderboard, refetch: refetchAuctionLeaderboard } = useAuctionLeaderboard(10);
+  const { startAuction: startAuctionOnChain, isPending: startingAuction, isConfirmed: auctionStarted } = useStartAuction();
+  const { stopAuction: stopAuctionOnChain, isPending: stoppingAuction, isConfirmed: auctionStopped } = useStopAuction();
+  const { finalizeAuction: finalizeAuctionOnChain, isPending: finalizingAuction, isConfirmed: auctionFinalized } = useFinalizeAuction();
+  const { updateConfig: updateAuctionConfigOnChain, isPending: updatingConfig, isConfirmed: configUpdated } = useUpdateAuctionConfig();
+  const { tokenAddress: currentBiddingToken, refetch: refetchBiddingToken } = useBiddingToken();
+  const { updateBiddingToken, isPending: updatingToken, isConfirmed: tokenUpdated } = useUpdateBiddingToken();
+  
+  // Parse auction config from contract
+  const auctionConfig = contractAuctionConfig ? {
+    isActive: contractAuctionConfig[0],
+    minBidAmount: Number(formatUnits(contractAuctionConfig[1] as bigint, 18)),
+    auctionStart: new Date(Number(contractAuctionConfig[2]) * 1000),
+    auctionEnd: new Date(Number(contractAuctionConfig[3]) * 1000),
+    minMarketCap: Number(contractAuctionConfig[4]),
+    maxMarketCap: Number(contractAuctionConfig[5]),
+  } : null;
+
+  // Use contract leaderboard data
+  const auctionLeaderboard = contractAuctionLeaderboard;
 
   // Max bet size hooks
   const { maxBetSize, isLoading: maxBetLoading, refetch: refetchMaxBet } = useMaxBetSize();
   const { setMaxBetSize, isPending: isSettingMaxBet, isConfirming: isConfirmingMaxBet, isConfirmed: isMaxBetConfirmed, error: maxBetError, reset: resetMaxBet } = useSetMaxBetSize();
-
-  // Burn config hooks
-  const { burnEnabled, totalBurned, utilityToken, uniswapRouter, isLoading: burnConfigLoading, refetch: refetchBurnConfig } = useBurnConfig();
-  const { configureBurn, isPending: isConfiguringBurn, isConfirming: isConfirmingBurn, isConfirmed: isBurnConfigured, error: burnError, reset: resetBurn } = useConfigureBurn();
 
   // Check if the connected wallet is an admin
   const addressLower = address?.toLowerCase();
@@ -436,60 +453,46 @@ export default function AdminPage() {
 
   // Auction management handlers
   const loadAuctionData = async () => {
-    try {
-      const [configRes, leaderboardRes] = await Promise.all([
-        fetch(`${API_BASE}/auction/config`),
-        fetch(`${API_BASE}/auction/leaderboard`),
-      ]);
-      const configData = await configRes.json();
-      const leaderboardData = await leaderboardRes.json();
-      setAuctionConfig(configData);
-      setAuctionLeaderboard(leaderboardData);
-      // Always update the input fields with latest values from server
-      if (configData) {
-        setAuctionMinMarketCap(String(configData.minMarketCap));
-        setAuctionMaxMarketCap(String(configData.maxMarketCap));
-        setAuctionMinBid(String(configData.minBidAmount));
-      }
-    } catch (error) {
-      console.error('Error loading auction data:', error);
-    }
+    refetchAuctionConfig();
+    refetchAuctionLeaderboard();
   };
 
-  const handleStartAuction = async () => {
+  const handleStartAuction = () => {
     if (!address) return;
     try {
-      const response = await fetch(`${API_BASE}/auction/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          walletAddress: address,
-          durationHours: parseInt(auctionDuration)
-        }),
-      });
-      if (response.ok) {
-        alert('✅ Auction started!');
-        loadAuctionData();
-      } else {
-        throw new Error('Failed to start auction');
+      const hours = parseInt(auctionDuration);
+      if (hours < 1 || hours > 168) {
+        alert('⚠️ Duration must be between 1 and 168 hours');
+        return;
       }
+      startAuctionOnChain(hours);
     } catch (error: any) {
       alert(`❌ Error: ${error.message}`);
     }
   };
 
-  const handleStopAuction = async () => {
+  const handleUpdateAuctionConfig = () => {
     if (!address) return;
     try {
-      const response = await fetch(`${API_BASE}/auction/stop`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: address }),
-      });
-      if (response.ok) {
-        alert('🛑 Auction stopped');
-        loadAuctionData();
+      const minBid = parseFloat(auctionMinBid);
+      const minMC = parseFloat(auctionMinMarketCap);
+      const maxMC = parseFloat(auctionMaxMarketCap);
+      
+      if (minBid <= 0 || minMC <= 0 || maxMC <= minMC) {
+        alert('⚠️ Invalid config values');
+        return;
       }
+      
+      updateAuctionConfigOnChain(auctionMinBid, auctionMinMarketCap, auctionMaxMarketCap);
+    } catch (error: any) {
+      alert(`❌ Error: ${error.message}`);
+    }
+  };
+
+  const handleStopAuction = () => {
+    if (!address) return;
+    try {
+      stopAuctionOnChain();
     } catch (error: any) {
       alert(`❌ Error: ${error.message}`);
     }
@@ -498,44 +501,115 @@ export default function AdminPage() {
   const handleFinalizeAuction = async () => {
     if (!address) return;
     try {
-      const response = await fetch(`${API_BASE}/auction/finalize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: address }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        alert(`🏆 Auction finalized! Winners: ${data.winners.map((w: any) => w.coinSymbol).join(' vs ')}`);
-        loadAuctionData();
-      } else {
-        throw new Error('Failed to finalize');
+      // Get top 2 bid IDs from leaderboard
+      if (auctionLeaderboard.length < 2) {
+        alert('⚠️ Need at least 2 bids to finalize auction');
+        return;
       }
+      
+      const winningBidIds = [
+        parseInt(auctionLeaderboard[0].id),
+        parseInt(auctionLeaderboard[1].id)
+      ];
+      
+      console.log('Finalizing auction with winners:', winningBidIds);
+      finalizeAuctionOnChain(winningBidIds);
+      
+      // After finalization, create the dual-coin market automatically
+      // We'll watch for the auctionFinalized event below
     } catch (error: any) {
       alert(`❌ Error: ${error.message}`);
     }
   };
 
-  const handleUpdateAuctionConfig = async () => {
+  const handleUpdateBiddingToken = () => {
     if (!address) return;
+    if (!newBiddingToken || !/^0x[a-fA-F0-9]{40}$/.test(newBiddingToken)) {
+      alert('⚠️ Please enter a valid token address (0x...)');
+      return;
+    }
+    if (auctionConfig?.isActive) {
+      alert('⚠️ Cannot change token during active auction. Stop the auction first.');
+      return;
+    }
     try {
-      const response = await fetch(`${API_BASE}/auction/config`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          walletAddress: address,
-          minMarketCap: parseFloat(auctionMinMarketCap),
-          maxMarketCap: parseFloat(auctionMaxMarketCap),
-          minBidAmount: parseFloat(auctionMinBid),
-        }),
-      });
-      if (response.ok) {
-        alert('✅ Auction config updated!');
-        loadAuctionData();
-      }
+      updateBiddingToken(newBiddingToken);
     } catch (error: any) {
       alert(`❌ Error: ${error.message}`);
     }
   };
+
+  // Watch for auction events and auto-create market (in useEffect to prevent repeated alerts)
+  useEffect(() => {
+    if (auctionStarted) {
+      alert('✅ Auction started on-chain!');
+      refetchAuctionConfig();
+    }
+  }, [auctionStarted]);
+
+  useEffect(() => {
+    if (configUpdated) {
+      alert('✅ Auction config updated on-chain!');
+      refetchAuctionConfig();
+    }
+  }, [configUpdated]);
+
+  useEffect(() => {
+    if (tokenUpdated) {
+      alert('✅ Bidding token updated on-chain!');
+      refetchBiddingToken();
+      setNewBiddingToken('');
+    }
+  }, [tokenUpdated]);
+
+  useEffect(() => {
+    if (auctionStopped) {
+      alert('🛑 Auction stopped on-chain');
+      refetchAuctionConfig();
+    }
+  }, [auctionStopped]);
+
+  useEffect(() => {
+    if (auctionFinalized) {
+      alert('🏆 Auction finalized on-chain!');
+      refetchAuctionConfig();
+      refetchAuctionLeaderboard();
+      
+      // Auto-create market with winners (no confirmation needed)
+      const winner1 = auctionLeaderboard[0];
+      const winner2 = auctionLeaderboard[1];
+      if (winner1 && winner2) {
+        (async () => {
+          try {
+            alert(`🚀 Creating dual-coin market with:\n🥇 ${winner1.coinAddress.slice(0,10)}...\n🥈 ${winner2.coinAddress.slice(0,10)}...`);
+            
+            const response = await fetch(`${API_BASE}/markets/dual-coin`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                coinAAddress: winner1.coinAddress,
+                coinBAddress: winner2.coinAddress,
+                lockMinutes: 720,
+                settleMinutes: 720.05,
+                createTiming: 'scheduled',
+                walletAddress: address,
+              }),
+            });
+            
+            if (response.ok) {
+              alert('✅ Dual-coin market created successfully!');
+              queryClient.invalidateQueries({ queryKey: ['admin-markets'] });
+            } else {
+              const error = await response.json();
+              alert(`❌ Failed to create market: ${error.error}`);
+            }
+          } catch (error: any) {
+            alert(`❌ Error creating market: ${error.message}`);
+          }
+        })();
+      }
+    }
+  }, [auctionFinalized, auctionLeaderboard, address]);
 
   // Filter markets based on search and status
   const filteredMarkets = markets.filter(market => {
@@ -768,65 +842,121 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <span className="text-muted-foreground">Min Bid:</span>
-                        <p className="font-medium">{auctionConfig.minBidAmount} USDC</p>
+                        <p className="font-medium">{auctionConfig.minBidAmount} MIND</p>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Total Bids:</span>
                         <p className="font-medium">{auctionLeaderboard.length}</p>
                       </div>
                     </div>
+                    {/* Current Bidding Token */}
+                    <div className="mt-3 pt-3 border-t">
+                      <span className="text-muted-foreground text-sm">Bidding Token:</span>
+                      <p className="font-mono text-xs break-all">{currentBiddingToken || 'Loading...'}</p>
+                    </div>
                   </div>
                 )}
 
-                {/* Admin Controls */}
-                <div className="p-4 bg-red-500/5 rounded-lg border border-red-500/20">
-                  <p className="text-sm font-medium mb-3 text-red-600">Admin Controls</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                {/* Change Bidding Token (only when auction is inactive) */}
+                {!auctionConfig?.isActive && (
+                  <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                    <p className="text-sm font-medium mb-2">🔄 Change Bidding Token</p>
+                    <p className="text-xs text-muted-foreground mb-3">Update the token used for auction bids (e.g., $STNG). Only works when auction is stopped.</p>
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="New Token Address (0x...)" 
+                        value={newBiddingToken}
+                        onChange={(e) => setNewBiddingToken(e.target.value)}
+                        className="flex-1 font-mono text-xs"
+                      />
+                      <Button 
+                        onClick={handleUpdateBiddingToken} 
+                        variant="outline" 
+                        size="sm"
+                        disabled={updatingToken || !newBiddingToken}
+                      >
+                        {updatingToken ? 'Updating...' : 'Update Token'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                     <Input 
-                      placeholder="Min Market Cap" 
-                      value={auctionMinMarketCap}
-                      onChange={(e) => setAuctionMinMarketCap(e.target.value)}
-                      type="number"
-                    />
-                    <Input 
-                      placeholder="Max Market Cap" 
-                      value={auctionMaxMarketCap}
-                      onChange={(e) => setAuctionMaxMarketCap(e.target.value)}
-                      type="number"
-                    />
-                    <Input 
-                      placeholder="Min Bid (USDC)" 
+                      placeholder="Min Bid (MIND)" 
                       value={auctionMinBid}
                       onChange={(e) => setAuctionMinBid(e.target.value)}
                       type="number"
+                      min="0"
+                    />
+                    <Input 
+                      placeholder="Min Market Cap ($)" 
+                      value={auctionMinMarketCap}
+                      onChange={(e) => setAuctionMinMarketCap(e.target.value)}
+                      type="number"
+                      min="0"
+                    />
+                    <Input 
+                      placeholder="Max Market Cap ($)" 
+                      value={auctionMaxMarketCap}
+                      onChange={(e) => setAuctionMaxMarketCap(e.target.value)}
+                      type="number"
+                      min="0"
                     />
                     <Input 
                       placeholder="Duration (hours)" 
                       value={auctionDuration}
                       onChange={(e) => setAuctionDuration(e.target.value)}
                       type="number"
+                      min="1"
+                      max="168"
                     />
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={handleUpdateAuctionConfig} variant="outline" size="sm">
-                      Update Config
+                    <Button 
+                      onClick={handleUpdateAuctionConfig} 
+                      variant="outline" 
+                      size="sm"
+                      disabled={updatingConfig}
+                    >
+                      {updatingConfig ? 'Updating...' : 'Update Config'}
                     </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
                     {!auctionConfig?.isActive ? (
-                      <Button onClick={handleStartAuction} className="bg-green-600" size="sm">
-                        <Play className="h-4 w-4 mr-2" />
-                        Start Auction
-                      </Button>
-                    ) : (
                       <>
-                        <Button onClick={handleStopAuction} variant="destructive" size="sm">
-                          <StopCircle className="h-4 w-4 mr-2" />
-                          Stop Auction
+                        <Button 
+                          onClick={handleStartAuction} 
+                          className="bg-green-600"
+                          size="sm"
+                          disabled={startingAuction}
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          {startingAuction ? 'Starting...' : 'Start Auction'}
                         </Button>
-                        <Button onClick={handleFinalizeAuction} className="bg-yellow-600" size="sm">
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Finalize & Create Market
-                        </Button>
+                        {/* Finalize only shows when auction is STOPPED and has enough bids */}
+                        {auctionLeaderboard.length >= 2 && (
+                          <Button 
+                            onClick={handleFinalizeAuction} 
+                            className="bg-yellow-600" 
+                            size="sm"
+                            disabled={finalizingAuction}
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            {finalizingAuction ? 'Finalizing...' : 'Finalize & Create Market'}
+                          </Button>
+                        )}
                       </>
+                    ) : (
+                      <Button 
+                        onClick={handleStopAuction} 
+                        variant="destructive" 
+                        size="sm"
+                        disabled={stoppingAuction}
+                      >
+                        <StopCircle className="h-4 w-4 mr-2" />
+                        {stoppingAuction ? 'Stopping...' : 'Stop Auction'}
+                      </Button>
                     )}
                     <Link to="/auction">
                       <Button variant="outline" size="sm">
@@ -835,7 +965,6 @@ export default function AdminPage() {
                       </Button>
                     </Link>
                   </div>
-                </div>
 
                 {/* Leaderboard Preview */}
                 {auctionLeaderboard.length > 0 && (
@@ -846,10 +975,10 @@ export default function AdminPage() {
                         <div key={bid.id} className="flex items-center justify-between text-sm p-2 bg-background rounded">
                           <div className="flex items-center gap-2">
                             <span className="font-bold">{index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}</span>
-                            <span>{bid.coinSymbol}</span>
+                            <span className="font-mono text-xs">{bid.coinAddress.slice(0, 8)}...{bid.coinAddress.slice(-6)}</span>
                             <Badge variant="outline" className="text-xs">{bid.chain.toUpperCase()}</Badge>
                           </div>
-                          <span className="font-medium">{bid.bidAmount} USDC</span>
+                          <span className="font-medium">{(Number(bid.amount) / 1e18).toFixed(0)} MIND</span>
                         </div>
                       ))}
                     </div>
@@ -935,102 +1064,62 @@ export default function AdminPage() {
               </CardContent>
             </Card>
 
-            {/* Burn Mechanism Configuration */}
+            {/* Burn Vault Collection */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  🔥 Burn Mechanism
+                  🔥 Burn Vault Collection
                 </CardTitle>
                 <CardDescription>
-                  Configure auto-swap and burn of utility tokens (1% of bets)
+                  Withdraw accumulated USDC (1% of bets) to bridge to Solana and burn utility token
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Status</p>
-                      <p className={`text-lg font-bold ${burnEnabled ? 'text-green-500' : 'text-red-500'}`}>
-                        {burnConfigLoading ? '...' : burnEnabled ? '✅ Enabled' : '❌ Disabled'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Burned</p>
-                      <p className="text-lg font-bold">
-                        {burnConfigLoading ? '...' : totalBurned ? `${formatUnits(totalBurned, 18)}` : '0'}
-                      </p>
-                    </div>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">USDC in Burn Vault</p>
+                    <p className="text-2xl font-bold">
+                      {burnVaultLoading ? '...' : burnVault ? `${formatUnits(burnVault, 6)} USDC` : '0 USDC'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Collected from 1% of all bets. Withdraw weekly to bridge to Solana.
+                    </p>
                   </div>
                   
-                  <div className="space-y-3">
-                    <div>
-                      <Label htmlFor="utilityToken">Utility Token Address</Label>
-                      <Input
-                        id="utilityToken"
-                        value={burnConfigInput.utilityToken || (utilityToken && utilityToken !== '0x0000000000000000000000000000000000000000' ? utilityToken : '')}
-                        onChange={(e) => setBurnConfigInput({ ...burnConfigInput, utilityToken: e.target.value })}
-                        placeholder="0x..."
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="router">Uniswap Router Address</Label>
-                      <Input
-                        id="router"
-                        value={burnConfigInput.router || (uniswapRouter && uniswapRouter !== '0x0000000000000000000000000000000000000000' ? uniswapRouter : '')}
-                        onChange={(e) => setBurnConfigInput({ ...burnConfigInput, router: e.target.value })}
-                        placeholder="0x..."
-                      />
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="burnEnabled"
-                        checked={burnConfigInput.enabled}
-                        onCheckedChange={(checked) => setBurnConfigInput({ ...burnConfigInput, enabled: checked as boolean })}
-                      />
-                      <Label htmlFor="burnEnabled">Enable Burn Mechanism</Label>
-                    </div>
-                    
-                    <Button
-                      onClick={async () => {
-                        const tokenAddr = burnConfigInput.utilityToken || utilityToken || '';
-                        const routerAddr = burnConfigInput.router || uniswapRouter || '';
-                        
-                        if (burnConfigInput.enabled && (!tokenAddr || !routerAddr)) {
-                          alert('Please provide both token and router addresses to enable burn');
-                          return;
-                        }
-                        
-                        try {
-                          await configureBurn(tokenAddr, routerAddr, burnConfigInput.enabled);
-                        } catch (err) {
-                          console.error('Failed to configure burn:', err);
-                        }
-                      }}
-                      disabled={isConfiguringBurn || isConfirmingBurn}
-                      className="w-full"
-                    >
-                      {isConfiguringBurn && 'Sending...'}
-                      {isConfirmingBurn && 'Confirming...'}
-                      {!isConfiguringBurn && !isConfirmingBurn && 'Update Burn Config'}
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await withdrawBurnVault();
+                        // Refetch after a delay
+                        setTimeout(() => {
+                          refetchBurnVault();
+                        }, 3000);
+                      } catch (err) {
+                        console.error('Failed to withdraw burn vault:', err);
+                      }
+                    }}
+                    disabled={isWithdrawingBurnVault || isConfirmingBurnVault || !burnVault || burnVault === 0n}
+                    className="w-full"
+                  >
+                    {isWithdrawingBurnVault && '🔄 Sending...'}
+                    {isConfirmingBurnVault && '⏳ Confirming...'}
+                    {!isWithdrawingBurnVault && !isConfirmingBurnVault && '💰 Collect Burn Vault'}
+                  </Button>
                   
-                  {isBurnConfigured && (
+                  {isBurnVaultWithdrawn && (
                     <Alert>
                       <CheckCircle className="h-4 w-4" />
                       <AlertDescription>
-                        ✅ Burn configuration updated!
+                        ✅ Burn vault collected! Now bridge USDC to Solana, buy your token, and burn it.
                       </AlertDescription>
                     </Alert>
                   )}
                   
-                  {burnError && (
+                  {burnVaultError && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        Error: {burnError.message}
+                        Error: {burnVaultError.message}
                       </AlertDescription>
                     </Alert>
                   )}

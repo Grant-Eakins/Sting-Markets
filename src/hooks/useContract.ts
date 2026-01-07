@@ -410,6 +410,63 @@ export function useWithdrawFees() {
 }
 
 /**
+ * Hook to read burn vault balance
+ */
+export function useBurnVault() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data, isLoading, refetch } = useReadContract({
+    address: contractAddress as `0x${string}`,
+    abi: PREDICTION_MARKET_ABI,
+    functionName: 'burnVault',
+  });
+  
+  return {
+    burnVault: data as bigint | undefined,
+    isLoading,
+    refetch,
+  };
+}
+
+/**
+ * Hook to withdraw burn vault (admin only)
+ */
+export function useWithdrawBurnVault() {
+  const chainId = useChainId();
+  const contractAddress = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const withdrawBurnVault = () => {
+    if (!contractAddress) {
+      throw new Error('Contract address not found');
+    }
+    
+    console.log('🔥 Withdrawing burn vault...');
+    writeContract({
+      address: contractAddress as `0x${string}`,
+      abi: PREDICTION_MARKET_ABI,
+      functionName: 'withdrawBurnVault',
+      args: [],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    withdrawBurnVault,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
  * Hook to withdraw from ListingAuction contract (admin only)
  */
 export function useWithdrawAuctionFunds() {
@@ -900,6 +957,289 @@ export function useAuctionConfig() {
     isLoading,
     error,
     refetch,
+  };
+}
+
+/**
+ * Hook to get auction leaderboard from contract
+ */
+export function useAuctionLeaderboard(limit: number = 50) {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: auctionAddress as `0x${string}`,
+    abi: LISTING_AUCTION_ABI,
+    functionName: 'getLeaderboard',
+    args: [BigInt(limit)],
+    query: {
+      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000',
+    },
+  });
+  
+  // Parse the returned data
+  const leaderboard = data ? (() => {
+    const [bidIds, bidders, coinAddresses, chains, amounts] = data as [bigint[], `0x${string}`[], string[], string[], bigint[]];
+    return bidIds.map((id, i) => ({
+      id: id.toString(),
+      bidder: bidders[i],
+      coinAddress: coinAddresses[i],
+      chain: chains[i],
+      amount: amounts[i].toString(),
+      rank: i + 1,
+    }));
+  })() : [];
+  
+  return {
+    leaderboard,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook to get total bid count from contract
+ */
+export function useAuctionTotalBids() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: auctionAddress as `0x${string}`,
+    abi: LISTING_AUCTION_ABI,
+    functionName: 'getTotalBids',
+    query: {
+      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000',
+    },
+  });
+  
+  return {
+    totalBids: data ? Number(data) : 0,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook to read the current bidding token address
+ */
+export function useBiddingToken() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: auctionAddress as `0x${string}`,
+    abi: LISTING_AUCTION_ABI,
+    functionName: 'biddingToken',
+    query: {
+      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000',
+    },
+  });
+  
+  return {
+    tokenAddress: data as `0x${string}` | undefined,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+/**
+ * Hook to update bidding token (admin only)
+ */
+export function useUpdateBiddingToken() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const updateBiddingToken = (newTokenAddress: string) => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    if (!newTokenAddress || !/^0x[a-fA-F0-9]{40}$/.test(newTokenAddress)) {
+      throw new Error('Invalid token address');
+    }
+    
+    console.log(`🔄 Updating bidding token to: ${newTokenAddress}`);
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'updateBiddingToken',
+      args: [newTokenAddress as `0x${string}`],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    updateBiddingToken,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
+ * Hook to update auction config (admin only)
+ */
+export function useUpdateAuctionConfig() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const updateConfig = (minBidAmount: string, minMarketCap: string, maxMarketCap: string) => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    const minBidInWei = parseUnits(minBidAmount, 18); // MIND has 18 decimals
+    const minMarketCapNum = BigInt(Math.floor(parseFloat(minMarketCap)));
+    const maxMarketCapNum = BigInt(Math.floor(parseFloat(maxMarketCap)));
+    
+    console.log(`⚙️ Updating auction config: minBid=${minBidAmount} MIND, minMC=${minMarketCap}, maxMC=${maxMarketCap}`);
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'updateConfig',
+      args: [minBidInWei, minMarketCapNum, maxMarketCapNum],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    updateConfig,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
+ * Hook to start auction (admin only)
+ */
+export function useStartAuction() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const startAuction = (durationHours: number) => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    console.log(`🎪 Starting auction for ${durationHours} hours`);
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'startAuction',
+      args: [BigInt(durationHours)],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    startAuction,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
+ * Hook to stop auction (admin only)
+ */
+export function useStopAuction() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const stopAuction = () => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    console.log('🛑 Stopping auction');
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'stopAuction',
+      args: [],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    stopAuction,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
+
+/**
+ * Hook to finalize auction (admin only)
+ */
+export function useFinalizeAuction() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const finalizeAuction = (winningBidIds: number[]) => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    if (winningBidIds.length !== 2) {
+      throw new Error('Must provide exactly 2 winning bid IDs');
+    }
+    
+    console.log(`🏆 Finalizing auction with winners: ${winningBidIds.join(', ')}`);
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'finalizeAuction',
+      args: [winningBidIds.map(id => BigInt(id))],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    finalizeAuction,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
   };
 }
 

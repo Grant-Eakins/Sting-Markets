@@ -86,6 +86,7 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
     uint256 public maxBetSize = 10 * 10**6; // 10 USDC (adjustable)
     uint256 public constant BONDING_CURVE_STEEPNESS = 10;
     uint256 public protocolFeesCollected;
+    uint256 public burnVault; // USDC accumulated for manual bridge & burn on Solana
     uint256 public totalBurned; // Track total utility tokens burned
     address public oracle;
     
@@ -126,6 +127,8 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
     event MarketLocked(uint256 indexed marketId, uint256 timestamp);
     event RefundClaimed(uint256 indexed marketId, address indexed user, uint256 refundAmount);
     event MaxBetSizeUpdated(uint256 oldMaxBet, uint256 newMaxBet);
+    event BurnVaultAccumulated(uint256 indexed marketId, uint256 amount, uint256 totalInVault);
+    event BurnVaultWithdrawn(address indexed recipient, uint256 amount);
     event UtilityTokenBurned(uint256 indexed marketId, uint256 usdcAmount, uint256 tokensBurned);
     event BurnConfigUpdated(address utilityToken, address router, bool enabled);
     
@@ -230,13 +233,9 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
         protocolFeesCollected += protocolFee;
         emit ProtocolFeeCollected(marketId, protocolFee);
         
-        // Auto-swap and burn utility token (1% of bet) if enabled
-        if (burnEnabled && burnFee > 0) {
-            _swapAndBurn(burnFee, marketId);
-        } else {
-            // If burn not enabled, add to protocol fees
-            protocolFeesCollected += burnFee;
-        }
+        // Accumulate burn fee in vault for manual bridge to Solana
+        burnVault += burnFee;
+        emit BurnVaultAccumulated(marketId, burnFee, burnVault);
         
         // Calculate shares using bonding curve
         uint256 shares = _calculateShares(net, market.bucketLiquidity[outcomeIndex]);
@@ -543,6 +542,19 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
         protocolFeesCollected = 0;
         token.safeTransfer(owner(), amount);
         emit ProtocolFeeWithdrawn(owner(), amount);
+    }
+    
+    /**
+     * @notice Withdraw burn vault USDC for manual bridge to Solana
+     * @dev Owner withdraws accumulated USDC to bridge to Solana, buy utility token, and burn
+     */
+    function withdrawBurnVault() external onlyOwner {
+        uint256 amount = burnVault;
+        require(amount > 0, "No USDC in burn vault");
+        
+        burnVault = 0;
+        token.safeTransfer(owner(), amount);
+        emit BurnVaultWithdrawn(owner(), amount);
     }
     
     function pause() external onlyOwner {

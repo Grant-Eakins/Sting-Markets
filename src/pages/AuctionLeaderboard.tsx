@@ -10,23 +10,18 @@ import { Trophy, Coins, Timer, DollarSign, TrendingUp, Play, StopCircle, CheckCi
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
-import { useAuctionTokenAllowance, useAuctionTokenApproval, useSubmitAuctionBid } from '@/hooks/useContract';
+import { useAuctionTokenAllowance, useAuctionTokenApproval, useSubmitAuctionBid, useAuctionConfig, useAuctionLeaderboard, useAuctionTotalBids } from '@/hooks/useContract';
 import { formatUnits } from 'viem';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
 interface Bid {
   id: string;
-  walletAddress: string;
-  coinContractAddress: string;
-  chain: 'base' | 'solana';
-  coinSymbol: string;
-  coinName?: string;
-  marketCap?: number;
-  bidAmount: number;
-  status: string;
-  createdAt: string;
-  rank?: number;
+  bidder: string;
+  coinAddress: string;
+  chain: string;
+  amount: string;
+  rank: number;
 }
 
 interface AuctionConfig {
@@ -50,34 +45,55 @@ export default function AuctionLeaderboard() {
   const { isInFarcasterClient } = useFarcasterAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  const [leaderboard, setLeaderboard] = useState<Bid[]>([]);
-  const [config, setConfig] = useState<AuctionConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  
   // Bid form
   const [coinAddress, setCoinAddress] = useState('');
   const [bidAmount, setBidAmount] = useState('');
 
-  // Blockchain hooks
+  // Blockchain hooks - read directly from contract
+  const { config: contractConfig, isLoading: configLoading, refetch: refetchConfig } = useAuctionConfig();
+  const { leaderboard, isLoading: leaderboardLoading, refetch: refetchLeaderboard } = useAuctionLeaderboard(50);
+  const { totalBids } = useAuctionTotalBids();
   const { allowance, refetch: refetchAllowance } = useAuctionTokenAllowance();
   const { approve, isPending: isApproving, isConfirming: isApprovingConfirm, isConfirmed: isApproved } = useAuctionTokenApproval();
   const { submitBid, isPending: isSubmitting, isConfirming: isSubmitConfirm, isConfirmed: isBidSubmitted, error: bidError } = useSubmitAuctionBid();
 
   const isAdmin = address && ADMIN_WALLETS.includes(address.toLowerCase());
+  const loading = configLoading || leaderboardLoading;
+  
+  // Parse contract config
+  const config = contractConfig ? {
+    isActive: contractConfig[0],
+    minBidAmount: Number(formatUnits(contractConfig[1] as bigint, 18)),
+    auctionStart: new Date(Number(contractConfig[2]) * 1000).toISOString(),
+    auctionEnd: new Date(Number(contractConfig[3]) * 1000).toISOString(),
+    minMarketCap: Number(contractConfig[4]),
+    maxMarketCap: Number(contractConfig[5]),
+  } : null;
 
+  // Auto-refresh every 10s
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 10000); // Refresh every 10s
+    const interval = setInterval(() => {
+      refetchConfig();
+      refetchLeaderboard();
+    }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refetchConfig, refetchLeaderboard]);
 
-  // Refetch allowance after approval
+  // Refetch allowance after approval and auto-submit bid
   useEffect(() => {
-    if (isApproved) {
+    if (isApproved && coinAddress && bidAmount) {
       refetchAllowance();
-      toast({ title: '✅ Approval successful!', description: 'You can now submit your bid' });
+      toast({ title: '✅ Approved! Submitting bid...', description: 'Now sending your bid to the auction' });
+      
+      // Auto-submit after approval
+      const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(coinAddress);
+      const detectedChain = isEthAddress ? 'base' : 'solana';
+      
+      setTimeout(() => {
+        submitBid(coinAddress, detectedChain, bidAmount);
+      }, 500);
     }
-  }, [isApproved, refetchAllowance]);
+  }, [isApproved]);
 
   // Handle successful bid submission
   useEffect(() => {
@@ -85,40 +101,36 @@ export default function AuctionLeaderboard() {
       toast({ title: '✅ Bid submitted on-chain!', description: `Your bid for ${coinAddress.slice(0, 10)}... has been recorded` });
       setCoinAddress('');
       setBidAmount('');
-      loadData();
+      refetchLeaderboard();
       refetchAllowance();
     }
-  }, [isBidSubmitted]);
+  }, [isBidSubmitted, refetchLeaderboard, refetchAllowance]);
 
   // Handle bid submission errors
   useEffect(() => {
     if (bidError) {
+      let errorMessage = bidError.message;
+      
+      // Parse common contract errors
+      if (errorMessage.includes('No active auction')) {
+        errorMessage = 'Auction is not active. Admin needs to start the auction first.';
+      } else if (errorMessage.includes('Auction has ended')) {
+        errorMessage = 'This auction has already ended.';
+      } else if (errorMessage.includes('Bid below minimum')) {
+        errorMessage = `Your bid is below the minimum of ${config?.minBidAmount || 0} MIND tokens.`;
+      } else if (errorMessage.includes('insufficient allowance')) {
+        errorMessage = 'Please approve MIND tokens first.';
+      }
+      
       toast({ 
         title: '❌ Bid failed', 
-        description: bidError.message,
+        description: errorMessage,
         variant: 'destructive' 
       });
     }
-  }, [bidError]);
+  }, [bidError, config]);
 
-  const loadData = async () => {
-    try {
-      const [configRes, leaderboardRes] = await Promise.all([
-        fetch(`${API_BASE}/auction/config`),
-        fetch(`${API_BASE}/auction/leaderboard`),
-      ]);
 
-      const configData = await configRes.json();
-      const leaderboardData = await leaderboardRes.json();
-
-      setConfig(configData);
-      setLeaderboard(leaderboardData);
-    } catch (error) {
-      console.error('Error loading auction data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmitBid = async () => {
     if (!bidAmount || !coinAddress || !address) return;
@@ -159,8 +171,8 @@ export default function AuctionLeaderboard() {
   const isProcessing = isApproving || isApprovingConfirm || isSubmitting || isSubmitConfirm;
   const needsApproval = !allowance || (bidAmount && allowance < BigInt(parseFloat(bidAmount) * 1e18));
 
-  const timeRemaining = config?.currentAuctionEnd 
-    ? Math.max(0, new Date(config.currentAuctionEnd).getTime() - Date.now())
+  const timeRemaining = config?.auctionEnd 
+    ? Math.max(0, new Date(config.auctionEnd).getTime() - Date.now())
     : 0;
   const hoursRemaining = Math.floor(timeRemaining / (1000 * 60 * 60));
   const minutesRemaining = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
@@ -278,7 +290,7 @@ export default function AuctionLeaderboard() {
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Min Bid</div>
-                <div className="text-lg font-bold">{config?.minBidAmount} USDC</div>
+                <div className="text-lg font-bold">{config?.minBidAmount} MIND</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Total Bids</div>
@@ -365,28 +377,20 @@ export default function AuctionLeaderboard() {
                         {index > 2 && `#${index + 1}`}
                       </div>
                       <div>
-                        <div className="font-bold">{bid.coinSymbol}</div>
+                        <div className="font-bold font-mono">{bid.coinAddress.slice(0, 6)}...{bid.coinAddress.slice(-4)}</div>
                         <div className="text-sm text-muted-foreground flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
                             {bid.chain.toUpperCase()}
                           </Badge>
-                          {bid.coinName}
-                          {bid.marketCap && (
-                            <span className="ml-1">
-                              <TrendingUp className="inline h-3 w-3" /> ${(bid.marketCap / 1000000).toFixed(2)}M
-                            </span>
-                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {bid.bidder.slice(0, 6)}...{bid.bidder.slice(-4)}
+                          </span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-lg flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        {bid.bidAmount.toFixed(2)} USDC
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {bid.walletAddress.slice(0, 6)}...{bid.walletAddress.slice(-4)}
-                      </div>
+                      <div className="text-xl font-bold">{(Number(bid.amount) / 1e18).toFixed(0)} MIND</div>
+                      <div className="text-xs text-muted-foreground">Bid Amount</div>
                     </div>
                   </div>
                 ))}

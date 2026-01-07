@@ -221,6 +221,23 @@ export const PREDICTION_MARKET_ABI = [
     "stateMutability": "nonpayable",
     "type": "function"
   },
+  // Burn vault functions
+  {
+    "inputs": [],
+    "name": "burnVault",
+    "outputs": [
+      { "internalType": "uint256", "name": "", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawBurnVault",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
   // Max bet size functions
   {
     "inputs": [],
@@ -598,6 +615,42 @@ export const LISTING_AUCTION_ABI = [
   },
   {
     "inputs": [
+      { "internalType": "uint256", "name": "_minBidAmount", "type": "uint256" },
+      { "internalType": "uint256", "name": "_minMarketCap", "type": "uint256" },
+      { "internalType": "uint256", "name": "_maxMarketCap", "type": "uint256" }
+    ],
+    "name": "updateConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "durationHours", "type": "uint256" }
+    ],
+    "name": "startAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "stopAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256[]", "name": "winningBidIds", "type": "uint256[]" }
+    ],
+    "name": "finalizeAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       { "internalType": "uint256", "name": "limit", "type": "uint256" }
     ],
     "name": "getLeaderboard",
@@ -621,7 +674,9 @@ export const LISTING_AUCTION_ABI = [
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
     "name": "withdrawToTreasury",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -658,6 +713,15 @@ export const LISTING_AUCTION_ABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      { "internalType": "address", "name": "_newToken", "type": "address" }
+    ],
+    "name": "updateBiddingToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "anonymous": false,
     "inputs": [
       { "indexed": true, "internalType": "address", "name": "bidder", "type": "address" },
@@ -667,6 +731,33 @@ export const LISTING_AUCTION_ABI = [
       { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
     ],
     "name": "BidSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "uint256", "name": "startTime", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "endTime", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "minBid", "type": "uint256" }
+    ],
+    "name": "AuctionStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+    ],
+    "name": "AuctionStopped",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "uint256[]", "name": "winningBidIds", "type": "uint256[]" },
+      { "indexed": false, "internalType": "uint256", "name": "totalBurned", "type": "uint256" }
+    ],
+    "name": "WinnersFinalized",
     "type": "event"
   }
 ] as const;
