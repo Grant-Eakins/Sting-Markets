@@ -111,34 +111,36 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
     bucketProbability = probabilities[bucketIndex] / 100; // Convert from percentage to decimal
   }
   
-  // Calculate shares using on-chain bucket liquidity data
-  // Contract formula: shares = netAmount * 1e18 / (1e18 + bucketLiquidity * STEEPNESS)
+  // Calculate shares based on market type
   const TOTAL_FEE_BPS = isDualCoin ? 300 : 200; // 3% for dual coin (2% protocol + 1% burn), 2% for standard
-  const STEEPNESS = 10; // Bonding curve steepness
   
   let sharesReceived = 0;
   const amountNum = parseFloat(amount || '0');
   let bondingBonus = 1; // Default no bonus
   
-  if (yourBucketLiquidity !== undefined && amountNum > 0) {
+  if (amountNum > 0 && bucketProbability > 0) {
     // Amount is in tokens (e.g. 5 USDC), convert to base units for calculation
     const amountInUnits = amountNum * Math.pow(10, TOKEN_DECIMALS);
     const totalFee = (amountInUnits * TOTAL_FEE_BPS) / 10000;
     const netAmount = amountInUnits - totalFee;
     
-    // Use on-chain liquidity (already in base units)
-    const yourLiquidityNum = Number(yourBucketLiquidity);
-    
-    // Contract formula: shares = (netAmount * 1e18) / (1e18 + bucketLiquidity * STEEPNESS)
-    const yourDivisor = 1e18 + (yourLiquidityNum * STEEPNESS);
-    const yourShares = (netAmount * 1e18) / yourDivisor;
-    sharesReceived = yourShares;
-    
-    // Calculate bonding curve advantage (how many more shares you get vs a neutral pool)
-    // A neutral pool would have divisor of 1e18, giving 1 share per unit
-    // Smaller pools give more shares per USDC
-    const neutralShares = netAmount; // What you'd get with no bonding curve
-    bondingBonus = yourShares / neutralShares; // How much more you get due to bonding curve (usually > 0, < 1)
+    if (isDualCoin) {
+      // NEW SHARE MODEL for dual coin: shares = netAmount / sharePrice
+      // sharePrice = probability (in USDC with 6 decimals)
+      const sharePrice = bucketProbability * 1e6; // Convert to 6 decimals (USDC units)
+      sharesReceived = (netAmount * 1e18) / sharePrice; // Result in 18 decimals
+    } else {
+      // BONDING CURVE for standard markets
+      const STEEPNESS = 10;
+      const yourLiquidityNum = Number(yourBucketLiquidity || 0);
+      const yourDivisor = 1e18 + (yourLiquidityNum * STEEPNESS);
+      const yourShares = (netAmount * 1e18) / yourDivisor;
+      sharesReceived = yourShares;
+      
+      // Calculate bonding curve advantage
+      const neutralShares = netAmount;
+      bondingBonus = yourShares / neutralShares;
+    }
     
     // Base multiplier from pool probability (1 / probability)
     // This is what you'd win if pools stay the same
