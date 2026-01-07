@@ -436,7 +436,7 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {position === 'UP' ? <TrendingUp className="w-5 h-5 text-green-500" /> : <TrendingDown className="w-5 h-5 text-red-500" />}
+            {position === 'UP' ? <TrendingUp className="w-5 h-5 text-green-500" /> : <TrendingUp className="w-5 h-5 text-green-500" />}
             <span>{coinName ? `Bet on ${coinName}` : `Bet ${position}`}</span>
           </DialogTitle>
           <DialogDescription className="line-clamp-2">

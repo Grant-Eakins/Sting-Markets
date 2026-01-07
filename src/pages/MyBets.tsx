@@ -601,10 +601,16 @@ export default function MyBets() {
     
     // Format the bucket as a price range based on contract's getBucketIndex logic
     // Contract mapping: bucket 0 = >+10%, lower buckets = higher positive %, higher buckets = negative %
-    const getBucketLabel = (outcomeIndex: number, numOutcomes: number = 42, isDualCoin: boolean = false) => {
+    const getBucketLabel = (outcomeIndex: number, numOutcomes: number = 42, isDualCoin: boolean = false, market?: any) => {
       // For 2-bucket dual-coin markets
       if (isDualCoin && numOutcomes === 2) {
-        return outcomeIndex === 0 ? 'Coin A Wins' : 'Coin B Wins';
+        // Get actual coin symbols from market
+        if (market) {
+          const coinASymbol = market.coinASymbol || (market.symbol?.split('-')[0]) || 'Coin A';
+          const coinBSymbol = market.coinBSymbol || (market.symbol?.split('-')[1]) || 'Coin B';
+          return outcomeIndex === 0 ? coinASymbol : coinBSymbol;
+        }
+        return outcomeIndex === 0 ? 'Coin A' : 'Coin B';
       }
       
       // For 10-bucket solo markets
@@ -720,7 +726,7 @@ export default function MyBets() {
     return {
       ...bet,
       marketName: displayMarketName,
-      bucketLabel: getBucketLabel(bet.outcomeIndex, marketData?.numOutcomes, market?.isDualCoin),
+      bucketLabel: getBucketLabel(bet.outcomeIndex, marketData?.numOutcomes, market?.isDualCoin, market),
       amountToken,
       sharesNum,
       potentialPayout,
