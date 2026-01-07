@@ -75,8 +75,11 @@ export function useBlockchainBets() {
       const sellLogs: any[] = [];
       const claimLogs: any[] = [];
       
-      // Query from BOTH contracts
+      // Query from BOTH contracts IN PARALLEL
       const contractsToQuery = [contractAddress, dualCoinContractAddress].filter(Boolean);
+      
+      // Build all query promises upfront for parallel execution
+      const allQueryPromises: Promise<any>[] = [];
       
       for (const contract of contractsToQuery) {
         console.log(`📊 Querying contract: ${contract}`);
@@ -85,45 +88,54 @@ export function useBlockchainBets() {
         for (let fromBlock = startBlock; fromBlock < currentBlock; fromBlock += CHUNK_SIZE) {
           const toBlock = fromBlock + CHUNK_SIZE - 1n > currentBlock ? currentBlock : fromBlock + CHUNK_SIZE - 1n;
           
-          console.log(`📊 Querying chunk: ${fromBlock} to ${toBlock}`);
+          // Add all 3 event queries to promises array (parallel per chunk)
+          allQueryPromises.push(
+            publicClient.getLogs({
+              address: contract as `0x${string}`,
+              event: parseAbiItem('event SharesPurchased(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 cost)'),
+              args: { user: address },
+              fromBlock: fromBlock,
+              toBlock: toBlock,
+            }).then(logs => ({ type: 'purchase', logs, contract, fromBlock, toBlock }))
+          );
           
-          // Fetch SharesPurchased events
-          const purchases = await publicClient.getLogs({
-            address: contract as `0x${string}`,
-            event: parseAbiItem('event SharesPurchased(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 cost)'),
-            args: {
-              user: address,
-            },
-            fromBlock: fromBlock,
-            toBlock: toBlock,
-          });
+          allQueryPromises.push(
+            publicClient.getLogs({
+              address: contract as `0x${string}`,
+              event: parseAbiItem('event SharesSold(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 payout)'),
+              args: { user: address },
+              fromBlock: fromBlock,
+              toBlock: toBlock,
+            }).then(logs => ({ type: 'sell', logs, contract, fromBlock, toBlock }))
+          );
           
-          // Fetch SharesSold events
-          const sells = await publicClient.getLogs({
-            address: contract as `0x${string}`,
-            event: parseAbiItem('event SharesSold(uint256 indexed marketId, address indexed user, uint8 outcomeIndex, uint256 shares, uint256 payout)'),
-            args: {
-              user: address,
-            },
-            fromBlock: fromBlock,
-            toBlock: toBlock,
-          });
-          
-          // Fetch PayoutClaimed events to track claimed status
-          const claims = await publicClient.getLogs({
-            address: contract as `0x${string}`,
-            event: parseAbiItem('event PayoutClaimed(uint256 indexed marketId, address indexed user, uint256 payout)'),
-            args: {
-              user: address,
-            },
-            fromBlock: fromBlock,
-            toBlock: toBlock,
-          });
-          
-          purchaseLogs.push(...purchases);
-          sellLogs.push(...sells);
-          claimLogs.push(...claims);
-          console.log(`📊 Found ${purchases.length} purchases, ${sells.length} sells, ${claims.length} claims in chunk from ${contract}`);
+          allQueryPromises.push(
+            publicClient.getLogs({
+              address: contract as `0x${string}`,
+              event: parseAbiItem('event PayoutClaimed(uint256 indexed marketId, address indexed user, uint256 payout)'),
+              args: { user: address },
+              fromBlock: fromBlock,
+              toBlock: toBlock,
+            }).then(logs => ({ type: 'claim', logs, contract, fromBlock, toBlock }))
+          );
+        }
+      }
+      
+      // Execute ALL queries in parallel
+      console.log(`📊 Executing ${allQueryPromises.length} queries in parallel...`);
+      const startTime = Date.now();
+      const results = await Promise.all(allQueryPromises);
+      const queryTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`📊 ✅ All queries completed in ${queryTime}s`);
+      
+      // Aggregate results
+      for (const result of results) {
+        if (result.type === 'purchase') {
+          purchaseLogs.push(...result.logs);
+        } else if (result.type === 'sell') {
+          sellLogs.push(...result.logs);
+        } else if (result.type === 'claim') {
+          claimLogs.push(...result.logs);
         }
       }
 
@@ -156,13 +168,9 @@ export function useBlockchainBets() {
         
         const key = `${marketId.toString()}-${outcomeIndex}`;
         
-        let timestamp = Date.now() / 1000;
-        try {
-          const block = await publicClient.getBlock({ blockNumber: log.blockNumber });
-          timestamp = Number(block.timestamp);
-        } catch (e) {
-          console.warn('Could not fetch block timestamp:', e);
-        }
+        // Use approximate timestamp based on block number (Base: ~2 sec/block)
+        // Much faster than fetching each block individually
+        const timestamp = Date.now() / 1000 - Number(currentBlock - log.blockNumber) * 2;
         
         const existing = positionMap.get(key);
         if (existing) {
@@ -288,8 +296,8 @@ export function useBlockchainBets() {
   useEffect(() => {
     fetchBets();
     
-    // Refresh every 15 seconds
-    const interval = setInterval(fetchBets, 15000);
+    // Refresh every 30 seconds (was 15s - too frequent)
+    const interval = setInterval(fetchBets, 30000);
     return () => clearInterval(interval);
   }, [address, contractAddress]);
 
