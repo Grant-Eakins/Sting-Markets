@@ -167,7 +167,8 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
         bondingBonus: bondingBonus.toFixed(3),
         baseMultiplier: baseMultiplier.toFixed(2), 
         effectiveOdds: effectiveOdds.toFixed(2)
-    });
+      });
+    }
   } else if (amountNum > 0) {
     // Fallback: use simple probability-based multiplier
     if (bucketProbability > 0 && bucketProbability < 1) {
