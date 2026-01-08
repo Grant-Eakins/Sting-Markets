@@ -224,6 +224,7 @@ contract ListingAuction is Ownable, ReentrancyGuard {
      * @notice Finalize auction and mark top 2 bids as winners
      * @param winningBidIds Array of winning bid IDs (top 2)
      * @dev Automatically refunds all non-winning bids and burns 20% of winning bid amounts
+     * @dev Validates that the two winning bids are for different coins
      */
     function finalizeAuction(uint256[] calldata winningBidIds) external onlyOwner nonReentrant {
         require(!config.isActive, "Stop auction first");
@@ -234,6 +235,13 @@ contract ListingAuction is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < winningBidIds.length; i++) {
             require(winningBidIds[i] < bids.length, "Invalid bid ID");
         }
+
+        // Ensure the two winning bids are for DIFFERENT coins
+        require(
+            keccak256(bytes(bids[winningBidIds[0]].coinContractAddress)) != 
+            keccak256(bytes(bids[winningBidIds[1]].coinContractAddress)),
+            "Winners must be different coins"
+        );
 
         uint256 totalBurnAmount = 0;
 

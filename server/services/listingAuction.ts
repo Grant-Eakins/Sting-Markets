@@ -38,6 +38,8 @@ export interface AuctionConfig {
   currentAuctionEnd?: Date;
   enableWalletBetLimit?: boolean;
   maxBetPerWallet?: number;
+  auto_cycle_enabled?: boolean;
+  linked_market_id?: number;
 }
 
 /**
@@ -66,6 +68,8 @@ export async function getAuctionConfig(): Promise<AuctionConfig | null> {
     currentAuctionEnd: data.current_auction_end ? new Date(data.current_auction_end) : undefined,
     enableWalletBetLimit: data.enable_wallet_bet_limit ?? true,
     maxBetPerWallet: data.max_bet_per_wallet ? parseFloat(data.max_bet_per_wallet) : 10,
+    auto_cycle_enabled: data.auto_cycle_enabled ?? false,
+    linked_market_id: data.linked_market_id,
   };
 }
 
@@ -275,11 +279,27 @@ export async function getLeaderboard(limit: number = 50): Promise<ListingBid[]> 
 }
 
 /**
- * Get top 2 winners
+ * Get top 2 winners (ensuring they are different coins)
  */
 export async function getTopTwoWinners(): Promise<ListingBid[]> {
-  const leaderboard = await getLeaderboard(2);
-  return leaderboard.slice(0, 2);
+  const leaderboard = await getLeaderboard(50); // Get more bids to find different coins
+  
+  if (leaderboard.length === 0) return [];
+  
+  // First winner is always the top bid
+  const winners: ListingBid[] = [leaderboard[0]];
+  
+  // Find the next highest bid for a DIFFERENT coin
+  for (let i = 1; i < leaderboard.length; i++) {
+    const bid = leaderboard[i];
+    // Check if this coin address is different from the first winner
+    if (bid.coinContractAddress.toLowerCase() !== winners[0].coinContractAddress.toLowerCase()) {
+      winners.push(bid);
+      break;
+    }
+  }
+  
+  return winners;
 }
 
 /**

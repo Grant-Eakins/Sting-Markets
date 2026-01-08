@@ -14,6 +14,7 @@ import {
   getUserBids,
   getTopTwoWinners,
 } from '../services/listingAuction';
+import { enableAutoCycle, disableAutoCycle } from '../services/auctionAutoCycle';
 
 const router = Router();
 
@@ -234,6 +235,46 @@ router.get('/my-bids', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error getting user bids:', error);
     res.status(500).json({ error: 'Failed to get user bids' });
+  }
+});
+
+/**
+ * POST /api/auction/enable-auto-cycle
+ * Enable auto-cycle mode (admin only)
+ */
+router.post('/enable-auto-cycle', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.body;
+
+    if (!walletAddress || !isAdmin(walletAddress)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const success = await enableAutoCycle();
+    res.json({ success });
+  } catch (error: any) {
+    console.error('Error enabling auto-cycle:', error);
+    res.status(500).json({ error: 'Failed to enable auto-cycle' });
+  }
+});
+
+/**
+ * POST /api/auction/disable-auto-cycle
+ * Disable auto-cycle mode (admin only)
+ */
+router.post('/disable-auto-cycle', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.body;
+
+    if (!walletAddress || !isAdmin(walletAddress)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const success = await disableAutoCycle();
+    res.json({ success });
+  } catch (error: any) {
+    console.error('Error disabling auto-cycle:', error);
+    res.status(500).json({ error: 'Failed to disable auto-cycle' });
   }
 });
 

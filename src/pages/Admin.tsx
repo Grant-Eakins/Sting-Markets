@@ -155,7 +155,29 @@ export default function AdminPage() {
     auctionEnd: new Date(Number(contractAuctionConfig[3]) * 1000),
     minMarketCap: Number(contractAuctionConfig[4]),
     maxMarketCap: Number(contractAuctionConfig[5]),
+    auto_cycle_enabled: false, // Will be updated from database
+    linked_market_id: undefined, // Will be updated from database
   } : null;
+
+  // Fetch auto-cycle config from database (not stored on-chain)
+  useEffect(() => {
+    const fetchAutoCycleConfig = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/auction/config`);
+        const dbConfig = await response.json();
+        if (auctionConfig && dbConfig) {
+          auctionConfig.auto_cycle_enabled = dbConfig.auto_cycle_enabled;
+          auctionConfig.linked_market_id = dbConfig.linked_market_id;
+        }
+      } catch (error) {
+        console.error('Error fetching auto-cycle config:', error);
+      }
+    };
+    
+    if (auctionConfig) {
+      fetchAutoCycleConfig();
+    }
+  }, [contractAuctionConfig]);
 
   // Use contract leaderboard data
   const auctionLeaderboard = contractAuctionLeaderboard;
@@ -536,16 +558,30 @@ export default function AdminPage() {
   const handleFinalizeAuction = async () => {
     if (!address) return;
     try {
-      // Get top 2 bid IDs from leaderboard
+      // Get top 2 bid IDs from leaderboard, ensuring they are different coins
       if (auctionLeaderboard.length < 2) {
         alert('⚠️ Need at least 2 bids to finalize auction');
         return;
       }
       
-      const winningBidIds = [
-        parseInt(auctionLeaderboard[0].id),
-        parseInt(auctionLeaderboard[1].id)
-      ];
+      // First winner is always the top bid
+      const winningBidIds = [parseInt(auctionLeaderboard[0].id)];
+      
+      // Find the next highest bid for a DIFFERENT coin
+      let foundSecondWinner = false;
+      for (let i = 1; i < auctionLeaderboard.length; i++) {
+        const bid = auctionLeaderboard[i];
+        if (bid.coinAddress.toLowerCase() !== auctionLeaderboard[0].coinAddress.toLowerCase()) {
+          winningBidIds.push(parseInt(bid.id));
+          foundSecondWinner = true;
+          break;
+        }
+      }
+      
+      if (!foundSecondWinner) {
+        alert('⚠️ Need at least 2 bids for DIFFERENT coins to finalize auction');
+        return;
+      }
       
       console.log('Finalizing auction with winners:', winningBidIds);
       finalizeAuctionOnChain(winningBidIds);
@@ -955,6 +991,57 @@ export default function AdminPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Auto-Cycle Mode Toggle */}
+                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">🔄 Auto-Cycle Mode</p>
+                      <Badge variant={auctionConfig?.auto_cycle_enabled ? "default" : "secondary"} className={auctionConfig?.auto_cycle_enabled ? "bg-blue-500" : ""}>
+                        {auctionConfig?.auto_cycle_enabled ? 'ON' : 'OFF'}
+                      </Badge>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        if (!address) return;
+                        try {
+                          const endpoint = auctionConfig?.auto_cycle_enabled 
+                            ? '/api/auction/disable-auto-cycle'
+                            : '/api/auction/enable-auto-cycle';
+                          
+                          const response = await fetch(`${import.meta.env.PROD ? '' : 'http://localhost:3001'}${endpoint}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ walletAddress: address }),
+                          });
+                          
+                          const result = await response.json();
+                          if (result.success) {
+                            loadAuctionData();
+                            alert(auctionConfig?.auto_cycle_enabled ? '✅ Auto-cycle disabled' : '✅ Auto-cycle enabled');
+                          } else {
+                            alert('❌ Failed to toggle auto-cycle');
+                          }
+                        } catch (error: any) {
+                          alert(`❌ Error: ${error.message}`);
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      disabled={!address}
+                    >
+                      {auctionConfig?.auto_cycle_enabled ? 'Disable' : 'Enable'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    When enabled, auctions automatically start with each dual coin battle and finalize when the battle ends, creating a continuous loop.
+                    {auctionConfig?.linked_market_id && (
+                      <span className="block mt-1 text-blue-400">
+                        🔗 Linked to Market ID: {auctionConfig.linked_market_id}
+                      </span>
+                    )}
+                  </p>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                     <Input 
