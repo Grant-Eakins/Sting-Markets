@@ -247,14 +247,16 @@ async function finalizeAndCreateNextMarket() {
 
 /**
  * Initialize auto-cycle monitoring if enabled
+ * Should be called after database is connected
  */
 export async function initializeAutoCycle() {
-  const config = await getAuctionConfig();
-  if (config?.auto_cycle_enabled) {
-    console.log('🔄 Auto-cycle is enabled, starting monitoring...');
-    startMonitoring();
+  try {
+    const config = await getAuctionConfig();
+    if (config?.auto_cycle_enabled) {
+      console.log('🔄 Auto-cycle is enabled, starting monitoring...');
+      startMonitoring();
+    }
+  } catch (error) {
+    console.error('⚠️ Failed to initialize auto-cycle (will retry later):', error);
   }
 }
-
-// Start monitoring when this module is loaded
-initializeAutoCycle();

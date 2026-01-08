@@ -13,6 +13,7 @@ import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain
 import { getAllMarkets, updateMarketPools, initializeMarketsFromDb } from './services/marketService';
 import { initializeDatabase, cleanupOldSettledMarkets, cleanupDuplicateActiveMarkets } from './services/database';
 import { activateScheduledMarkets } from './services/scheduledMarketActivation';
+import { initializeAutoCycle } from './services/auctionAutoCycle';
 
 // Dynamically import burn scheduler only if configured
 let burnScheduler: any = null;
@@ -40,6 +41,13 @@ initializePausedSymbols();
 
 // Initialize blockchain connection for on-chain market creation
 initializeBlockchain();
+
+// Initialize auction auto-cycle (after database is ready)
+setTimeout(() => {
+  initializeAutoCycle().catch(err => {
+    console.error('⚠️ Failed to initialize auction auto-cycle:', err);
+  });
+}, 2000); // Wait 2 seconds for database to be fully ready
 
 const app = express();
 const PORT = process.env.PORT || 3001;
