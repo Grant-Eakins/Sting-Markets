@@ -22,6 +22,9 @@ interface Bid {
   chain: string;
   amount: string;
   rank: number;
+  coinName?: string;
+  coinSymbol?: string;
+  coinImage?: string;
 }
 
 interface AuctionConfig {
@@ -48,6 +51,7 @@ export default function AuctionLeaderboard() {
   // Bid form
   const [coinAddress, setCoinAddress] = useState('');
   const [bidAmount, setBidAmount] = useState('');
+  const [enrichedLeaderboard, setEnrichedLeaderboard] = useState<Bid[]>([]);
 
   // Blockchain hooks - read directly from contract
   const { config: contractConfig, isLoading: configLoading, refetch: refetchConfig } = useAuctionConfig();
@@ -80,6 +84,45 @@ export default function AuctionLeaderboard() {
     }, 10000);
     return () => clearInterval(interval);
   }, [refetchConfig, refetchLeaderboard]);
+
+  // Fetch coin metadata for leaderboard
+  useEffect(() => {
+    const fetchCoinMetadata = async () => {
+      if (!leaderboard || leaderboard.length === 0) {
+        setEnrichedLeaderboard([]);
+        return;
+      }
+
+      const enriched = await Promise.all(
+        leaderboard.map(async (bid) => {
+          try {
+            const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${bid.coinAddress}`);
+            const data = await response.json();
+            
+            if (data.pairs && data.pairs.length > 0) {
+              const bestPair = data.pairs.sort((a: any, b: any) => 
+                (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0)
+              )[0];
+              
+              return {
+                ...bid,
+                coinName: bestPair.baseToken?.name || 'Unknown',
+                coinSymbol: bestPair.baseToken?.symbol || '???',
+                coinImage: bestPair.info?.imageUrl,
+              };
+            }
+          } catch (error) {
+            console.error(`Failed to fetch metadata for ${bid.coinAddress}:`, error);
+          }
+          return bid;
+        })
+      );
+
+      setEnrichedLeaderboard(enriched);
+    };
+
+    fetchCoinMetadata();
+  }, [leaderboard]);
 
   // Refetch allowance after approval and auto-submit bid
   useEffect(() => {
@@ -296,7 +339,7 @@ export default function AuctionLeaderboard() {
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Total Bids</div>
-                <div className="text-lg font-bold">{leaderboard.length}</div>
+                <div className="text-lg font-bold">{enrichedLeaderboard.length}</div>
               </div>
             </div>
           </CardContent>
@@ -358,13 +401,13 @@ export default function AuctionLeaderboard() {
             <CardDescription>Top 2 bidders will be featured in the next Coin Battle market</CardDescription>
           </CardHeader>
           <CardContent>
-            {leaderboard.length === 0 ? (
+            {enrichedLeaderboard.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No bids yet. Be the first!
               </div>
             ) : (
               <div className="space-y-3">
-                {leaderboard.map((bid, index) => (
+                {enrichedLeaderboard.map((bid, index) => (
                   <div
                     key={bid.id}
                     className={`flex items-center justify-between p-4 rounded-lg border ${
@@ -378,14 +421,24 @@ export default function AuctionLeaderboard() {
                         {index === 2 && '🥉'}
                         {index > 2 && `#${index + 1}`}
                       </div>
+                      {bid.coinImage && (
+                        <img 
+                          src={bid.coinImage} 
+                          alt={bid.coinSymbol || 'Coin'} 
+                          className="w-10 h-10 rounded-full"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      )}
                       <div>
-                        <div className="font-bold font-mono">{bid.coinAddress.slice(0, 6)}...{bid.coinAddress.slice(-4)}</div>
+                        <div className="font-bold">
+                          {bid.coinName || `${bid.coinAddress.slice(0, 6)}...${bid.coinAddress.slice(-4)}`}
+                        </div>
                         <div className="text-sm text-muted-foreground flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
-                            {bid.chain.toUpperCase()}
+                            {bid.coinSymbol || bid.chain.toUpperCase()}
                           </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {bid.bidder.slice(0, 6)}...{bid.bidder.slice(-4)}
+                          <span className="text-xs font-mono">
+                            {bid.coinAddress.slice(0, 6)}...{bid.coinAddress.slice(-4)}
                           </span>
                         </div>
                       </div>
