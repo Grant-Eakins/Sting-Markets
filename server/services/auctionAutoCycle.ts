@@ -127,7 +127,7 @@ async function checkAndCycleAuctions() {
 
   // CASE 1: No active market - finalize current auction if it exists and create new market
   if (!activeMarket) {
-    if (config.is_active && config.linked_market_id) {
+    if (config.isActive && config.linked_market_id) {
       console.log('🏁 Active market ended, finalizing auction and creating next market...');
       await finalizeAndCreateNextMarket();
     }
@@ -135,12 +135,14 @@ async function checkAndCycleAuctions() {
   }
 
   // CASE 2: Active market exists but auction not linked to it - start new auction
-  if (config.linked_market_id !== activeMarket.id && !config.is_active) {
+  if (config.linked_market_id !== activeMarket.id && !config.isActive) {
     console.log('🚀 New market detected, starting auction cycle...');
+    console.log(`   Market ID: ${activeMarket.id}, ends at: ${activeMarket.resolution_time}`);
     const marketEndTime = new Date(activeMarket.resolution_time);
     const now = new Date();
     const hoursRemaining = Math.max(1, Math.ceil((marketEndTime.getTime() - now.getTime()) / (1000 * 60 * 60)));
     
+    console.log(`   Starting auction for ${hoursRemaining} hours to match market duration`);
     await startAuction(hoursRemaining);
     
     // Link to this market
@@ -148,10 +150,12 @@ async function checkAndCycleAuctions() {
       .from('auction_config')
       .update({ linked_market_id: activeMarket.id })
       .eq('id', 1);
+    
+    console.log(`✅ Auction linked to market ${activeMarket.id}`);
   }
 
   // CASE 3: Market is about to end - stop auction if still active
-  if (config.linked_market_id === activeMarket.id && config.is_active) {
+  if (config.linked_market_id === activeMarket.id && config.isActive) {
     const marketEndTime = new Date(activeMarket.resolution_time);
     const now = new Date();
     const minutesRemaining = (marketEndTime.getTime() - now.getTime()) / (1000 * 60);

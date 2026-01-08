@@ -116,6 +116,8 @@ export default function AdminPage() {
   const [auctionMinMarketCap, setAuctionMinMarketCap] = useState('500000');
   const [auctionMaxMarketCap, setAuctionMaxMarketCap] = useState('50000000');
   const [newBiddingToken, setNewBiddingToken] = useState('');
+  const [autoCycleEnabled, setAutoCycleEnabled] = useState(false);
+  const [linkedMarketId, setLinkedMarketId] = useState<number | undefined>(undefined);
 
   // Contract configuration state
   const [newMaxBetInput, setNewMaxBetInput] = useState('');
@@ -155,8 +157,8 @@ export default function AdminPage() {
     auctionEnd: new Date(Number(contractAuctionConfig[3]) * 1000),
     minMarketCap: Number(contractAuctionConfig[4]),
     maxMarketCap: Number(contractAuctionConfig[5]),
-    auto_cycle_enabled: false, // Will be updated from database
-    linked_market_id: undefined, // Will be updated from database
+    auto_cycle_enabled: autoCycleEnabled,
+    linked_market_id: linkedMarketId,
   } : null;
 
   // Fetch auto-cycle config from database (not stored on-chain)
@@ -165,19 +167,17 @@ export default function AdminPage() {
       try {
         const response = await fetch(`${API_BASE}/auction/config`);
         const dbConfig = await response.json();
-        if (auctionConfig && dbConfig) {
-          auctionConfig.auto_cycle_enabled = dbConfig.auto_cycle_enabled;
-          auctionConfig.linked_market_id = dbConfig.linked_market_id;
+        if (dbConfig) {
+          setAutoCycleEnabled(dbConfig.auto_cycle_enabled || false);
+          setLinkedMarketId(dbConfig.linked_market_id);
         }
       } catch (error) {
         console.error('Error fetching auto-cycle config:', error);
       }
     };
     
-    if (auctionConfig) {
-      fetchAutoCycleConfig();
-    }
-  }, [contractAuctionConfig]);
+    fetchAutoCycleConfig();
+  }, [contractAuctionConfig]); // Re-fetch when contract config changes
 
   // Use contract leaderboard data
   const auctionLeaderboard = contractAuctionLeaderboard;
@@ -483,6 +483,18 @@ export default function AdminPage() {
   const loadAuctionData = async () => {
     refetchAuctionConfig();
     refetchAuctionLeaderboard();
+    
+    // Also fetch auto-cycle config
+    try {
+      const response = await fetch(`${API_BASE}/auction/config`);
+      const dbConfig = await response.json();
+      if (dbConfig) {
+        setAutoCycleEnabled(dbConfig.auto_cycle_enabled || false);
+        setLinkedMarketId(dbConfig.linked_market_id);
+      }
+    } catch (error) {
+      console.error('Error fetching auto-cycle config:', error);
+    }
   };
 
   // Wallet bet limit handlers
