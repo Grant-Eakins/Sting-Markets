@@ -10,7 +10,7 @@ import { Trophy, Coins, Timer, DollarSign, TrendingUp, Play, StopCircle, CheckCi
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
-import { useAuctionTokenAllowance, useAuctionTokenApproval, useSubmitAuctionBid, useAuctionConfig, useAuctionLeaderboard, useAuctionTotalBids } from '@/hooks/useContract';
+import { useAuctionTokenAllowance, useAuctionTokenApproval, useSubmitAuctionBid, useAuctionConfig, useAuctionLeaderboard, useAuctionTotalBids, useBiddingToken, useTokenSymbol } from '@/hooks/useContract';
 import { formatUnits } from 'viem';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
@@ -53,6 +53,8 @@ export default function AuctionLeaderboard() {
   const { config: contractConfig, isLoading: configLoading, refetch: refetchConfig } = useAuctionConfig();
   const { leaderboard, isLoading: leaderboardLoading, refetch: refetchLeaderboard } = useAuctionLeaderboard(50);
   const { totalBids } = useAuctionTotalBids();
+  const { tokenAddress: biddingTokenAddress } = useBiddingToken();
+  const { symbol: tokenSymbol } = useTokenSymbol(biddingTokenAddress);
   const { allowance, refetch: refetchAllowance } = useAuctionTokenAllowance();
   const { approve, isPending: isApproving, isConfirming: isApprovingConfirm, isConfirmed: isApproved } = useAuctionTokenApproval();
   const { submitBid, isPending: isSubmitting, isConfirming: isSubmitConfirm, isConfirmed: isBidSubmitted, error: bidError } = useSubmitAuctionBid();
@@ -83,7 +85,7 @@ export default function AuctionLeaderboard() {
   useEffect(() => {
     if (isApproved && coinAddress && bidAmount) {
       refetchAllowance();
-      toast({ title: '✅ Approved! Submitting bid...', description: 'Now sending your bid to the auction' });
+      toast({ title: '✅ Approved! Submitting bid...', description: `Now sending your ${tokenSymbol || 'MIND'} bid to the auction` });
       
       // Auto-submit after approval
       const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(coinAddress);
@@ -117,9 +119,9 @@ export default function AuctionLeaderboard() {
       } else if (errorMessage.includes('Auction has ended')) {
         errorMessage = 'This auction has already ended.';
       } else if (errorMessage.includes('Bid below minimum')) {
-        errorMessage = `Your bid is below the minimum of ${config?.minBidAmount || 0} MIND tokens.`;
+        errorMessage = `Your bid is below the minimum of ${config?.minBidAmount || 0} ${tokenSymbol || 'MIND'} tokens.`;
       } else if (errorMessage.includes('insufficient allowance')) {
-        errorMessage = 'Please approve MIND tokens first.';
+        errorMessage = `Please approve ${tokenSymbol || 'MIND'} tokens first.`;
       }
       
       toast({ 
@@ -158,7 +160,7 @@ export default function AuctionLeaderboard() {
       const needsApproval = !allowance || allowance < amountInWei;
 
       if (needsApproval) {
-        toast({ title: '🔓 Approval needed', description: 'Approving MIND tokens for auction...' });
+        toast({ title: '🔓 Approval needed', description: `Approving ${tokenSymbol || 'MIND'} tokens for auction...` });
         approve(bidAmount);
       } else {
         submitBid(coinAddress, detectedChain, bidAmount);
@@ -290,7 +292,7 @@ export default function AuctionLeaderboard() {
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Min Bid</div>
-                <div className="text-lg font-bold">{config?.minBidAmount} MIND</div>
+                <div className="text-lg font-bold">{config?.minBidAmount} {tokenSymbol || 'MIND'}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Total Bids</div>
@@ -325,7 +327,7 @@ export default function AuctionLeaderboard() {
                     className="flex-1"
                   />
                   <Input
-                    placeholder="Bid Amount (MIND)"
+                    placeholder={`Bid Amount (${tokenSymbol || 'MIND'})`}
                     type="number"
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
@@ -341,7 +343,7 @@ export default function AuctionLeaderboard() {
                     {isApprovingConfirm && 'Confirming Approval...'}
                     {isSubmitting && 'Submitting Bid...'}
                     {isSubmitConfirm && 'Confirming Bid...'}
-                    {!isProcessing && needsApproval && 'Approve MIND'}
+                    {!isProcessing && needsApproval && `Approve ${tokenSymbol || 'MIND'}`}
                     {!isProcessing && !needsApproval && 'Submit Bid'}
                   </Button>
                 </div>
@@ -389,7 +391,7 @@ export default function AuctionLeaderboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold">{(Number(bid.amount) / 1e18).toFixed(0)} MIND</div>
+                      <div className="text-xl font-bold">{(Number(bid.amount) / 1e18).toFixed(0)} {tokenSymbol || 'MIND'}</div>
                       <div className="text-xs text-muted-foreground">Bid Amount</div>
                     </div>
                   </div>

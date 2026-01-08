@@ -1119,6 +1119,25 @@ export function useBiddingToken() {
 }
 
 /**
+ * Hook to read token symbol from any ERC20 contract
+ */
+export function useTokenSymbol(tokenAddress: `0x${string}` | undefined) {
+  const { data, isLoading } = useReadContract({
+    address: tokenAddress,
+    abi: ERC20_ABI,
+    functionName: 'symbol',
+    query: {
+      enabled: !!tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000',
+    },
+  });
+  
+  return {
+    symbol: data as string | undefined,
+    isLoading,
+  };
+}
+
+/**
  * Hook to update bidding token (admin only)
  */
 export function useUpdateBiddingToken() {
