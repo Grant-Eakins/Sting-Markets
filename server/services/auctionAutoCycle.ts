@@ -114,7 +114,7 @@ async function checkAndCycleAuctions() {
   const { data: activeMarket, error: marketError } = await supabase
     .from('markets')
     .select('*')
-    .eq('type', 'dual_coin')
+    .eq('is_dual_coin', true)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -198,7 +198,7 @@ async function finalizeAndCreateNextMarket() {
     const marketData = {
       title: `${token1.symbol} vs ${token2.symbol}`,
       description: `Which coin will have the higher price increase? Market runs for 24 hours.`,
-      type: 'dual_coin',
+      is_dual_coin: true,
       status: 'active',
       total_cost: 0,
       outcomes: 2,
@@ -214,7 +214,6 @@ async function finalizeAndCreateNextMarket() {
       coin_b_name: token2.name,
       coin_b_opening_price: token2.price,
       coin_b_image_url: token2.imageUrl,
-      is_dual_coin: true,
       contract_market_id: -1, // Placeholder until synced on-chain
     };
 
