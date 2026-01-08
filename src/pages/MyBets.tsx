@@ -541,23 +541,17 @@ export default function MyBets() {
     const netAmount = amountToken * 0.97; // 3% fee taken out
     let purchaseProbability = 0.5; // Default 50%
     
+    console.log(`🔍 Bet ${bet.betId}: amountToken=${amountToken}, sharesNum=${sharesNum}, netAmount=${netAmount}`);
+    
     if (sharesNum > 0 && netAmount > 0) {
       if (isDualCoin) {
-        // DUAL COIN: shares = (netAmount_in_base * 1e18) / (probability * 1e6)
-        // When you get MORE shares than you paid, probability was LOW (good odds)
-        // When you get FEWER shares than you paid, probability was HIGH (bad odds)
-        // Example: bet $5 at 25% → get 5/0.25 = 20 shares (more shares = lower probability)
-        // Reverse formula: probability = netAmount / sharesNum
-        // BUT this gives the price you paid PER share, not the bucket probability
-        // Actually: sharesNum represents value in a different scale
-        // The purchase probability is: what % of pool was your bucket?
-        // Since pool distribution = probability, we need to extract it from the share price
-        // Simple approach: shares/netAmount ratio tells us the multiplier you got
-        // Lower probability = higher multiplier = more shares per dollar
-        // So: probability ≈ netAmount / sharesNum (clamped to reasonable range)
+        // DUAL COIN: Simple probability = amount paid / shares received
+        // If you get MORE shares than you paid → LOW probability (good odds)
+        // If you get FEWER shares than you paid → HIGH probability (bad odds)
         purchaseProbability = Math.min(0.99, Math.max(0.01, netAmount / sharesNum));
+        console.log(`🎯 Dual coin purchase probability: ${(purchaseProbability * 100).toFixed(1)}% (${netAmount} / ${sharesNum})`);
       } else {
-        // BONDING CURVE (standard markets): different formula
+        // BONDING CURVE (standard markets)
         purchaseProbability = Math.min(0.99, Math.max(0.01, netAmount / sharesNum));
       }
     }
