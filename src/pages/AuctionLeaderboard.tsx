@@ -52,6 +52,7 @@ export default function AuctionLeaderboard() {
   const [coinAddress, setCoinAddress] = useState('');
   const [bidAmount, setBidAmount] = useState('');
   const [enrichedLeaderboard, setEnrichedLeaderboard] = useState<Bid[]>([]);
+  const [isValidatingCoin, setIsValidatingCoin] = useState(false);
 
   // Blockchain hooks - read directly from contract
   const { config: contractConfig, isLoading: configLoading, refetch: refetchConfig } = useAuctionConfig();
@@ -199,6 +200,85 @@ export default function AuctionLeaderboard() {
     }
 
     try {
+      // Validate market cap BEFORE submitting to contract
+      if (config) {
+        setIsValidatingCoin(true);
+        toast({ title: '🔍 Validating coin...', description: 'Checking market cap requirements' });
+        
+        try {
+          const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${coinAddress}`);
+          const data = await response.json();
+          
+          if (!data.pairs || data.pairs.length === 0) {
+            toast({ 
+              title: '❌ Token not found', 
+              description: 'Could not find this token on DexScreener. Make sure the contract address is correct.',
+              variant: 'destructive' 
+            });
+            setIsValidatingCoin(false);
+            return;
+          }
+          
+          // Get the best pair (highest liquidity)
+          const supportedPairs = data.pairs.filter((pair: any) => 
+            pair.chainId === 'base' || pair.chainId === 'solana'
+          );
+          
+          const pairsToCheck = supportedPairs.length > 0 ? supportedPairs : data.pairs;
+          const bestPair = pairsToCheck.sort((a: any, b: any) => 
+            (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0)
+          )[0];
+          
+          const marketCap = bestPair.marketCap || bestPair.fdv || 0;
+          
+          if (marketCap === 0 || !marketCap) {
+            toast({ 
+              title: '❌ Market cap unavailable', 
+              description: 'Could not determine the market cap for this token. It may be too new or have insufficient liquidity.',
+              variant: 'destructive' 
+            });
+            setIsValidatingCoin(false);
+            return;
+          }
+          
+          if (marketCap < config.minMarketCap) {
+            toast({ 
+              title: '❌ Market cap too low', 
+              description: `This token has a market cap of $${marketCap.toLocaleString()}, but the minimum required is $${config.minMarketCap.toLocaleString()}`,
+              variant: 'destructive' 
+            });
+            setIsValidatingCoin(false);
+            return;
+          }
+          
+          if (marketCap > config.maxMarketCap) {
+            toast({ 
+              title: '❌ Market cap too high', 
+              description: `This token has a market cap of $${marketCap.toLocaleString()}, but the maximum allowed is $${config.maxMarketCap.toLocaleString()}`,
+              variant: 'destructive' 
+            });
+            setIsValidatingCoin(false);
+            return;
+          }
+          
+          toast({ 
+            title: '✅ Token validated', 
+            description: `${bestPair.baseToken?.symbol || 'Token'} has valid market cap: $${marketCap.toLocaleString()}` 
+          });
+        } catch (error) {
+          console.error('Failed to validate coin:', error);
+          toast({ 
+            title: '❌ Validation failed', 
+            description: 'Could not validate the token. Please try again.',
+            variant: 'destructive' 
+          });
+          setIsValidatingCoin(false);
+          return;
+        }
+        
+        setIsValidatingCoin(false);
+      }
+
       const amountInWei = BigInt(parseFloat(bidAmount) * 1e18);
       const needsApproval = !allowance || allowance < amountInWei;
 
@@ -213,7 +293,7 @@ export default function AuctionLeaderboard() {
     }
   };
 
-  const isProcessing = isApproving || isApprovingConfirm || isSubmitting || isSubmitConfirm;
+  const isProcessing = isValidatingCoin || isApproving || isApprovingConfirm || isSubmitting || isSubmitConfirm;
   const needsApproval = !allowance || (bidAmount && allowance < BigInt(parseFloat(bidAmount) * 1e18));
 
   const timeRemaining = config?.auctionEnd 
