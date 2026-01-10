@@ -307,9 +307,15 @@ async function checkAndCycleAuctions() {
 
   // CASE 3: Current market exists (scheduled or active)
   if (currentMarket) {
-    const marketEndTime = new Date(currentMarket.resolution_time);
-    const minutesRemaining = (marketEndTime.getTime() - now.getTime()) / (1000 * 60);
     const isScheduled = currentMarket.status === 'scheduled';
+    
+    // For scheduled markets, use start_time (when it activates)
+    // For active markets, use settle_time (when it ends)
+    const relevantTime = isScheduled 
+      ? (currentMarket.start_time || currentMarket.settle_time)
+      : currentMarket.settle_time;
+    const marketEndTime = new Date(relevantTime);
+    const minutesRemaining = (marketEndTime.getTime() - now.getTime()) / (1000 * 60);
 
     console.log(`📊 Market: ${currentMarket.title} (${isScheduled ? 'SCHEDULED' : 'ACTIVE'}, ${Math.round(minutesRemaining)} min remaining)`);
 
@@ -454,7 +460,7 @@ async function bootstrapAutoCycle() {
     stock_symbol: `${coin1.symbol}-${coin2.symbol}`,
     description: `Which coin will have the higher price increase? Preview until ${startTime.toLocaleString()}, battle until ${settleTime.toLocaleString()}.`,
     is_dual_coin: true,
-    status: 'scheduled',
+    status: 'SCHEDULED',
     start_time: startTime.toISOString(),
     total_cost: 0,
     reference_price: 0,
@@ -633,7 +639,7 @@ async function finalizeAuctionAndCreateMarket() {
       stock_symbol: `${coin1.symbol}-${coin2.symbol}`,
       description: `Which coin will have the higher price increase? Preview until ${startTime.toLocaleString()}, battle until ${settleTime.toLocaleString()}.`,
       is_dual_coin: true,
-      status: 'scheduled',  // Start as scheduled, auto-activates at startTime
+      status: 'SCHEDULED',  // Start as scheduled, auto-activates at startTime
       start_time: startTime.toISOString(),  // When market goes active
       total_cost: 0,
       reference_price: 0,

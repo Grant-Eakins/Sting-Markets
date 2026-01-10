@@ -601,7 +601,7 @@ function dbMarketToMarket(row: any): Market {
     stockSymbol: row.stock_symbol,
     stockName: row.stock_name,
     description: row.description,
-    status: row.status as MarketStatus,
+    status: (row.status?.toUpperCase() || 'ACTIVE') as MarketStatus,
     createdAt: new Date(row.created_at),
     startTime: row.start_time ? new Date(row.start_time) : undefined,
     lockTime: new Date(row.lock_time),
