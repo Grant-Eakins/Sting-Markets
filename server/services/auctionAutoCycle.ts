@@ -15,7 +15,6 @@
 import { getSupabase } from './database';
 import { getTokenByAddress } from './dexScreenerApi';
 import { 
-  createDualCoinOnChainMarket, 
   getOnChainAuctionConfig,
   getOnChainTopTwoWinners,
   startOnChainAuction,
@@ -443,22 +442,11 @@ async function bootstrapAutoCycle() {
   console.log(`   Start (goes active): ${startTime.toLocaleString()}`);
   console.log(`   Lock (betting stops): ${lockTime.toLocaleString()}`);
   
-  // Create on-chain market
-  console.log(`⛓️ Creating on-chain dual coin market: ${coin1.symbol} vs ${coin2.symbol}`);
-  const blockchainMarketId = await createDualCoinOnChainMarket(
-    coin1.symbol,
-    coin2.symbol,
-    lockTime,
-    settleTime
-  );
+  // NOTE: On-chain market is NOT created here - it will be created when the market
+  // transitions from "scheduled" to "active" by scheduledMarketActivation service
+  console.log(`📋 Market will be created on-chain when scheduled period ends at ${startTime.toLocaleString()}`);
   
-  if (blockchainMarketId === null) {
-    console.error('❌ Failed to create on-chain market');
-    return;
-  }
-  console.log(`✅ On-chain market created with ID: ${blockchainMarketId}`);
-  
-  // Create database market
+  // Create database market (scheduled, no on-chain ID yet)
   const marketId = `market-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const marketData = {
     id: marketId,
@@ -482,7 +470,7 @@ async function bootstrapAutoCycle() {
     coin_b_name: coin2.name,
     coin_b_opening_price: coin2.price,
     coin_b_image_url: coin2.imageUrl,
-    contract_market_id: blockchainMarketId,
+    // contract_market_id will be set when market activates (on-chain creation)
   };
   
   const { data: newMarket, error } = await supabase
@@ -633,20 +621,9 @@ async function finalizeAuctionAndCreateMarket() {
     console.log(`   Settle: ${settleTime.toLocaleString()}`);
     console.log(`   Total cycle: 24 hours (12h preview + 12h battle)`);
 
-    // Create on-chain market FIRST
-    console.log(`⛓️ Creating on-chain dual coin market: ${coin1.symbol} vs ${coin2.symbol}`);
-    const blockchainMarketId = await createDualCoinOnChainMarket(
-      coin1.symbol,
-      coin2.symbol,
-      lockTime,
-      settleTime
-    );
-
-    if (blockchainMarketId === null) {
-      console.error('❌ Failed to create on-chain market');
-      return;
-    }
-    console.log(`✅ On-chain market created with ID: ${blockchainMarketId}`);
+    // NOTE: On-chain market is NOT created here - it will be created when the market
+    // transitions from "scheduled" to "active" by scheduledMarketActivation service
+    console.log(`📋 Market will be created on-chain when scheduled period ends at ${startTime.toLocaleString()}`);
 
     // Create database market as SCHEDULED (will auto-activate at startTime)
     const marketId = `market-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
@@ -672,7 +649,7 @@ async function finalizeAuctionAndCreateMarket() {
       coin_b_name: coin2.name,
       coin_b_opening_price: coin2.price,
       coin_b_image_url: coin2.imageUrl,
-      contract_market_id: blockchainMarketId,
+      // contract_market_id will be set when market activates (on-chain creation)
     };
 
     const { data: newMarket, error } = await supabase
@@ -686,7 +663,8 @@ async function finalizeAuctionAndCreateMarket() {
       return;
     }
 
-    console.log(`✅ Created new market: ${newMarket.title} (DB ID: ${newMarket.id}, Chain ID: ${blockchainMarketId})`);
+    console.log(`✅ Created new scheduled market: ${newMarket.title} (DB ID: ${newMarket.id})`);
+    console.log(`   On-chain market will be created at ${startTime.toLocaleString()}`);
 
     // Link new market to auction config
     await supabase
