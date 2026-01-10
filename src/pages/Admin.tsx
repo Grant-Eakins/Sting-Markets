@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -118,6 +118,9 @@ export default function AdminPage() {
   const [newBiddingToken, setNewBiddingToken] = useState('');
   const [autoCycleEnabled, setAutoCycleEnabled] = useState(false);
   const [linkedMarketId, setLinkedMarketId] = useState<number | undefined>(undefined);
+  
+  // Ref to prevent multiple market creations on auction finalization
+  const hasCreatedMarketRef = useRef(false);
 
   // Contract configuration state
   const [newMaxBetInput, setNewMaxBetInput] = useState('');
@@ -647,6 +650,8 @@ export default function AdminPage() {
     if (auctionStarted) {
       alert('✅ Auction started on-chain!');
       refetchAuctionConfig();
+      // Reset the market creation flag when new auction starts
+      hasCreatedMarketRef.current = false;
     }
   }, [auctionStarted]);
 
@@ -673,15 +678,26 @@ export default function AdminPage() {
   }, [auctionStopped]);
 
   useEffect(() => {
-    if (auctionFinalized) {
+    if (auctionFinalized && !hasCreatedMarketRef.current) {
       alert('🏆 Auction finalized on-chain!');
       refetchAuctionConfig();
       refetchAuctionLeaderboard();
       
       // Auto-create market with winners (no confirmation needed)
+      // Find top 2 bids for DIFFERENT coins
       const winner1 = auctionLeaderboard[0];
-      const winner2 = auctionLeaderboard[1];
-      if (winner1 && winner2) {
+      let winner2 = null;
+      for (let i = 1; i < auctionLeaderboard.length; i++) {
+        if (auctionLeaderboard[i].coinAddress.toLowerCase() !== winner1?.coinAddress?.toLowerCase()) {
+          winner2 = auctionLeaderboard[i];
+          break;
+        }
+      }
+      
+      if (winner1 && winner2 && winner1.coinAddress.toLowerCase() !== winner2.coinAddress.toLowerCase()) {
+        // Mark as handled BEFORE async call to prevent race conditions
+        hasCreatedMarketRef.current = true;
+        
         (async () => {
           try {
             alert(`🚀 Creating dual-coin market with:\n🥇 ${winner1.coinAddress.slice(0,10)}...\n🥈 ${winner2.coinAddress.slice(0,10)}...`);
@@ -705,11 +721,17 @@ export default function AdminPage() {
             } else {
               const error = await response.json();
               alert(`❌ Failed to create market: ${error.error}`);
+              // Reset ref on failure so user can retry
+              hasCreatedMarketRef.current = false;
             }
           } catch (error: any) {
             alert(`❌ Error creating market: ${error.message}`);
+            // Reset ref on failure so user can retry
+            hasCreatedMarketRef.current = false;
           }
         })();
+      } else if (winner1) {
+        alert('⚠️ Cannot create market: Need bids for 2 different coins. All bids are for the same coin.');
       }
     }
   }, [auctionFinalized, auctionLeaderboard, address]);
