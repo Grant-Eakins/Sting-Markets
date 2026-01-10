@@ -686,7 +686,7 @@ export default function AdminPage() {
           try {
             alert(`🚀 Creating dual-coin market with:\n🥇 ${winner1.coinAddress.slice(0,10)}...\n🥈 ${winner2.coinAddress.slice(0,10)}...`);
             
-            const response = await fetch(`${API_BASE}/markets/dual-coin`, {
+            const response = await fetch(`${API_BASE}/markets/create-dual-coin`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
