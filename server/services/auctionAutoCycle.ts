@@ -78,6 +78,10 @@ function getNext24HourCycleTiming() {
 
 let isMonitoring = false;
 let monitoringInterval: NodeJS.Timeout | null = null;
+let lastBootstrapAttempt = 0;
+let isBootstrapping = false; // Prevent re-entrant calls
+let isChecking = false; // Prevent concurrent cycle checks
+const BOOTSTRAP_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between bootstrap retries
 
 /**
  * Get coins from the fallback queue to use when auction has no bids
@@ -232,29 +236,34 @@ async function getAutoCycleConfig(): Promise<{ enabled: boolean; linkedMarketId:
  * Check if we need to cycle auctions based on dual coin market lifecycle
  */
 async function checkAndCycleAuctions() {
-  const autoCycleConfig = await getAutoCycleConfig();
+  // Prevent concurrent checks
+  if (isChecking) return;
+  isChecking = true;
   
-  if (!autoCycleConfig || !autoCycleConfig.enabled) {
-    return;
-  }
+  try {
+    const autoCycleConfig = await getAutoCycleConfig();
+    
+    if (!autoCycleConfig || !autoCycleConfig.enabled) {
+      return;
+    }
 
-  const supabase = getDb();
-  
-  // Get on-chain auction state
-  const auctionConfig = await getOnChainAuctionConfig();
-  if (!auctionConfig) {
-    console.log('⚠️ Could not read on-chain auction config');
-    return;
-  }
+    const supabase = getDb();
+    
+    // Get on-chain auction state
+    const auctionConfig = await getOnChainAuctionConfig();
+    if (!auctionConfig) {
+      console.log('⚠️ Could not read on-chain auction config');
+      return;
+    }
 
-  // Find the most recent dual coin market (either scheduled or active)
-  const { data: currentMarket, error: marketError } = await supabase
-    .from('markets')
-    .select('*')
-    .eq('is_dual_coin', true)
-    .in('status', ['scheduled', 'active'])
-    .order('created_at', { ascending: false })
-    .limit(1)
+    // Find the most recent dual coin market (either scheduled or active)
+    const { data: currentMarket, error: marketError } = await supabase
+      .from('markets')
+      .select('*')
+      .eq('is_dual_coin', true)
+      .in('status', ['scheduled', 'active'])
+      .order('created_at', { ascending: false })
+      .limit(1)
     .single();
 
   if (marketError && marketError.code !== 'PGRST116') {
@@ -266,6 +275,12 @@ async function checkAndCycleAuctions() {
 
   // CASE 1: No current market and no active auction - need to bootstrap
   if (!currentMarket && !auctionConfig.isActive) {
+    // Check cooldown to prevent log spam
+    const timeSinceLastAttempt = Date.now() - lastBootstrapAttempt;
+    if (timeSinceLastAttempt < BOOTSTRAP_COOLDOWN_MS && lastBootstrapAttempt > 0) {
+      // Silent - don't log during cooldown
+      return;
+    }
     console.log('🚀 No current market or auction - bootstrapping auto-cycle...');
     await bootstrapAutoCycle();
     return;
@@ -319,6 +334,9 @@ async function checkAndCycleAuctions() {
       return;
     }
   }
+  } finally {
+    isChecking = false;
+  }
 }
 
 /**
@@ -326,9 +344,17 @@ async function checkAndCycleAuctions() {
  * Can bootstrap from: 1) existing scheduled market, or 2) fallback coin queue
  */
 async function bootstrapAutoCycle() {
+  // Prevent re-entrant calls
+  if (isBootstrapping) {
+    return;
+  }
+  isBootstrapping = true;
+  lastBootstrapAttempt = Date.now();
+  
   console.log('🚀 Bootstrapping auto-cycle...');
   
-  const supabase = getDb();
+  try {
+    const supabase = getDb();
   
   // First, check if there's a scheduled market we can use
   const { data: scheduledMarket } = await supabase
@@ -471,6 +497,9 @@ async function bootstrapAutoCycle() {
   await startOnChainAuction(auctionDurationHours);
   
   console.log('✅ Bootstrap complete! Market created from fallback queue and auction started.');
+  } finally {
+    isBootstrapping = false;
+  }
 }
 
 /**
