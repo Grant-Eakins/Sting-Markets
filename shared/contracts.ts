@@ -35,5 +35,5 @@ export const MIND_TOKEN_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000',
   // Base Sepolia Testnet
-  84532: '0x2A9A8eb5a722053AeF8E98A5E1f0dfDC9CaE5f50', // MockUSDC as MIND
+  84532: '0x2A9A8eb5a722053AeF8E98A5E1f0dfDC9CaE5f50', // MockUSDC for auction
 } as const;
