@@ -160,7 +160,7 @@ export default function AdminPage() {
   // Parse auction config from contract
   const auctionConfig = contractAuctionConfig ? {
     isActive: contractAuctionConfig[0],
-    minBidAmount: Number(formatUnits(contractAuctionConfig[1] as bigint, 18)),
+    minBidAmount: Number(formatUnits(contractAuctionConfig[1] as bigint, 6)),
     auctionStart: new Date(Number(contractAuctionConfig[2]) * 1000),
     auctionEnd: new Date(Number(contractAuctionConfig[3]) * 1000),
     minMarketCap: Number(contractAuctionConfig[4]),
@@ -1324,7 +1324,7 @@ export default function AdminPage() {
                             <span className="font-mono text-xs">{bid.coinAddress.slice(0, 8)}...{bid.coinAddress.slice(-6)}</span>
                             <Badge variant="outline" className="text-xs">{bid.chain.toUpperCase()}</Badge>
                           </div>
-                          <span className="font-medium">{(Number(bid.amount) / 1e18).toFixed(0)} MIND</span>
+                          <span className="font-medium">{(Number(bid.amount) / 1e6).toFixed(0)} USDC</span>
                         </div>
                       ))}
                     </div>

@@ -270,7 +270,7 @@ async function checkAndCycleAuctions() {
       .from('markets')
       .select('*')
       .eq('is_dual_coin', true)
-      .in('status', ['scheduled', 'active'])
+      .in('status', ['SCHEDULED', 'ACTIVE'])
       .order('created_at', { ascending: false })
       .limit(1)
     .single();
@@ -307,7 +307,7 @@ async function checkAndCycleAuctions() {
 
   // CASE 3: Current market exists (scheduled or active)
   if (currentMarket) {
-    const isScheduled = currentMarket.status === 'scheduled';
+    const isScheduled = currentMarket.status === 'SCHEDULED';
     
     // For scheduled markets, use start_time (when it activates)
     // For active markets, use settle_time (when it ends)
@@ -376,7 +376,7 @@ async function bootstrapAutoCycle() {
     .from('markets')
     .select('*')
     .eq('is_dual_coin', true)
-    .eq('status', 'scheduled')
+    .eq('status', 'SCHEDULED')
     .order('created_at', { ascending: false })
     .limit(1)
     .single();

@@ -944,9 +944,9 @@ export function useAuctionTokenApproval() {
       throw new Error('Auction or MIND token address not found');
     }
     
-    const amountInToken = parseUnits(amount, 18); // MIND has 18 decimals
+    const amountInToken = parseUnits(amount, 6); // MockUSDC has 6 decimals
     
-    console.log(`✅ Approving ${amount} MIND for auction contract`);
+    console.log(`✅ Approving ${amount} tokens for auction contract`);
     writeContract({
       address: mindTokenAddress as `0x${string}`,
       abi: ERC20_ABI,
@@ -983,9 +983,9 @@ export function useSubmitAuctionBid() {
       throw new Error('Auction contract not deployed');
     }
     
-    const amountInToken = parseUnits(amount, 18); // MIND has 18 decimals
+    const amountInToken = parseUnits(amount, 6); // MockUSDC has 6 decimals
     
-    console.log(`🏆 Submitting auction bid: ${coinAddress} (${chain}) - ${amount} MIND`);
+    console.log(`🏆 Submitting auction bid: ${coinAddress} (${chain}) - ${amount} tokens`);
     writeContract({
       address: auctionAddress as `0x${string}`,
       abi: LISTING_AUCTION_ABI,

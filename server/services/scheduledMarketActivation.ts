@@ -3,17 +3,49 @@
  * Runs every minute to check for markets ready to activate
  */
 
-import { MarketStatus } from '../types/market';
+import { MarketStatus, Market } from '../types/market';
 import { getAllMarkets } from './marketService';
-import { updateMarketStatus } from './database';
+import { updateMarketStatus, getSupabase } from './database';
 import { createOnChainMarket, createDualCoinOnChainMarket } from './blockchainSync';
 import { getTokenByAddress } from './dexScreenerApi';
 
 /**
  * Check for scheduled markets that should activate now and activate them
+ * Checks both in-memory markets and database for scheduled markets
  */
 export async function activateScheduledMarkets(): Promise<number> {
   const now = new Date();
+  const supabase = getSupabase();
+  
+  // Check database for scheduled markets ready to activate
+  if (supabase) {
+    try {
+      const { data: dbScheduledMarkets, error } = await supabase
+        .from('markets')
+        .select('*')
+        .eq('status', 'SCHEDULED')
+        .lte('start_time', now.toISOString());
+      
+      if (!error && dbScheduledMarkets && dbScheduledMarkets.length > 0) {
+        console.log(`🚀 Found ${dbScheduledMarkets.length} scheduled markets in DB ready to activate`);
+        
+        let activated = 0;
+        for (const dbMarket of dbScheduledMarkets) {
+          try {
+            await activateMarketFromDb(dbMarket, supabase);
+            activated++;
+          } catch (err: any) {
+            console.error(`❌ Failed to activate market ${dbMarket.id}:`, err.message);
+          }
+        }
+        return activated;
+      }
+    } catch (err) {
+      console.error('Error checking scheduled markets in DB:', err);
+    }
+  }
+  
+  // Fallback to in-memory markets
   const markets = getAllMarkets();
   const scheduledMarkets = markets.filter(m => 
     m.status === MarketStatus.SCHEDULED && 
@@ -122,13 +154,160 @@ export async function activateScheduledMarkets(): Promise<number> {
 }
 
 /**
- * Get all scheduled markets (for display purposes)
+ * Activate a market directly from database record
  */
-export function getScheduledMarkets() {
-  const markets = getAllMarkets();
-  return markets.filter(m => m.status === MarketStatus.SCHEDULED)
-    .sort((a, b) => {
-      if (!a.startTime || !b.startTime) return 0;
-      return a.startTime.getTime() - b.startTime.getTime();
-    });
+async function activateMarketFromDb(dbMarket: any, supabase: any) {
+  console.log(`⏰ Activating market from DB: ${dbMarket.stock_symbol}`);
+  
+  const now = new Date();
+  
+  // Recalculate lock and settle times at activation (12 hours from now)
+  const activationTime = new Date();
+  const newLockTime = new Date(activationTime.getTime() + 12 * 60 * 60 * 1000);
+  const newSettleTime = new Date(activationTime.getTime() + 12 * 60 * 60 * 1000 + 5 * 60 * 1000);
+  
+  console.log(`   Lock time: ${newLockTime.toLocaleString()}`);
+  console.log(`   Settle time: ${newSettleTime.toLocaleString()}`);
+  
+  // Fetch current prices for dual-coin markets
+  let coinAOpeningPrice = dbMarket.coin_a_opening_price;
+  let coinBOpeningPrice = dbMarket.coin_b_opening_price;
+  
+  if (dbMarket.is_dual_coin && dbMarket.coin_a_address && dbMarket.coin_b_address) {
+    const [tokenA, tokenB] = await Promise.all([
+      getTokenByAddress(dbMarket.coin_a_address),
+      getTokenByAddress(dbMarket.coin_b_address)
+    ]);
+    
+    if (tokenA && tokenB) {
+      coinAOpeningPrice = tokenA.price;
+      coinBOpeningPrice = tokenB.price;
+      console.log(`   ${dbMarket.coin_a_symbol}: $${tokenA.price < 0.01 ? tokenA.price.toFixed(8) : tokenA.price.toFixed(4)}`);
+      console.log(`   ${dbMarket.coin_b_symbol}: $${tokenB.price < 0.01 ? tokenB.price.toFixed(8) : tokenB.price.toFixed(4)}`);
+    }
+  }
+  
+  // Create market on blockchain
+  let blockchainMarketId: number | null = null;
+  
+  try {
+    if (dbMarket.is_dual_coin && dbMarket.coin_a_symbol && dbMarket.coin_b_symbol) {
+      blockchainMarketId = await createDualCoinOnChainMarket(
+        dbMarket.coin_a_symbol,
+        dbMarket.coin_b_symbol,
+        newLockTime,
+        newSettleTime
+      );
+    } else {
+      const referencePrice = dbMarket.reference_price || 0;
+      blockchainMarketId = await createOnChainMarket(
+        dbMarket.stock_symbol,
+        referencePrice,
+        newLockTime,
+        newSettleTime,
+        false,
+        42
+      );
+    }
+    
+    if (blockchainMarketId !== null) {
+      console.log(`   ⛓️  Created on-chain market #${blockchainMarketId}`);
+    }
+  } catch (err: any) {
+    console.error(`   ❌ Failed to create on-chain market:`, err.message);
+  }
+  
+  // Update database
+  const { error } = await supabase
+    .from('markets')
+    .update({
+      status: 'ACTIVE',
+      lock_time: newLockTime.toISOString(),
+      settle_time: newSettleTime.toISOString(),
+      coin_a_opening_price: coinAOpeningPrice,
+      coin_b_opening_price: coinBOpeningPrice,
+      contract_market_id: blockchainMarketId,
+      updated_at: now.toISOString(),
+    })
+    .eq('id', dbMarket.id);
+  
+  if (error) {
+    throw new Error(`DB update failed: ${error.message}`);
+  }
+  
+  console.log(`✅ Market activated: ${dbMarket.stock_symbol}`);
+}
+
+/**
+ * Get all scheduled markets (for display purposes)
+ * Queries database directly to include markets created by auto-cycle
+ */
+export async function getScheduledMarkets(): Promise<Market[]> {
+  const supabase = getSupabase();
+  
+  // First get from in-memory (for markets created via API)
+  const inMemoryMarkets = getAllMarkets().filter(m => m.status === MarketStatus.SCHEDULED);
+  
+  // Also query database for markets created by auto-cycle (may not be in memory yet)
+  if (supabase) {
+    try {
+      const { data: dbMarkets, error } = await supabase
+        .from('markets')
+        .select('*')
+        .eq('status', 'SCHEDULED')
+        .order('start_time', { ascending: true });
+      
+      if (!error && dbMarkets) {
+        // Merge database results with in-memory, avoiding duplicates
+        const inMemoryIds = new Set(inMemoryMarkets.map(m => m.id));
+        
+        for (const dbMarket of dbMarkets) {
+          if (!inMemoryIds.has(dbMarket.id)) {
+            // Convert DB format to Market format
+            const market: Market = {
+              id: dbMarket.id,
+              stockSymbol: dbMarket.stock_symbol || dbMarket.title || '',
+              stockName: dbMarket.title,
+              description: dbMarket.description || '',
+              status: MarketStatus.SCHEDULED,
+              openingPrice: dbMarket.reference_price || 0,
+              currentPrice: dbMarket.current_price || dbMarket.reference_price || 0,
+              lockTime: new Date(dbMarket.lock_time),
+              settleTime: new Date(dbMarket.settle_time),
+              startTime: dbMarket.start_time ? new Date(dbMarket.start_time) : undefined,
+              createdAt: new Date(dbMarket.created_at),
+              openTimestamp: new Date(dbMarket.created_at),
+              isDualCoin: dbMarket.is_dual_coin || false,
+              isAfterHours: false,
+              coinAAddress: dbMarket.coin_a_address,
+              coinASymbol: dbMarket.coin_a_symbol,
+              coinAName: dbMarket.coin_a_name,
+              coinAOpeningPrice: dbMarket.coin_a_opening_price,
+              coinAImageUrl: dbMarket.coin_a_image_url,
+              coinBAddress: dbMarket.coin_b_address,
+              coinBSymbol: dbMarket.coin_b_symbol,
+              coinBName: dbMarket.coin_b_name,
+              coinBOpeningPrice: dbMarket.coin_b_opening_price,
+              coinBImageUrl: dbMarket.coin_b_image_url,
+              blockchainMarketId: dbMarket.contract_market_id,
+              upPool: 0,
+              downPool: 0,
+              totalPool: 0,
+              upBettors: 0,
+              downBettors: 0,
+              totalBets: 0,
+            };
+            inMemoryMarkets.push(market);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching scheduled markets from DB:', err);
+    }
+  }
+  
+  return inMemoryMarkets.sort((a, b) => {
+    if (!a.startTime || !b.startTime) return 0;
+    return a.startTime.getTime() - b.startTime.getTime();
+  });
 }

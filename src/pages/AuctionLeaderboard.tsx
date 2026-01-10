@@ -75,7 +75,7 @@ export default function AuctionLeaderboard() {
   // Parse contract config
   const config = contractConfig ? {
     isActive: contractConfig[0],
-    minBidAmount: Number(formatUnits(contractConfig[1] as bigint, 18)),
+    minBidAmount: Number(formatUnits(contractConfig[1] as bigint, 6)),
     auctionStart: new Date(Number(contractConfig[2]) * 1000).toISOString(),
     auctionEnd: new Date(Number(contractConfig[3]) * 1000).toISOString(),
     minMarketCap: Number(contractConfig[4]),
@@ -313,7 +313,7 @@ export default function AuctionLeaderboard() {
           );
           
           if (existingBidForCoin) {
-            const existingBidAmount = parseFloat(existingBidForCoin.amount) / 1e18;
+            const existingBidAmount = parseFloat(existingBidForCoin.amount) / 1e6;
             const newBidAmount = parseFloat(bidAmount);
             
             if (newBidAmount <= existingBidAmount) {
@@ -345,7 +345,7 @@ export default function AuctionLeaderboard() {
         setIsValidatingCoin(false);
       }
 
-      const amountInWei = BigInt(parseFloat(bidAmount) * 1e18);
+      const amountInWei = BigInt(Math.floor(parseFloat(bidAmount) * 1e6));
       const needsApproval = !allowance || allowance < amountInWei;
 
       if (needsApproval) {
@@ -360,7 +360,7 @@ export default function AuctionLeaderboard() {
   };
 
   const isProcessing = isValidatingCoin || isApproving || isApprovingConfirm || isSubmitting || isSubmitConfirm;
-  const needsApproval = !allowance || (bidAmount && allowance < BigInt(parseFloat(bidAmount) * 1e18));
+  const needsApproval = !allowance || (bidAmount && allowance < BigInt(Math.floor(parseFloat(bidAmount) * 1e6)));
 
   const timeRemaining = config?.auctionEnd 
     ? Math.max(0, new Date(config.auctionEnd).getTime() - Date.now())
@@ -590,7 +590,7 @@ export default function AuctionLeaderboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold">{(Number(bid.amount) / 1e18).toFixed(0)} {tokenSymbol || 'MIND'}</div>
+                      <div className="text-xl font-bold">{(Number(bid.amount) / 1e6).toFixed(0)} {tokenSymbol || 'USDC'}</div>
                       <div className="text-xs text-muted-foreground">Bid Amount</div>
                     </div>
                   </div>
