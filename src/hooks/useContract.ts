@@ -1294,47 +1294,6 @@ export function useStopAuction() {
 }
 
 /**
- * Hook to finalize auction (admin only)
- */
-export function useFinalizeAuction() {
-  const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
-  
-  const { data: hash, isPending, writeContract, error } = useWriteContract();
-  
-  const finalizeAuction = (winningBidIds: number[]) => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
-      throw new Error('Auction contract not deployed');
-    }
-    
-    if (winningBidIds.length !== 2) {
-      throw new Error('Must provide exactly 2 winning bid IDs');
-    }
-    
-    console.log(`🏆 Finalizing auction with winners: ${winningBidIds.join(', ')}`);
-    writeContract({
-      address: auctionAddress as `0x${string}`,
-      abi: LISTING_AUCTION_ABI,
-      functionName: 'finalizeAuction',
-      args: [winningBidIds.map(id => BigInt(id))],
-    } as any);
-  };
-  
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  });
-  
-  return {
-    finalizeAuction,
-    isPending,
-    isConfirming,
-    isConfirmed,
-    error,
-    hash,
-  };
-}
-
-/**
  * Hook to get bucket liquidity for dual coin market
  */
 export function useDualCoinBucketLiquidity(marketId: number | undefined, outcomeIndex: number | undefined) {
