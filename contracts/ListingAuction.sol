@@ -2,16 +2,15 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title ListingAuction
- * @notice Auction system for coin listing bids using utility token
+ * @notice Auction system for coin listing bids using USDC
  * @dev Token address is configurable by owner, allowing migration from testnet to mainnet
- * @dev Burns 20% of winning bid amounts, sends 80% to treasury
+ * @dev Winning bid amounts are vaulted (kept in contract) for treasury withdrawal
  */
 contract ListingAuction is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -45,8 +44,7 @@ contract ListingAuction is Ownable, ReentrancyGuard {
     // Track if a coin has any bids
     mapping(bytes32 => bool) public coinHasBids;
     
-    uint256 public totalBurned; // Track total tokens burned from auctions
-    uint256 public constant BURN_PERCENTAGE = 20; // 20% of winning bids burned
+    uint256 public totalVaulted; // Track total tokens vaulted from winning bids
     
     // Events
     event TokenUpdated(address indexed oldToken, address indexed newToken);
@@ -61,15 +59,17 @@ contract ListingAuction is Ownable, ReentrancyGuard {
     );
     event BidRefunded(address indexed bidder, uint256 indexed bidId, uint256 amount);
     event ConfigUpdated(uint256 minBid, uint256 minMarketCap, uint256 maxMarketCap);
-    event WinnersFinalized(uint256[] winningBidIds, uint256 totalBurned);
-    event TokensBurned(uint256 amount);
+    event WinnersFinalized(uint256[] winningBidIds, uint256 totalVaulted);
+    event TokensVaulted(uint256 amount);
 
     constructor(address _biddingToken) Ownable(msg.sender) {
         require(_biddingToken != address(0), "Invalid token address");
         biddingToken = IERC20(_biddingToken);
         
-        // Default config
-        config.minBidAmount = 100 * 10**18; // 100 tokens default
+        // Default config - adjust minBidAmount based on token decimals
+        // USDC has 6 decimals, so 100 USDC = 100 * 10**6
+        // MIND has 18 decimals, so 100 MIND = 100 * 10**18
+        config.minBidAmount = 100 * 10**6; // 100 USDC default (6 decimals)
         config.minMarketCap = 500000; // $500k default
         config.maxMarketCap = 50000000; // $50M default
     }
@@ -242,7 +242,7 @@ contract ListingAuction is Ownable, ReentrancyGuard {
     /**
      * @notice Finalize auction and mark top 2 bids as winners
      * @param winningBidIds Array of winning bid IDs (top 2)
-     * @dev Automatically refunds all non-winning bids and burns 20% of winning bid amounts
+     * @dev Automatically refunds all non-winning bids, vaults 100% of winning bid amounts
      * @dev Validates that the two winning bids are for different coins
      */
     function finalizeAuction(uint256[] calldata winningBidIds) external onlyOwner nonReentrant {
@@ -262,7 +262,7 @@ contract ListingAuction is Ownable, ReentrancyGuard {
             "Winners must be different coins"
         );
 
-        uint256 totalBurnAmount = 0;
+        uint256 totalVaultAmount = 0;
 
         // Automatically refund all non-winning bids
         for (uint256 i = 0; i < bids.length; i++) {
@@ -276,12 +276,9 @@ contract ListingAuction is Ownable, ReentrancyGuard {
             }
 
             if (isWinner) {
-                // For winning bids: burn 20% of the amount
-                uint256 burnAmount = (bids[i].amount * BURN_PERCENTAGE) / 100;
-                totalBurnAmount += burnAmount;
-                
-                // Burn the tokens (remaining 80% stays in contract for treasury)
-                ERC20Burnable(address(biddingToken)).burn(burnAmount);
+                // For winning bids: vault 100% of the amount (stays in contract)
+                totalVaultAmount += bids[i].amount;
+                // Tokens stay in contract - no transfer needed
             } else if (!bids[i].refunded) {
                 // For non-winning bids: refund the full amount
                 bids[i].refunded = true;
@@ -290,9 +287,9 @@ contract ListingAuction is Ownable, ReentrancyGuard {
             }
         }
 
-        totalBurned += totalBurnAmount;
-        emit TokensBurned(totalBurnAmount);
-        emit WinnersFinalized(winningBidIds, totalBurnAmount);
+        totalVaulted += totalVaultAmount;
+        emit TokensVaulted(totalVaultAmount);
+        emit WinnersFinalized(winningBidIds, totalVaultAmount);
     }
 
     /**
@@ -369,6 +366,15 @@ contract ListingAuction is Ownable, ReentrancyGuard {
     function withdrawToTreasury(uint256 amount) external onlyOwner nonReentrant {
         require(amount <= biddingToken.balanceOf(address(this)), "Insufficient balance");
         biddingToken.safeTransfer(owner(), amount);
+    }
+
+    /**
+     * @notice Get current vault balance (tokens held in contract)
+     * @return balance Current token balance in the contract
+     * @return vaulted Total amount vaulted from winning bids (historical)
+     */
+    function getVaultBalance() external view returns (uint256 balance, uint256 vaulted) {
+        return (biddingToken.balanceOf(address(this)), totalVaulted);
     }
 
     /**

@@ -11,7 +11,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const MIND_TOKEN_ADDRESS = '0xce31ae82c11dd708ef51c93deeb5be0474a132d1'; // Base Sepolia
-const LISTING_AUCTION_ADDRESS = '0xbd1a3880c174d9ae8831bf28880e6e4e9a5090b5'; // Base Sepolia
+const LISTING_AUCTION_ADDRESS = '0xd080A8e6260C394077cE6E8f77F9DbC5C2B50ec5'; // Base Sepolia (USDC)
 
 const MIND_ABI = [
   {
