@@ -400,6 +400,7 @@ async function bootstrapAutoCycle() {
   console.log('📦 No scheduled market, checking fallback queue...');
   
   const fallbackCoins = await getCoinsFromFallbackQueue(2);
+  console.log(`📦 Got ${fallbackCoins.length} coins from queue:`, fallbackCoins.map(c => c.symbol).join(', ') || 'none');
   
   if (fallbackCoins.length < 2) {
     console.log('⚠️ Need at least 2 coins in fallback queue to bootstrap. Add coins and try again.');
@@ -407,8 +408,12 @@ async function bootstrapAutoCycle() {
   }
   
   // Fetch current prices for fallback coins
+  console.log(`📡 Fetching prices for ${fallbackCoins[0].symbol} and ${fallbackCoins[1].symbol}...`);
   const token1 = await getTokenByAddress(fallbackCoins[0].contractAddress);
   const token2 = await getTokenByAddress(fallbackCoins[1].contractAddress);
+  
+  console.log(`📡 Token1 result:`, token1 ? `${token1.symbol} @ $${token1.price}` : 'FAILED');
+  console.log(`📡 Token2 result:`, token2 ? `${token2.symbol} @ $${token2.price}` : 'FAILED');
   
   if (!token1 || !token2) {
     console.error('❌ Failed to fetch prices for fallback coins');
