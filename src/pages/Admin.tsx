@@ -1252,6 +1252,34 @@ export default function AdminPage() {
                           <Play className="h-4 w-4 mr-2" />
                           {startingAuction ? 'Starting...' : 'Start Auction'}
                         </Button>
+                        {/* Clear Bids button - only when auction is stopped */}
+                        <Button 
+                          onClick={async () => {
+                            if (!address) return;
+                            if (!confirm('Clear all auction bids? This cannot be undone.')) return;
+                            try {
+                              const response = await fetch(`${import.meta.env.PROD ? '' : 'http://localhost:3001'}/api/auction/clear-bids`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ walletAddress: address }),
+                              });
+                              const result = await response.json();
+                              if (result.success) {
+                                alert('✅ All bids cleared');
+                                loadAuctionData();
+                              } else {
+                                alert(`❌ ${result.error || 'Failed to clear bids'}`);
+                              }
+                            } catch (error: any) {
+                              alert(`❌ Error: ${error.message}`);
+                            }
+                          }}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Clear Bids
+                        </Button>
                         {/* Finalize only shows when auction is STOPPED and has enough bids */}
                         {auctionLeaderboard.length >= 2 && (
                           <Button 

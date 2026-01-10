@@ -15,6 +15,7 @@ import {
   getTopTwoWinners,
 } from '../services/listingAuction';
 import { enableAutoCycle, disableAutoCycle } from '../services/auctionAutoCycle';
+import { clearOnChainAuctionBids } from '../services/blockchainSync';
 import { getSupabase } from '../services/database';
 import { getTokenByAddress } from '../services/dexScreenerApi';
 
@@ -243,13 +244,20 @@ router.get('/my-bids', async (req: Request, res: Response) => {
 /**
  * POST /api/auction/enable-auto-cycle
  * Enable auto-cycle mode (admin only)
+ * Clears old bids and starts fresh
  */
 router.post('/enable-auto-cycle', async (req: Request, res: Response) => {
   try {
-    const { walletAddress } = req.body;
+    const { walletAddress, clearBids = true } = req.body;
 
     if (!walletAddress || !isAdmin(walletAddress)) {
       return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Clear old bids before starting fresh (optional, default true)
+    if (clearBids) {
+      console.log('🧹 Clearing old auction bids before enabling auto-cycle...');
+      await clearOnChainAuctionBids();
     }
 
     const success = await enableAutoCycle();
@@ -277,6 +285,33 @@ router.post('/disable-auto-cycle', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error disabling auto-cycle:', error);
     res.status(500).json({ error: 'Failed to disable auto-cycle' });
+  }
+});
+
+/**
+ * POST /api/auction/clear-bids
+ * Clear all auction bids on-chain (admin only)
+ * Use this to reset the leaderboard for a fresh start
+ */
+router.post('/clear-bids', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.body;
+
+    if (!walletAddress || !isAdmin(walletAddress)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    console.log('🧹 Admin requested clearing all auction bids...');
+    const success = await clearOnChainAuctionBids();
+    
+    if (success) {
+      res.json({ success: true, message: 'All auction bids cleared' });
+    } else {
+      res.status(500).json({ error: 'Failed to clear bids on-chain' });
+    }
+  } catch (error: any) {
+    console.error('Error clearing bids:', error);
+    res.status(500).json({ error: 'Failed to clear bids' });
   }
 });
 
