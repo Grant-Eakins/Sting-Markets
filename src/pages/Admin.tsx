@@ -690,8 +690,8 @@ export default function AdminPage() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                coinAAddress: winner1.coinAddress,
-                coinBAddress: winner2.coinAddress,
+                contractAddressA: winner1.coinAddress,
+                contractAddressB: winner2.coinAddress,
                 lockMinutes: 720,
                 settleMinutes: 720.05,
                 createTiming: 'scheduled',
