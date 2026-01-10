@@ -306,6 +306,31 @@ export default function AuctionLeaderboard() {
             title: '✅ Token validated', 
             description: `${bestPair.baseToken?.symbol || 'Token'} has valid market cap: $${marketCap.toLocaleString()}` 
           });
+          
+          // Check if this coin already has a bid - new bid must be higher
+          const existingBidForCoin = leaderboard.find(
+            bid => bid.coinAddress.toLowerCase() === coinAddress.toLowerCase()
+          );
+          
+          if (existingBidForCoin) {
+            const existingBidAmount = parseFloat(existingBidForCoin.amount) / 1e18;
+            const newBidAmount = parseFloat(bidAmount);
+            
+            if (newBidAmount <= existingBidAmount) {
+              toast({ 
+                title: '❌ Bid too low', 
+                description: `This coin already has a bid of ${existingBidAmount.toLocaleString()} ${tokenSymbol || 'MIND'}. Your bid must be higher.`,
+                variant: 'destructive' 
+              });
+              setIsValidatingCoin(false);
+              return;
+            }
+            
+            toast({ 
+              title: '💰 Outbidding existing bid', 
+              description: `Your ${bidAmount} ${tokenSymbol || 'MIND'} will outbid the current ${existingBidAmount.toLocaleString()} ${tokenSymbol || 'MIND'}` 
+            });
+          }
         } catch (error) {
           console.error('Failed to validate coin:', error);
           toast({ 

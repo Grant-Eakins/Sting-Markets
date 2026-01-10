@@ -5,7 +5,7 @@ import { createPublicClient, createWalletClient, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import dotenv from 'dotenv';
-import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES } from '../../shared/contracts';
+import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, LISTING_AUCTION_ADDRESSES } from '../../shared/contracts';
 
 dotenv.config();
 
@@ -161,6 +161,61 @@ const DUAL_COIN_ABI = [
       { "internalType": "uint256", "name": "settleTime", "type": "uint256" },
       { "internalType": "bool", "name": "settled", "type": "bool" },
       { "internalType": "bool", "name": "coinAWon", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
+
+// ListingAuction contract address (Base Sepolia)
+const AUCTION_CONTRACT_ADDRESS = LISTING_AUCTION_ADDRESSES[84532];
+
+// ListingAuction ABI (for on-chain auction management)
+const AUCTION_ABI = [
+  {
+    "inputs": [],
+    "name": "config",
+    "outputs": [
+      { "internalType": "bool", "name": "isActive", "type": "bool" },
+      { "internalType": "uint256", "name": "minBidAmount", "type": "uint256" },
+      { "internalType": "uint256", "name": "auctionStart", "type": "uint256" },
+      { "internalType": "uint256", "name": "auctionEnd", "type": "uint256" },
+      { "internalType": "uint256", "name": "minMarketCap", "type": "uint256" },
+      { "internalType": "uint256", "name": "maxMarketCap", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "durationHours", "type": "uint256" }],
+    "name": "startAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "stopAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256[]", "name": "winningBidIds", "type": "uint256[]" }],
+    "name": "finalizeAuction",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "limit", "type": "uint256" }],
+    "name": "getLeaderboard",
+    "outputs": [
+      { "internalType": "uint256[]", "name": "bidIds", "type": "uint256[]" },
+      { "internalType": "address[]", "name": "bidders", "type": "address[]" },
+      { "internalType": "string[]", "name": "coinAddresses", "type": "string[]" },
+      { "internalType": "string[]", "name": "chains", "type": "string[]" },
+      { "internalType": "uint256[]", "name": "amounts", "type": "uint256[]" }
     ],
     "stateMutability": "view",
     "type": "function"
@@ -775,4 +830,266 @@ export async function syncSettlementStatusFromChain(markets: Array<{ id: string;
   }
 
   return syncedCount;
+}
+
+// ============================================
+// LISTING AUCTION ON-CHAIN FUNCTIONS
+// ============================================
+
+export interface OnChainAuctionConfig {
+  isActive: boolean;
+  minBidAmount: bigint;
+  auctionStart: Date;
+  auctionEnd: Date;
+  minMarketCap: bigint;
+  maxMarketCap: bigint;
+}
+
+export interface OnChainLeaderboardEntry {
+  bidId: bigint;
+  bidder: string;
+  coinAddress: string;
+  chain: string;
+  amount: bigint;
+}
+
+/**
+ * Get auction config from on-chain contract
+ */
+export async function getOnChainAuctionConfig(): Promise<OnChainAuctionConfig | null> {
+  if (!isInitialized || !publicClient) {
+    console.log('⚠️  Blockchain not initialized');
+    return null;
+  }
+
+  try {
+    const result = await publicClient.readContract({
+      address: AUCTION_CONTRACT_ADDRESS,
+      abi: AUCTION_ABI,
+      functionName: 'config'
+    });
+
+    const [isActive, minBidAmount, auctionStart, auctionEnd, minMarketCap, maxMarketCap] = result as any[];
+
+    return {
+      isActive: isActive as boolean,
+      minBidAmount: minBidAmount as bigint,
+      auctionStart: new Date(Number(auctionStart) * 1000),
+      auctionEnd: new Date(Number(auctionEnd) * 1000),
+      minMarketCap: minMarketCap as bigint,
+      maxMarketCap: maxMarketCap as bigint
+    };
+  } catch (error: any) {
+    console.error('❌ Error getting on-chain auction config:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Get leaderboard from on-chain contract
+ */
+export async function getOnChainLeaderboard(limit: number = 50): Promise<OnChainLeaderboardEntry[]> {
+  if (!isInitialized || !publicClient) {
+    console.log('⚠️  Blockchain not initialized');
+    return [];
+  }
+
+  try {
+    const result = await publicClient.readContract({
+      address: AUCTION_CONTRACT_ADDRESS,
+      abi: AUCTION_ABI,
+      functionName: 'getLeaderboard',
+      args: [BigInt(limit)]
+    });
+
+    const [bidIds, bidders, coinAddresses, chains, amounts] = result as any[];
+
+    const entries: OnChainLeaderboardEntry[] = [];
+    for (let i = 0; i < bidIds.length; i++) {
+      entries.push({
+        bidId: bidIds[i] as bigint,
+        bidder: bidders[i] as string,
+        coinAddress: coinAddresses[i] as string,
+        chain: chains[i] as string,
+        amount: amounts[i] as bigint
+      });
+    }
+
+    return entries;
+  } catch (error: any) {
+    console.error('❌ Error getting on-chain leaderboard:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Get top two winners from on-chain leaderboard (ensuring different coins)
+ */
+export async function getOnChainTopTwoWinners(): Promise<OnChainLeaderboardEntry[]> {
+  const leaderboard = await getOnChainLeaderboard(50);
+  
+  if (leaderboard.length === 0) return [];
+  
+  const winners: OnChainLeaderboardEntry[] = [leaderboard[0]];
+  
+  // Find the next highest bid for a DIFFERENT coin
+  for (let i = 1; i < leaderboard.length; i++) {
+    const bid = leaderboard[i];
+    if (bid.coinAddress.toLowerCase() !== winners[0].coinAddress.toLowerCase()) {
+      winners.push(bid);
+      break;
+    }
+  }
+  
+  return winners;
+}
+
+/**
+ * Start auction on-chain
+ */
+export async function startOnChainAuction(durationHours: number): Promise<boolean> {
+  if (!isInitialized || !walletClient) {
+    console.log('⚠️  Blockchain not initialized');
+    return false;
+  }
+
+  try {
+    console.log(`🎪 Starting on-chain auction for ${durationHours} hours...`);
+    
+    const hash = await walletClient.writeContract({
+      address: AUCTION_CONTRACT_ADDRESS,
+      abi: AUCTION_ABI,
+      functionName: 'startAuction',
+      args: [BigInt(durationHours)]
+    });
+
+    console.log(`⏳ Transaction submitted: ${hash}`);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status === 'success') {
+      console.log(`✅ On-chain auction started!`);
+      console.log(`🔗 https://sepolia.basescan.org/tx/${hash}`);
+      return true;
+    } else {
+      console.error('❌ Transaction failed');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('❌ Error starting on-chain auction:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Stop auction on-chain
+ */
+export async function stopOnChainAuction(): Promise<boolean> {
+  if (!isInitialized || !walletClient) {
+    console.log('⚠️  Blockchain not initialized');
+    return false;
+  }
+
+  try {
+    console.log('🛑 Stopping on-chain auction...');
+    
+    const hash = await walletClient.writeContract({
+      address: AUCTION_CONTRACT_ADDRESS,
+      abi: AUCTION_ABI,
+      functionName: 'stopAuction',
+      args: []
+    });
+
+    console.log(`⏳ Transaction submitted: ${hash}`);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status === 'success') {
+      console.log(`✅ On-chain auction stopped!`);
+      console.log(`🔗 https://sepolia.basescan.org/tx/${hash}`);
+      return true;
+    } else {
+      console.error('❌ Transaction failed');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('❌ Error stopping on-chain auction:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Finalize auction on-chain with winning bid IDs
+ */
+export async function finalizeOnChainAuction(winningBidIds: bigint[]): Promise<boolean> {
+  if (!isInitialized || !walletClient) {
+    console.log('⚠️  Blockchain not initialized');
+    return false;
+  }
+
+  try {
+    console.log(`🏆 Finalizing on-chain auction with winners: ${winningBidIds.map(id => id.toString()).join(', ')}`);
+    
+    const hash = await walletClient.writeContract({
+      address: AUCTION_CONTRACT_ADDRESS,
+      abi: AUCTION_ABI,
+      functionName: 'finalizeAuction',
+      args: [winningBidIds]
+    });
+
+    console.log(`⏳ Transaction submitted: ${hash}`);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status === 'success') {
+      console.log(`✅ On-chain auction finalized!`);
+      console.log(`🔗 https://sepolia.basescan.org/tx/${hash}`);
+      return true;
+    } else {
+      console.error('❌ Transaction failed');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('❌ Error finalizing on-chain auction:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Clear all bids on-chain after auction finalization (for next cycle)
+ */
+export async function clearOnChainAuctionBids(): Promise<boolean> {
+  if (!isInitialized || !walletClient) {
+    console.log('⚠️  Blockchain not initialized');
+    return false;
+  }
+
+  try {
+    console.log('🧹 Clearing on-chain auction bids...');
+    
+    const hash = await walletClient.writeContract({
+      address: AUCTION_CONTRACT_ADDRESS,
+      abi: [...AUCTION_ABI, {
+        "inputs": [],
+        "name": "clearBids",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }],
+      functionName: 'clearBids',
+      args: []
+    });
+
+    console.log(`⏳ Transaction submitted: ${hash}`);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status === 'success') {
+      console.log(`✅ On-chain auction bids cleared!`);
+      console.log(`🔗 https://sepolia.basescan.org/tx/${hash}`);
+      return true;
+    } else {
+      console.error('❌ Transaction failed');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('❌ Error clearing on-chain auction bids:', error.message);
+    return false;
+  }
 }

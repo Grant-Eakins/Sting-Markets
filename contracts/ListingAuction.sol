@@ -40,6 +40,10 @@ contract ListingAuction is Ownable, ReentrancyGuard {
     AuctionConfig public config;
     Bid[] public bids;
     mapping(address => uint256[]) public bidsByAddress;
+    // Track the highest bid per coin (coinAddress hash => bidId)
+    mapping(bytes32 => uint256) public highestBidPerCoin;
+    // Track if a coin has any bids
+    mapping(bytes32 => bool) public coinHasBids;
     
     uint256 public totalBurned; // Track total tokens burned from auctions
     uint256 public constant BURN_PERCENTAGE = 20; // 20% of winning bids burned
@@ -132,6 +136,7 @@ contract ListingAuction is Ownable, ReentrancyGuard {
      * @param coinAddress Contract address of the coin to list
      * @param chain "base" or "solana"
      * @param amount Amount of tokens to bid
+     * @dev If the coin already has a bid, the new bid must be higher than the existing highest bid
      */
     function submitBid(
         string calldata coinAddress,
@@ -148,6 +153,16 @@ contract ListingAuction is Ownable, ReentrancyGuard {
             "Chain must be 'base' or 'solana'"
         );
 
+        // Check if this coin already has bids - new bid must be higher
+        bytes32 coinHash = keccak256(abi.encodePacked(coinAddress));
+        if (coinHasBids[coinHash]) {
+            uint256 existingHighestBidId = highestBidPerCoin[coinHash];
+            require(
+                amount > bids[existingHighestBidId].amount,
+                "Bid must be higher than existing bid for this coin"
+            );
+        }
+
         // Transfer tokens from bidder to contract
         biddingToken.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -163,6 +178,10 @@ contract ListingAuction is Ownable, ReentrancyGuard {
         }));
 
         bidsByAddress[msg.sender].push(bidId);
+        
+        // Update highest bid tracking for this coin
+        highestBidPerCoin[coinHash] = bidId;
+        coinHasBids[coinHash] = true;
 
         emit BidSubmitted(msg.sender, bidId, coinAddress, chain, amount);
     }
@@ -362,4 +381,25 @@ contract ListingAuction is Ownable, ReentrancyGuard {
             biddingToken.safeTransfer(owner(), balance);
         }
     }
+
+    /**
+     * @notice Clear all bids after auction is finalized (for next cycle)
+     * @dev Only call after finalizeAuction has been called and all refunds processed
+     * @dev This resets the auction state for a fresh start
+     */
+    function clearBids() external onlyOwner {
+        require(!config.isActive, "Cannot clear during active auction");
+        
+        // Clear the bids array by resetting length
+        // Note: This doesn't clear storage slots but makes them inaccessible
+        delete bids;
+        
+        // We cannot easily clear mappings in Solidity, but since bids array is reset,
+        // old bidsByAddress entries will reference invalid indices (which is fine)
+        // highestBidPerCoin and coinHasBids will be stale but get overwritten on new bids
+        
+        emit AuctionCleared(block.timestamp, bids.length);
+    }
+
+    event AuctionCleared(uint256 timestamp, uint256 previousBidCount);
 }
