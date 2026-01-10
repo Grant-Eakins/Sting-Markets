@@ -428,8 +428,6 @@ async function bootstrapAutoCycle() {
     status: 'scheduled',
     start_time: startTime.toISOString(),
     total_cost: 0,
-    outcomes: 2,
-    num_outcomes: 2,
     resolution_time: settleTime.toISOString(),
     lock_time: lockTime.toISOString(),
     coin_a_address: coin1.address,
@@ -616,8 +614,6 @@ async function finalizeAuctionAndCreateMarket() {
       status: 'scheduled',  // Start as scheduled, auto-activates at startTime
       start_time: startTime.toISOString(),  // When market goes active
       total_cost: 0,
-      outcomes: 2,
-      num_outcomes: 2,
       resolution_time: settleTime.toISOString(),
       lock_time: lockTime.toISOString(),
       coin_a_address: coin1.address,
