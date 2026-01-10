@@ -2,12 +2,14 @@
  * Auction Auto-Cycle Service
  * Automatically manages auction lifecycle synced to dual coin battles
  * 
- * FLOW:
- * 1. Dual coin market starts -> Auction starts (runs alongside market)
- * 2. Market ends -> Stop auction, finalize with winners, refund losers
- * 3. Create new dual coin market from winning bids
- * 4. Clear old auction data and start new auction
- * 5. Repeat
+ * FLOW (24-hour cycle):
+ * 1. Create dual coin market as "scheduled" (12 hours preview)
+ * 2. Auction starts (runs full 24 hours alongside market)
+ * 3. After 12 hours, market goes "active" (12 hours battle)
+ * 4. Market ends (24 hours total) -> Stop auction, finalize with winners, refund losers
+ * 5. Create new scheduled market from winning bids
+ * 6. Clear old auction data and start new auction
+ * 7. Repeat
  */
 
 import { getSupabase } from './database';
@@ -21,7 +23,6 @@ import {
   finalizeOnChainAuction,
   clearOnChainAuctionBids
 } from './blockchainSync';
-import { getNext12HourSettlement } from './cryptoSync';
 
 const getDb = () => {
   const db = getSupabase();
@@ -29,8 +30,97 @@ const getDb = () => {
   return db;
 };
 
+/**
+ * Get the next 24-hour session timing for dual coin markets
+ * Market lifecycle: 12 hours scheduled (preview) + 12 hours active (battle) = 24 hours total
+ * Auction runs the full 24 hours alongside the market
+ */
+function getNext24HourCycleTiming() {
+  const now = new Date();
+  
+  // Align to 12-hour UTC boundaries (00:00 or 12:00)
+  const currentHour = now.getUTCHours();
+  const currentSessionStart = currentHour < 12 ? 0 : 12;
+  const nextSessionStart = currentSessionStart === 0 ? 12 : 0;
+  
+  // Calculate when the next session starts (market becomes active)
+  const sessionStartDate = new Date(now);
+  sessionStartDate.setUTCMinutes(0, 0, 0);
+  
+  if (nextSessionStart === 0) {
+    // Next session is midnight tomorrow
+    sessionStartDate.setUTCDate(sessionStartDate.getUTCDate() + 1);
+    sessionStartDate.setUTCHours(0);
+  } else {
+    // Next session is noon today or tomorrow
+    if (currentHour >= 12) {
+      sessionStartDate.setUTCDate(sessionStartDate.getUTCDate() + 1);
+    }
+    sessionStartDate.setUTCHours(12);
+  }
+  
+  // startTime = when market goes from scheduled to active (first 12-hour boundary)
+  const startTime = new Date(sessionStartDate);
+  
+  // lockTime = when betting stops (12 hours after startTime = 24 hours total cycle)
+  const lockTime = new Date(startTime.getTime() + 12 * 60 * 60 * 1000);
+  
+  // settleTime = when winner is determined (a few seconds after lock)
+  const settleTime = new Date(lockTime.getTime() + 3000);
+  
+  // Total auction duration in hours (from now until market settles)
+  const auctionDurationHours = Math.max(1, Math.floor((lockTime.getTime() - Date.now()) / (1000 * 60 * 60)));
+  
+  const sessionLabel = `${startTime.toDateString()} ${startTime.getUTCHours()}:00 UTC`;
+  
+  return { startTime, lockTime, settleTime, auctionDurationHours, sessionLabel };
+}
+
 let isMonitoring = false;
 let monitoringInterval: NodeJS.Timeout | null = null;
+
+/**
+ * Get coins from the fallback queue to use when auction has no bids
+ * Returns 2 coins if available, marks them as used
+ */
+async function getCoinsFromFallbackQueue(count: number = 2): Promise<{
+  contractAddress: string;
+  symbol: string;
+  name: string;
+  imageUrl: string | null;
+  id: number;
+}[]> {
+  const supabase = getDb();
+  
+  const { data: coins, error } = await supabase
+    .from('fallback_coin_queue')
+    .select('*')
+    .eq('is_available', true)
+    .order('added_at', { ascending: true })
+    .limit(count);
+
+  if (error || !coins || coins.length < count) {
+    console.log(`⚠️ Not enough coins in fallback queue (need ${count}, have ${coins?.length || 0})`);
+    return [];
+  }
+
+  // Mark coins as used
+  const coinIds = coins.map(c => c.id);
+  await supabase
+    .from('fallback_coin_queue')
+    .update({ is_available: false, used_at: new Date().toISOString() })
+    .in('id', coinIds);
+
+  console.log(`📦 Using ${coins.length} coins from fallback queue: ${coins.map(c => c.symbol).join(', ')}`);
+  
+  return coins.map(c => ({
+    contractAddress: c.contract_address,
+    symbol: c.symbol,
+    name: c.name,
+    imageUrl: c.image_url,
+    id: c.id,
+  }));
+}
 
 /**
  * Enable auto-cycle mode
@@ -157,58 +247,61 @@ async function checkAndCycleAuctions() {
     return;
   }
 
-  // Find the most recent active dual coin market
-  const { data: activeMarket, error: marketError } = await supabase
+  // Find the most recent dual coin market (either scheduled or active)
+  const { data: currentMarket, error: marketError } = await supabase
     .from('markets')
     .select('*')
     .eq('is_dual_coin', true)
-    .eq('status', 'active')
+    .in('status', ['scheduled', 'active'])
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
 
   if (marketError && marketError.code !== 'PGRST116') {
-    console.error('Error fetching active market:', marketError);
+    console.error('Error fetching current market:', marketError);
     return;
   }
 
   const now = new Date();
 
-  // CASE 1: No active market and no active auction - need to bootstrap
-  if (!activeMarket && !auctionConfig.isActive) {
-    console.log('🚀 No active market or auction - bootstrapping auto-cycle...');
+  // CASE 1: No current market and no active auction - need to bootstrap
+  if (!currentMarket && !auctionConfig.isActive) {
+    console.log('🚀 No current market or auction - bootstrapping auto-cycle...');
     await bootstrapAutoCycle();
     return;
   }
 
-  // CASE 2: No active market but auction exists - finalize and create market
-  if (!activeMarket && auctionConfig.isActive) {
+  // CASE 2: No current market but auction exists - finalize and create market
+  if (!currentMarket && auctionConfig.isActive) {
     // Check if auction has ended
     if (now > auctionConfig.auctionEnd) {
-      console.log('🏁 Auction ended, no active market - finalizing and creating new market...');
+      console.log('🏁 Auction ended, no current market - finalizing and creating new market...');
       await finalizeAuctionAndCreateMarket();
     }
     return;
   }
 
-  // CASE 3: Active market exists
-  if (activeMarket) {
-    const marketEndTime = new Date(activeMarket.resolution_time);
+  // CASE 3: Current market exists (scheduled or active)
+  if (currentMarket) {
+    const marketEndTime = new Date(currentMarket.resolution_time);
     const minutesRemaining = (marketEndTime.getTime() - now.getTime()) / (1000 * 60);
+    const isScheduled = currentMarket.status === 'scheduled';
+
+    console.log(`📊 Market: ${currentMarket.title} (${isScheduled ? 'SCHEDULED' : 'ACTIVE'}, ${Math.round(minutesRemaining)} min remaining)`);
 
     // Update linked market in DB if not set
-    if (autoCycleConfig.linkedMarketId !== activeMarket.id) {
+    if (autoCycleConfig.linkedMarketId !== currentMarket.id) {
       await supabase
         .from('auction_config')
-        .update({ linked_market_id: activeMarket.id })
+        .update({ linked_market_id: currentMarket.id })
         .eq('id', 1);
     }
 
-    // If auction not running, start it
+    // If auction not running, start it to run alongside the market (full 24h cycle)
     if (!auctionConfig.isActive) {
-      // Calculate hours until market ends (minus 5 minutes buffer)
+      // Calculate hours until market ends
       const hoursUntilEnd = Math.max(1, Math.floor((minutesRemaining - 5) / 60));
-      console.log(`🎪 Starting auction to run alongside market (${hoursUntilEnd} hours)`);
+      console.log(`🎪 Starting auction to run alongside market (${hoursUntilEnd} hours until market ends)`);
       await startOnChainAuction(hoursUntilEnd);
       return;
     }
@@ -234,7 +327,7 @@ async function checkAndCycleAuctions() {
 async function bootstrapAutoCycle() {
   console.log('🚀 Bootstrapping auto-cycle...');
   
-  // Check if there's a scheduled market we can activate
+  // Check if there's a scheduled market we can use
   const supabase = getDb();
   const { data: scheduledMarket } = await supabase
     .from('markets')
@@ -247,21 +340,21 @@ async function bootstrapAutoCycle() {
 
   if (scheduledMarket) {
     console.log(`📅 Found scheduled market: ${scheduledMarket.title}`);
-    // Activate the scheduled market
-    await supabase
-      .from('markets')
-      .update({ status: 'active' })
-      .eq('id', scheduledMarket.id);
     
-    // Link it and start auction
+    // Link it to auction config (don't force activate - let scheduledMarketActivation handle it)
     await supabase
       .from('auction_config')
       .update({ linked_market_id: scheduledMarket.id })
       .eq('id', 1);
     
-    // Start auction for 12 hours (standard session length)
-    await startOnChainAuction(12);
-    console.log('✅ Bootstrap complete - activated scheduled market and started auction');
+    // Calculate hours until market ends
+    const endTime = new Date(scheduledMarket.resolution_time || scheduledMarket.lock_time);
+    const hoursUntilEnd = Math.max(1, Math.floor((endTime.getTime() - Date.now()) / (1000 * 60 * 60)));
+    
+    // Start auction for remaining time until market ends (could be up to 24 hours)
+    console.log(`🎪 Starting auction (${hoursUntilEnd} hours until market ends)`);
+    await startOnChainAuction(hoursUntilEnd);
+    console.log('✅ Bootstrap complete - linked scheduled market and started auction');
   } else {
     console.log('⚠️ No scheduled market to bootstrap with. Create a dual coin market first.');
   }
@@ -269,6 +362,7 @@ async function bootstrapAutoCycle() {
 
 /**
  * Finalize current auction, create new market from winners, and start new auction
+ * Falls back to queue if not enough auction bids
  */
 async function finalizeAuctionAndCreateMarket() {
   try {
@@ -277,56 +371,115 @@ async function finalizeAuctionAndCreateMarket() {
     // Get top two winners from on-chain leaderboard
     const winners = await getOnChainTopTwoWinners();
     
-    if (winners.length < 2) {
-      console.log('⚠️ Not enough bids (need 2 different coins) - cannot create market');
-      // Clear bids and start a new auction anyway
-      await clearOnChainAuctionBids();
-      await startOnChainAuction(12);
-      return;
-    }
-
-    const [winner1, winner2] = winners;
+    let coin1: { address: string; symbol: string; name: string; price: number; imageUrl: string | null };
+    let coin2: { address: string; symbol: string; name: string; price: number; imageUrl: string | null };
+    let hadAuctionWinners = false;
+    let winnerBidIds: bigint[] = [];
     
-    // Verify they are different coins
-    if (winner1.coinAddress.toLowerCase() === winner2.coinAddress.toLowerCase()) {
-      console.log('⚠️ Top bids are for the same coin - cannot create market');
-      await clearOnChainAuctionBids();
-      await startOnChainAuction(12);
-      return;
+    // Check if we have 2 different coins from auction
+    if (winners.length >= 2 && 
+        winners[0].coinAddress.toLowerCase() !== winners[1].coinAddress.toLowerCase()) {
+      
+      hadAuctionWinners = true;
+      winnerBidIds = [winners[0].bidId, winners[1].bidId];
+      
+      console.log(`🏆 Auction winners: ${winners[0].coinAddress.slice(0, 10)}... vs ${winners[1].coinAddress.slice(0, 10)}...`);
+      
+      // Fetch token info for winners
+      const token1 = await getTokenByAddress(winners[0].coinAddress);
+      const token2 = await getTokenByAddress(winners[1].coinAddress);
+      
+      if (!token1 || !token2) {
+        console.error('❌ Failed to fetch token info for auction winners');
+        // Fall through to fallback queue
+      } else {
+        coin1 = { 
+          address: winners[0].coinAddress, 
+          symbol: token1.symbol, 
+          name: token1.name, 
+          price: token1.price,
+          imageUrl: token1.imageUrl || null 
+        };
+        coin2 = { 
+          address: winners[1].coinAddress, 
+          symbol: token2.symbol, 
+          name: token2.name, 
+          price: token2.price,
+          imageUrl: token2.imageUrl || null 
+        };
+      }
     }
-
-    console.log(`🏆 Winners: ${winner1.coinAddress.slice(0, 10)}... vs ${winner2.coinAddress.slice(0, 10)}...`);
-
-    // Finalize auction on-chain (this refunds losers automatically)
-    const finalized = await finalizeOnChainAuction([winner1.bidId, winner2.bidId]);
     
-    if (!finalized) {
-      console.error('❌ Failed to finalize auction on-chain');
-      return;
+    // If we don't have valid coins from auction, try fallback queue
+    if (!coin1! || !coin2!) {
+      console.log('📦 Not enough valid auction bids, checking fallback queue...');
+      
+      const fallbackCoins = await getCoinsFromFallbackQueue(2);
+      
+      if (fallbackCoins.length < 2) {
+        console.log('⚠️ No fallback coins available - cannot create market');
+        // Clear bids and start a new auction anyway
+        await clearOnChainAuctionBids();
+        const { auctionDurationHours } = getNext24HourCycleTiming();
+        await startOnChainAuction(auctionDurationHours);
+        return;
+      }
+      
+      // Fetch current prices for fallback coins
+      const token1 = await getTokenByAddress(fallbackCoins[0].contractAddress);
+      const token2 = await getTokenByAddress(fallbackCoins[1].contractAddress);
+      
+      if (!token1 || !token2) {
+        console.error('❌ Failed to fetch prices for fallback coins');
+        await clearOnChainAuctionBids();
+        const { auctionDurationHours } = getNext24HourCycleTiming();
+        await startOnChainAuction(auctionDurationHours);
+        return;
+      }
+      
+      coin1 = { 
+        address: fallbackCoins[0].contractAddress, 
+        symbol: fallbackCoins[0].symbol, 
+        name: fallbackCoins[0].name, 
+        price: token1.price,
+        imageUrl: fallbackCoins[0].imageUrl 
+      };
+      coin2 = { 
+        address: fallbackCoins[1].contractAddress, 
+        symbol: fallbackCoins[1].symbol, 
+        name: fallbackCoins[1].name, 
+        price: token2.price,
+        imageUrl: fallbackCoins[1].imageUrl 
+      };
+      
+      console.log(`📦 Using fallback coins: ${coin1.symbol} vs ${coin2.symbol}`);
     }
 
-    // Fetch token info for both winners
-    const token1 = await getTokenByAddress(winner1.coinAddress);
-    const token2 = await getTokenByAddress(winner2.coinAddress);
-
-    if (!token1 || !token2) {
-      console.error('❌ Failed to fetch token info for winners');
-      return;
+    // Finalize auction on-chain if we had winners (this refunds losers)
+    if (hadAuctionWinners && winnerBidIds.length === 2) {
+      const finalized = await finalizeOnChainAuction(winnerBidIds);
+      if (!finalized) {
+        console.error('❌ Failed to finalize auction on-chain');
+        return;
+      }
     }
 
     const supabase = getDb();
 
-    // Use the next 12-hour session timing
-    const { lockTime, settleTime, sessionLabel } = getNext12HourSettlement();
-    console.log(`📅 Creating market for ${sessionLabel}`);
-    console.log(`   Lock: ${lockTime.toLocaleString()}`);
+    // Use the next 24-hour session timing
+    const { startTime, lockTime, settleTime, auctionDurationHours, sessionLabel } = getNext24HourCycleTiming();
+    console.log(`📅 Creating SCHEDULED market for ${sessionLabel}`);
+    console.log(`   Coins: ${coin1.symbol} vs ${coin2.symbol}`);
+    console.log(`   Start (goes active): ${startTime.toLocaleString()}`);
+    console.log(`   Lock (betting stops): ${lockTime.toLocaleString()}`);
     console.log(`   Settle: ${settleTime.toLocaleString()}`);
+    console.log(`   Total cycle: 24 hours (12h preview + 12h battle)`);
 
     // Create on-chain market FIRST
-    console.log(`⛓️ Creating on-chain dual coin market: ${token1.symbol} vs ${token2.symbol}`);
+    console.log(`⛓️ Creating on-chain dual coin market: ${coin1.symbol} vs ${coin2.symbol}`);
     const blockchainMarketId = await createDualCoinOnChainMarket(
-      token1.symbol,
-      token2.symbol,
+      coin1.symbol,
+      coin2.symbol,
       lockTime,
       settleTime
     );
@@ -337,30 +490,31 @@ async function finalizeAuctionAndCreateMarket() {
     }
     console.log(`✅ On-chain market created with ID: ${blockchainMarketId}`);
 
-    // Create database market
+    // Create database market as SCHEDULED (will auto-activate at startTime)
     const marketId = `market-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const marketData = {
       id: marketId,
-      title: `${token1.symbol} vs ${token2.symbol}`,
-      stock_symbol: `${token1.symbol}-${token2.symbol}`,
-      description: `Which coin will have the higher price increase? Market runs until ${settleTime.toLocaleString()}.`,
+      title: `${coin1.symbol} vs ${coin2.symbol}`,
+      stock_symbol: `${coin1.symbol}-${coin2.symbol}`,
+      description: `Which coin will have the higher price increase? Preview until ${startTime.toLocaleString()}, battle until ${settleTime.toLocaleString()}.`,
       is_dual_coin: true,
-      status: 'active',
+      status: 'scheduled',  // Start as scheduled, auto-activates at startTime
+      start_time: startTime.toISOString(),  // When market goes active
       total_cost: 0,
       outcomes: 2,
       num_outcomes: 2,
       resolution_time: settleTime.toISOString(),
       lock_time: lockTime.toISOString(),
-      coin_a_address: winner1.coinAddress,
-      coin_a_symbol: token1.symbol,
-      coin_a_name: token1.name,
-      coin_a_opening_price: token1.price,
-      coin_a_image_url: token1.imageUrl,
-      coin_b_address: winner2.coinAddress,
-      coin_b_symbol: token2.symbol,
-      coin_b_name: token2.name,
-      coin_b_opening_price: token2.price,
-      coin_b_image_url: token2.imageUrl,
+      coin_a_address: coin1.address,
+      coin_a_symbol: coin1.symbol,
+      coin_a_name: coin1.name,
+      coin_a_opening_price: coin1.price,
+      coin_a_image_url: coin1.imageUrl,
+      coin_b_address: coin2.address,
+      coin_b_symbol: coin2.symbol,
+      coin_b_name: coin2.name,
+      coin_b_opening_price: coin2.price,
+      coin_b_image_url: coin2.imageUrl,
       contract_market_id: blockchainMarketId,
     };
 
@@ -387,14 +541,11 @@ async function finalizeAuctionAndCreateMarket() {
     console.log('🧹 Clearing old auction bids...');
     await clearOnChainAuctionBids();
 
-    // Calculate hours for new auction (until new market ends, minus buffer)
-    const hoursUntilEnd = Math.max(1, Math.floor((settleTime.getTime() - Date.now()) / (1000 * 60 * 60) - 1));
-    
-    // Start new auction for next cycle
-    console.log(`🎪 Starting new auction (${hoursUntilEnd} hours)`);
-    await startOnChainAuction(hoursUntilEnd);
+    // Start new auction for full 24-hour cycle
+    console.log(`🎪 Starting new 24-hour auction (${auctionDurationHours} hours until market ends)`);
+    await startOnChainAuction(auctionDurationHours);
 
-    console.log('✅ Auto-cycle complete! New market and auction are live.');
+    console.log('✅ Auto-cycle complete! New scheduled market and 24-hour auction are live.');
 
   } catch (error) {
     console.error('❌ Error in finalizeAuctionAndCreateMarket:', error);

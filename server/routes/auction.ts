@@ -15,6 +15,8 @@ import {
   getTopTwoWinners,
 } from '../services/listingAuction';
 import { enableAutoCycle, disableAutoCycle } from '../services/auctionAutoCycle';
+import { getSupabase } from '../services/database';
+import { getTokenByAddress } from '../services/dexScreenerApi';
 
 const router = Router();
 
@@ -275,6 +277,125 @@ router.post('/disable-auto-cycle', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error disabling auto-cycle:', error);
     res.status(500).json({ error: 'Failed to disable auto-cycle' });
+  }
+});
+
+/**
+ * GET /api/auction/fallback-queue
+ * Get all coins in the fallback queue
+ */
+router.get('/fallback-queue', async (req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database not initialized' });
+    }
+
+    const { data: queue, error } = await supabase
+      .from('fallback_coin_queue')
+      .select('*')
+      .eq('is_available', true)
+      .order('added_at', { ascending: true });
+
+    if (error) throw error;
+
+    res.json({ queue: queue || [] });
+  } catch (error: any) {
+    console.error('Error getting fallback queue:', error);
+    res.status(500).json({ error: 'Failed to get fallback queue' });
+  }
+});
+
+/**
+ * POST /api/auction/fallback-queue
+ * Add a coin to the fallback queue (admin only)
+ */
+router.post('/fallback-queue', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress, contractAddress } = req.body;
+
+    if (!walletAddress || !isAdmin(walletAddress)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    if (!contractAddress) {
+      return res.status(400).json({ error: 'Contract address required' });
+    }
+
+    // Fetch token info from DexScreener
+    const token = await getTokenByAddress(contractAddress);
+    if (!token) {
+      return res.status(404).json({ error: 'Token not found on DexScreener' });
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database not initialized' });
+    }
+
+    // Check if already in queue
+    const { data: existing } = await supabase
+      .from('fallback_coin_queue')
+      .select('id')
+      .ilike('contract_address', contractAddress)
+      .eq('is_available', true)
+      .single();
+
+    if (existing) {
+      return res.status(400).json({ error: 'Coin already in queue' });
+    }
+
+    // Add to queue
+    const { data: newEntry, error } = await supabase
+      .from('fallback_coin_queue')
+      .insert({
+        contract_address: contractAddress,
+        symbol: token.symbol,
+        name: token.name,
+        image_url: token.imageUrl,
+        added_by: walletAddress,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ success: true, coin: newEntry });
+  } catch (error: any) {
+    console.error('Error adding to fallback queue:', error);
+    res.status(500).json({ error: 'Failed to add coin to queue' });
+  }
+});
+
+/**
+ * DELETE /api/auction/fallback-queue/:id
+ * Remove a coin from the fallback queue (admin only)
+ */
+router.delete('/fallback-queue/:id', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.body;
+    const { id } = req.params;
+
+    if (!walletAddress || !isAdmin(walletAddress)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Database not initialized' });
+    }
+
+    const { error } = await supabase
+      .from('fallback_coin_queue')
+      .delete()
+      .eq('id', parseInt(id));
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error removing from fallback queue:', error);
+    res.status(500).json({ error: 'Failed to remove coin from queue' });
   }
 });
 

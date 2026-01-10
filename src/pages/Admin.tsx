@@ -119,6 +119,11 @@ export default function AdminPage() {
   const [autoCycleEnabled, setAutoCycleEnabled] = useState(false);
   const [linkedMarketId, setLinkedMarketId] = useState<number | undefined>(undefined);
   
+  // Fallback queue state
+  const [fallbackQueue, setFallbackQueue] = useState<{id: number; contract_address: string; symbol: string; name: string; image_url: string | null}[]>([]);
+  const [fallbackCoinAddress, setFallbackCoinAddress] = useState('');
+  const [addingFallbackCoin, setAddingFallbackCoin] = useState(false);
+  
   // Ref to prevent multiple market creations on auction finalization
   const hasCreatedMarketRef = useRef(false);
 
@@ -497,6 +502,62 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error('Error fetching auto-cycle config:', error);
+    }
+    
+    // Fetch fallback queue
+    try {
+      const queueResponse = await fetch(`${API_BASE}/auction/fallback-queue`);
+      const queueData = await queueResponse.json();
+      if (queueData.queue) {
+        setFallbackQueue(queueData.queue);
+      }
+    } catch (error) {
+      console.error('Error fetching fallback queue:', error);
+    }
+  };
+  
+  // Fallback queue handlers
+  const addToFallbackQueue = async () => {
+    if (!address || !fallbackCoinAddress) return;
+    setAddingFallbackCoin(true);
+    try {
+      const response = await fetch(`${API_BASE}/auction/fallback-queue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: address, contractAddress: fallbackCoinAddress }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setFallbackCoinAddress('');
+        loadAuctionData(); // Refresh the queue
+        alert(`✅ Added ${result.coin.symbol} to fallback queue`);
+      } else {
+        alert(`❌ ${result.error || 'Failed to add coin'}`);
+      }
+    } catch (error: any) {
+      alert(`❌ Error: ${error.message}`);
+    } finally {
+      setAddingFallbackCoin(false);
+    }
+  };
+  
+  const removeFromFallbackQueue = async (id: number) => {
+    if (!address) return;
+    if (!confirm('Remove this coin from the queue?')) return;
+    try {
+      const response = await fetch(`${API_BASE}/auction/fallback-queue/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: address }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        loadAuctionData(); // Refresh the queue
+      } else {
+        alert(`❌ ${result.error || 'Failed to remove coin'}`);
+      }
+    } catch (error: any) {
+      alert(`❌ Error: ${error.message}`);
     }
   };
 
@@ -1075,6 +1136,67 @@ export default function AdminPage() {
                       </span>
                     )}
                   </p>
+                </div>
+
+                {/* Fallback Coin Queue */}
+                <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">📦 Fallback Coin Queue</p>
+                      <Badge variant="secondary">{fallbackQueue.length} coins</Badge>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    If no one bids during an auction, these coins will be used to create the next market. Add coins to ensure 24/7 operation.
+                  </p>
+                  
+                  {/* Add coin form */}
+                  <div className="flex gap-2 mb-3">
+                    <Input 
+                      placeholder="Contract address (0x...)" 
+                      value={fallbackCoinAddress}
+                      onChange={(e) => setFallbackCoinAddress(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={addToFallbackQueue}
+                      variant="outline"
+                      size="sm"
+                      disabled={addingFallbackCoin || !fallbackCoinAddress || !address}
+                    >
+                      {addingFallbackCoin ? 'Adding...' : <><Plus className="h-4 w-4 mr-1" /> Add</>}
+                    </Button>
+                  </div>
+                  
+                  {/* Queue list */}
+                  {fallbackQueue.length > 0 ? (
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {fallbackQueue.map((coin, index) => (
+                        <div key={coin.id} className="flex items-center justify-between bg-background/50 rounded px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                            {coin.image_url && (
+                              <img src={coin.image_url} alt={coin.symbol} className="w-5 h-5 rounded-full" />
+                            )}
+                            <span className="font-medium">{coin.symbol}</span>
+                            <span className="text-xs text-muted-foreground">{coin.name}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
+                            onClick={() => removeFromFallbackQueue(coin.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      No coins in queue. Add some to ensure markets run 24/7.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
