@@ -145,6 +145,11 @@ export async function enableAutoCycle(): Promise<boolean> {
     return false;
   }
 
+  // Reset cooldown so bootstrap runs immediately
+  lastBootstrapAttempt = 0;
+  isBootstrapping = false;
+  isChecking = false;
+  
   console.log('✅ Auction auto-cycle enabled');
   startMonitoring();
   
@@ -180,7 +185,12 @@ export async function disableAutoCycle(): Promise<boolean> {
  * Start monitoring dual coin markets for auto-cycle
  */
 function startMonitoring() {
-  if (isMonitoring) return;
+  if (isMonitoring) {
+    // Already monitoring, but run an immediate check since we just enabled
+    console.log('🔄 Already monitoring, running immediate check...');
+    checkAndCycleAuctions();
+    return;
+  }
   
   console.log('🔄 Starting auction auto-cycle monitoring...');
   isMonitoring = true;
