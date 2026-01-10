@@ -1367,7 +1367,138 @@ export function useDualCoinBucketLiquidity(marketId: number | undefined, outcome
   };
 }
 
+/**
+ * Hook to finalize auction on-chain (admin only)
+ * This refunds all losing bids and burns 20% of winning bids
+ */
+export function useFinalizeAuction() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const finalizeAuction = (winningBidIds: [bigint, bigint]) => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    console.log(`🏆 Finalizing auction with winners: ${winningBidIds[0]}, ${winningBidIds[1]}`);
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'finalizeAuction',
+      args: [winningBidIds],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    finalizeAuction,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
 
+/**
+ * Hook to refund a single bid (user or admin)
+ * Users can call this to get their tokens back after auction ends
+ */
+export function useRefundBid() {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data: hash, isPending, writeContract, error } = useWriteContract();
+  
+  const refundBid = (bidId: bigint) => {
+    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Auction contract not deployed');
+    }
+    
+    console.log(`💸 Refunding bid ID: ${bidId}`);
+    writeContract({
+      address: auctionAddress as `0x${string}`,
+      abi: LISTING_AUCTION_ABI,
+      functionName: 'refundBid',
+      args: [bidId],
+    } as any);
+  };
+  
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+  
+  return {
+    refundBid,
+    isPending,
+    isConfirming,
+    isConfirmed,
+    error,
+    hash,
+  };
+}
 
+/**
+ * Hook to get user's bids from contract
+ */
+export function useUserAuctionBids(userAddress: `0x${string}` | undefined) {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: auctionAddress as `0x${string}`,
+    abi: LISTING_AUCTION_ABI,
+    functionName: 'getBidsByAddress',
+    args: userAddress ? [userAddress] : undefined,
+    query: {
+      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000' && !!userAddress,
+    },
+  });
+  
+  return {
+    bidIds: data as bigint[] | undefined,
+    isLoading,
+    error,
+    refetch,
+  };
+}
 
-
+/**
+ * Hook to get bid details by ID
+ */
+export function useAuctionBidDetails(bidId: bigint | undefined) {
+  const chainId = useChainId();
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  
+  const { data, isLoading, error, refetch } = useReadContract({
+    address: auctionAddress as `0x${string}`,
+    abi: LISTING_AUCTION_ABI,
+    functionName: 'bids',
+    args: bidId !== undefined ? [bidId] : undefined,
+    query: {
+      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000' && bidId !== undefined,
+    },
+  });
+  
+  // bids returns: (address bidder, string coinContractAddress, string chain, uint256 amount, uint256 timestamp, bool refunded)
+  const bidData = data as [string, string, string, bigint, bigint, boolean] | undefined;
+  
+  return {
+    bid: bidData ? {
+      bidder: bidData[0],
+      coinContractAddress: bidData[1],
+      chain: bidData[2],
+      amount: bidData[3],
+      timestamp: bidData[4],
+      refunded: bidData[5],
+    } : undefined,
+    isLoading,
+    error,
+    refetch,
+  };
+}

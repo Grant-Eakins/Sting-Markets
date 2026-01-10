@@ -486,12 +486,17 @@ export default function MyBets() {
   // Calculate stats from blockchain bets
   // ProportionalMarket.getMarket returns:
   // [stockSymbol, sessionType, status, numOutcomes, referencePrice, finalPrice, lockTime, settleTime, settled, winningOutcome, totalLiquidity]
+  // ProportionalMarketDualCoin.getMarket returns:
+  // [coinASymbol, coinBSymbol, status, coinAPool, coinBPool, totalPool, lockTime, settleTime, settled, winningOutcome]
   const getBetMarketData = (marketId: bigint) => {
     const index = marketIds.indexOf(marketId);
     if (index === -1 || !marketsData?.[index]) return null;
     const marketResult: any = marketsData[index];
     if (marketResult.status !== 'success' || !marketResult.result) return null;
     const result: any = marketResult.result;
+    
+    // Check if this is a dual coin market
+    const isDualCoin = marketIdsToDualCoin.get(marketId.toString()) || false;
     
     // Get probabilities for this market
     let probabilities: number[] = [];
@@ -502,19 +507,46 @@ export default function MyBets() {
       }
     }
     
-    // Access by tuple index for ProportionalMarket
-    return {
-      stockSymbol: result[0] || 'Unknown Market',
-      sessionType: result[1],
-      status: result[2], // 0=ACTIVE, 1=LOCKED, 2=SETTLED, 3=CANCELLED
-      numOutcomes: Number(result[3]),
-      referencePrice: result[4],
-      finalPrice: result[5],
-      settled: result[8] === true,
-      winningOutcome: Number(result[9]), // The winning bucket index
-      totalLiquidity: Number(result[10]) / TOKEN_DIVISOR,
-      probabilities,
-    };
+    if (isDualCoin) {
+      // Dual Coin contract format:
+      // [coinASymbol, coinBSymbol, status, coinAPool, coinBPool, totalPool, lockTime, settleTime, settled, winningOutcome]
+      const totalPool = Number(result[5]) / 1e6; // USDC has 6 decimals
+      const coinAPool = Number(result[3]) / 1e6;
+      const coinBPool = Number(result[4]) / 1e6;
+      
+      // Calculate probabilities from pools if not provided
+      if (probabilities.length === 0 && totalPool > 0) {
+        probabilities = [coinAPool / totalPool, coinBPool / totalPool];
+      }
+      
+      return {
+        stockSymbol: `${result[0]} vs ${result[1]}`,
+        sessionType: 0,
+        status: result[2], // 0=ACTIVE, 1=LOCKED, 2=SETTLED, 3=CANCELLED
+        numOutcomes: 2,
+        referencePrice: 0n,
+        finalPrice: 0n,
+        settled: result[8] === true,
+        winningOutcome: Number(result[9]), // The winning bucket index (0=CoinA, 1=CoinB)
+        totalLiquidity: totalPool,
+        probabilities,
+      };
+    } else {
+      // Standard contract format:
+      // [stockSymbol, sessionType, status, numOutcomes, referencePrice, finalPrice, lockTime, settleTime, settled, winningOutcome, totalLiquidity]
+      return {
+        stockSymbol: result[0] || 'Unknown Market',
+        sessionType: result[1],
+        status: result[2], // 0=ACTIVE, 1=LOCKED, 2=SETTLED, 3=CANCELLED
+        numOutcomes: Number(result[3]),
+        referencePrice: result[4],
+        finalPrice: result[5],
+        settled: result[8] === true,
+        winningOutcome: Number(result[9]), // The winning bucket index
+        totalLiquidity: Number(result[10]) / TOKEN_DIVISOR,
+        probabilities,
+      };
+    }
   };
 
   // Enrich bets with market data and categorize

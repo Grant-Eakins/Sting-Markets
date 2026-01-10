@@ -577,14 +577,14 @@ export default function AdminPage() {
       }
       
       // First winner is always the top bid
-      const winningBidIds = [parseInt(auctionLeaderboard[0].id)];
+      const winningBidIds: [bigint, bigint] = [BigInt(auctionLeaderboard[0].id), BigInt(0)];
       
       // Find the next highest bid for a DIFFERENT coin
       let foundSecondWinner = false;
       for (let i = 1; i < auctionLeaderboard.length; i++) {
         const bid = auctionLeaderboard[i];
         if (bid.coinAddress.toLowerCase() !== auctionLeaderboard[0].coinAddress.toLowerCase()) {
-          winningBidIds.push(parseInt(bid.id));
+          winningBidIds[1] = BigInt(bid.id);
           foundSecondWinner = true;
           break;
         }
@@ -595,7 +595,7 @@ export default function AdminPage() {
         return;
       }
       
-      console.log('Finalizing auction with winners:', winningBidIds);
+      console.log('Finalizing auction with winners:', winningBidIds[0].toString(), winningBidIds[1].toString());
       finalizeAuctionOnChain(winningBidIds);
       
       // After finalization, create the dual-coin market automatically

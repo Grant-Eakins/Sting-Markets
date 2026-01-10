@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Trophy, Coins, Timer, DollarSign, TrendingUp, Play, StopCircle, CheckCircle2, Menu, X } from 'lucide-react';
+import { Trophy, Coins, Timer, DollarSign, TrendingUp, Play, StopCircle, CheckCircle2, Menu, X, RefreshCw } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
-import { useAuctionTokenAllowance, useAuctionTokenApproval, useSubmitAuctionBid, useAuctionConfig, useAuctionLeaderboard, useAuctionTotalBids, useBiddingToken, useTokenSymbol } from '@/hooks/useContract';
+import { useAuctionTokenAllowance, useAuctionTokenApproval, useSubmitAuctionBid, useAuctionConfig, useAuctionLeaderboard, useAuctionTotalBids, useBiddingToken, useTokenSymbol, useUserAuctionBids, useRefundBid, useAuctionBidDetails } from '@/hooks/useContract';
 import { formatUnits } from 'viem';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
@@ -53,6 +53,7 @@ export default function AuctionLeaderboard() {
   const [bidAmount, setBidAmount] = useState('');
   const [enrichedLeaderboard, setEnrichedLeaderboard] = useState<Bid[]>([]);
   const [isValidatingCoin, setIsValidatingCoin] = useState(false);
+  const [refundingBidId, setRefundingBidId] = useState<bigint | null>(null);
 
   // Blockchain hooks - read directly from contract
   const { config: contractConfig, isLoading: configLoading, refetch: refetchConfig } = useAuctionConfig();
@@ -63,6 +64,10 @@ export default function AuctionLeaderboard() {
   const { allowance, refetch: refetchAllowance } = useAuctionTokenAllowance();
   const { approve, isPending: isApproving, isConfirming: isApprovingConfirm, isConfirmed: isApproved } = useAuctionTokenApproval();
   const { submitBid, isPending: isSubmitting, isConfirming: isSubmitConfirm, isConfirmed: isBidSubmitted, error: bidError } = useSubmitAuctionBid();
+  
+  // User's bids and refund functionality
+  const { bidIds: userBidIds, refetch: refetchUserBids } = useUserAuctionBids(address as `0x${string}` | undefined);
+  const { refundBid, isPending: isRefunding, isConfirming: isRefundConfirming, isConfirmed: isRefundConfirmed, error: refundError } = useRefundBid();
 
   const isAdmin = address && ADMIN_WALLETS.includes(address.toLowerCase());
   const loading = configLoading || leaderboardLoading;
@@ -176,6 +181,42 @@ export default function AuctionLeaderboard() {
     }
   }, [bidError, config]);
 
+  // Handle successful refund
+  useEffect(() => {
+    if (isRefundConfirmed) {
+      toast({ title: '✅ Refund claimed!', description: `Your ${tokenSymbol || 'MIND'} tokens have been returned to your wallet` });
+      setRefundingBidId(null);
+      refetchUserBids();
+      refetchLeaderboard();
+    }
+  }, [isRefundConfirmed, refetchUserBids, refetchLeaderboard, tokenSymbol]);
+
+  // Handle refund errors
+  useEffect(() => {
+    if (refundError) {
+      let errorMessage = refundError.message;
+      
+      if (errorMessage.includes('Auction still active')) {
+        errorMessage = 'Cannot claim refund while auction is still active.';
+      } else if (errorMessage.includes('Already refunded')) {
+        errorMessage = 'This bid has already been refunded.';
+      } else if (errorMessage.includes('Not authorized')) {
+        errorMessage = 'You can only refund your own bids.';
+      }
+      
+      toast({ 
+        title: '❌ Refund failed', 
+        description: errorMessage,
+        variant: 'destructive' 
+      });
+      setRefundingBidId(null);
+    }
+  }, [refundError]);
+
+  const handleClaimRefund = (bidId: bigint) => {
+    setRefundingBidId(bidId);
+    refundBid(bidId);
+  };
 
 
   const handleSubmitBid = async () => {
