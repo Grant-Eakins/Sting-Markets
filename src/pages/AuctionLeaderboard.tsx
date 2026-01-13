@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,6 +54,11 @@ export default function AuctionLeaderboard() {
   const [enrichedLeaderboard, setEnrichedLeaderboard] = useState<Bid[]>([]);
   const [isValidatingCoin, setIsValidatingCoin] = useState(false);
   const [refundingBidId, setRefundingBidId] = useState<bigint | null>(null);
+  
+  // Refs to track if we've already handled approval/submission to prevent infinite loops
+  const hasHandledApproval = useRef(false);
+  const hasHandledBidSubmission = useRef(false);
+  const hasHandledRefund = useRef(false);
 
   // Blockchain hooks - read directly from contract
   const { config: contractConfig, isLoading: configLoading, refetch: refetchConfig } = useAuctionConfig();
@@ -132,7 +137,8 @@ export default function AuctionLeaderboard() {
 
   // Refetch allowance after approval and auto-submit bid
   useEffect(() => {
-    if (isApproved && coinAddress && bidAmount) {
+    if (isApproved && coinAddress && bidAmount && !hasHandledApproval.current) {
+      hasHandledApproval.current = true;
       refetchAllowance();
       toast({ title: '✅ Approved! Submitting bid...', description: `Now sending your ${tokenSymbol || 'MIND'} bid to the auction` });
       
@@ -144,18 +150,27 @@ export default function AuctionLeaderboard() {
         submitBid(coinAddress, detectedChain, bidAmount);
       }, 500);
     }
-  }, [isApproved]);
+    // Reset the flag when isApproved becomes false
+    if (!isApproved) {
+      hasHandledApproval.current = false;
+    }
+  }, [isApproved, coinAddress, bidAmount, refetchAllowance, toast, tokenSymbol, submitBid]);
 
   // Handle successful bid submission
   useEffect(() => {
-    if (isBidSubmitted) {
-      toast({ title: '✅ Bid submitted on-chain!', description: `Your bid for ${coinAddress.slice(0, 10)}... has been recorded` });
+    if (isBidSubmitted && !hasHandledBidSubmission.current) {
+      hasHandledBidSubmission.current = true;
+      toast({ title: '✅ Bid submitted on-chain!', description: `Your bid has been recorded` });
       setCoinAddress('');
       setBidAmount('');
       refetchLeaderboard();
       refetchAllowance();
     }
-  }, [isBidSubmitted, refetchLeaderboard, refetchAllowance]);
+    // Reset the flag when isBidSubmitted becomes false
+    if (!isBidSubmitted) {
+      hasHandledBidSubmission.current = false;
+    }
+  }, [isBidSubmitted, refetchLeaderboard, refetchAllowance, toast]);
 
   // Handle bid submission errors
   useEffect(() => {
@@ -183,13 +198,18 @@ export default function AuctionLeaderboard() {
 
   // Handle successful refund
   useEffect(() => {
-    if (isRefundConfirmed) {
+    if (isRefundConfirmed && !hasHandledRefund.current) {
+      hasHandledRefund.current = true;
       toast({ title: '✅ Refund claimed!', description: `Your ${tokenSymbol || 'MIND'} tokens have been returned to your wallet` });
       setRefundingBidId(null);
       refetchUserBids();
       refetchLeaderboard();
     }
-  }, [isRefundConfirmed, refetchUserBids, refetchLeaderboard, tokenSymbol]);
+    // Reset the flag when isRefundConfirmed becomes false
+    if (!isRefundConfirmed) {
+      hasHandledRefund.current = false;
+    }
+  }, [isRefundConfirmed, refetchUserBids, refetchLeaderboard, tokenSymbol, toast]);
 
   // Handle refund errors
   useEffect(() => {

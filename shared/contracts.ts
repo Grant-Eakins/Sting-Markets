@@ -21,7 +21,7 @@ export const LISTING_AUCTION_ADDRESSES = {
   // Base Mainnet
   8453: '0x0000000000000000000000000000000000000000',
   // Base Sepolia Testnet
-  84532: '0xd080A8e6260C394077cE6E8f77F9DbC5C2B50ec5', // ListingAuction (USDC, vault mode)
+  84532: '0x4e03284c6caCD161A3238AAe211DA11FbbC6fC0C', // ListingAuction (USDC, vault mode)
 } as const;
 
 export const TOKEN_ADDRESSES = {

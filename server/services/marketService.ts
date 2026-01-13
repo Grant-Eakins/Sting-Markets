@@ -351,6 +351,15 @@ export function getMarket(marketId: string): Market | undefined {
 }
 
 /**
+ * Adds or updates a market in the in-memory storage
+ * Used when activating markets from database to keep memory in sync
+ */
+export function addMarketToMemory(market: Market): void {
+  markets.set(market.id, market);
+  console.log(`📦 Added/updated market in memory: ${market.stockSymbol} (${market.id})`);
+}
+
+/**
  * Update market status in memory (syncs with database)
  */
 export async function updateMarketStatusInMemory(marketId: string, status: MarketStatus): Promise<boolean> {

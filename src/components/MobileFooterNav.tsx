@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Swords, TrendingUp, Wallet, Menu, Trophy } from 'lucide-react';
+import { Swords, TrendingUp, Wallet, Menu, Trophy, Gavel } from 'lucide-react';
 import { useState } from 'react';
 import {
   Sheet,
@@ -35,15 +35,15 @@ export function MobileFooterNav() {
             <span className="text-sm font-medium">Battles</span>
           </Link>
 
-          {/* Markets */}
+          {/* Auction */}
           <Link 
-            to="/single-markets" 
+            to="/auction" 
             className={`flex flex-col items-center justify-center flex-1 gap-1.5 py-2 transition-colors ${
-              isActive('/single-markets') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              isActive('/auction') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <TrendingUp className="h-7 w-7" />
-            <span className="text-sm font-medium">Markets</span>
+            <Gavel className="h-7 w-7" />
+            <span className="text-sm font-medium">Auction</span>
           </Link>
 
           {/* My Bets */}
@@ -77,10 +77,10 @@ export function MobileFooterNav() {
                 </SheetDescription>
               </SheetHeader>
               <div className="flex flex-col gap-2 mt-6">
-                <Link to="/auction" onClick={() => setIsMoreOpen(false)}>
+                <Link to="/single-markets" onClick={() => setIsMoreOpen(false)}>
                   <Button variant="outline" className="w-full justify-start" size="lg">
-                    <Trophy className="h-4 w-4 mr-2" />
-                    Listing Auction
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Markets
                   </Button>
                 </Link>
                 <Link to="/how-it-works" onClick={() => setIsMoreOpen(false)}>

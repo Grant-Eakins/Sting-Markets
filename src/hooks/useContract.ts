@@ -1412,7 +1412,7 @@ export function useUserAuctionBids(userAddress: `0x${string}` | undefined) {
   const { data, isLoading, error, refetch } = useReadContract({
     address: auctionAddress as `0x${string}`,
     abi: LISTING_AUCTION_ABI,
-    functionName: 'getBidsByAddress',
+    functionName: 'bidsByAddress',
     args: userAddress ? [userAddress] : undefined,
     query: {
       enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000' && !!userAddress,
@@ -1420,7 +1420,7 @@ export function useUserAuctionBids(userAddress: `0x${string}` | undefined) {
   });
   
   return {
-    bidIds: data as bigint[] | undefined,
+    bidIds: data as readonly bigint[] | undefined,
     isLoading,
     error,
     refetch,
@@ -1437,15 +1437,15 @@ export function useAuctionBidDetails(bidId: bigint | undefined) {
   const { data, isLoading, error, refetch } = useReadContract({
     address: auctionAddress as `0x${string}`,
     abi: LISTING_AUCTION_ABI,
-    functionName: 'bids',
+    functionName: 'getBid',
     args: bidId !== undefined ? [bidId] : undefined,
     query: {
       enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000' && bidId !== undefined,
     },
   });
   
-  // bids returns: (address bidder, string coinContractAddress, string chain, uint256 amount, uint256 timestamp, bool refunded)
-  const bidData = data as [string, string, string, bigint, bigint, boolean] | undefined;
+  // getBid returns: (address bidder, string coinAddress, string chain, uint256 amount, uint256 timestamp, bool refunded)
+  const bidData = data as readonly [`0x${string}`, string, string, bigint, bigint, boolean] | undefined;
   
   return {
     bid: bidData ? {

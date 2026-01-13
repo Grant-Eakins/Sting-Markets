@@ -730,5 +730,41 @@ export const LISTING_AUCTION_ABI = [
     ],
     "name": "WinnersFinalized",
     "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user", "type": "address" }
+    ],
+    "name": "bidsByAddress",
+    "outputs": [
+      { "internalType": "uint256[]", "name": "", "type": "uint256[]" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "bidId", "type": "uint256" }
+    ],
+    "name": "getBid",
+    "outputs": [
+      { "internalType": "address", "name": "bidder", "type": "address" },
+      { "internalType": "string", "name": "coinAddress", "type": "string" },
+      { "internalType": "string", "name": "chain", "type": "string" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "internalType": "uint256", "name": "timestamp", "type": "uint256" },
+      { "internalType": "bool", "name": "refunded", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "bidId", "type": "uint256" }
+    ],
+    "name": "refundBid",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ] as const;

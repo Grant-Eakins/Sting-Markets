@@ -1,16 +1,81 @@
-import { getMarketsReadyToSettle, settleMarket, lockExpiredMarkets, getActiveMarkets, updateMarketPrice, getAllMarkets } from './marketService';
+import { getMarketsReadyToSettle, settleMarket, lockExpiredMarkets, getActiveMarkets, updateMarketPrice, getAllMarkets, addMarketToMemory, getMarket } from './marketService';
 import { getCryptoQuote, getBatchQuotes } from './cryptoApi';
 import { sendPriceUpdateTweets, sendClosingPriceTweets, sendOpeningPriceTweets } from './discordBot';
 import { syncCryptoMarkets } from './cryptoSync';
 import { syncSettlementStatusFromChain, settleOnChainMarket, settleDualCoinOnChain } from './blockchainSync';
 import { getTokenByAddress } from './dexScreenerApi';
-import { saveMarket } from './database';
+import { saveMarket, getSupabase } from './database';
 import { MarketStatus, Position } from '../types/market';
 import type { Market } from '../types/market';
 
 // Track last Discord update time to send every 3 hours
 let lastDiscordUpdateTime: number = 0;
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+
+/**
+ * Get dual coin markets from database that may need settlement
+ * These might not be in memory if created by auto-cycle
+ */
+async function getDualCoinMarketsFromDb(): Promise<Market[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from('markets')
+      .select('*')
+      .eq('is_dual_coin', true)
+      .in('status', ['ACTIVE', 'LOCKED'])
+      .order('created_at', { ascending: false });
+    
+    if (error || !data) {
+      console.error('Error fetching dual coin markets from DB:', error);
+      return [];
+    }
+    
+    // Convert DB records to Market objects
+    return data.map((row: any) => ({
+      id: row.id,
+      stockSymbol: row.stock_symbol || row.title,
+      stockName: row.title,
+      description: row.description || '',
+      status: row.status === 'ACTIVE' ? MarketStatus.ACTIVE : 
+              row.status === 'LOCKED' ? MarketStatus.LOCKED :
+              row.status === 'SETTLED' ? MarketStatus.SETTLED :
+              row.status === 'SCHEDULED' ? MarketStatus.SCHEDULED : MarketStatus.ACTIVE,
+      createdAt: new Date(row.created_at),
+      lockTime: new Date(row.lock_time),
+      settleTime: new Date(row.settle_time),
+      startTime: row.start_time ? new Date(row.start_time) : undefined,
+      openingPrice: row.reference_price || 0,
+      currentPrice: row.current_price || row.reference_price || 0,
+      openTimestamp: new Date(row.created_at),
+      isAfterHours: false,
+      upPool: 0,
+      downPool: 0,
+      totalPool: row.total_cost || 0,
+      upBettors: 0,
+      downBettors: 0,
+      totalBets: 0,
+      isDualCoin: true,
+      coinASymbol: row.coin_a_symbol,
+      coinAName: row.coin_a_name,
+      coinAAddress: row.coin_a_address,
+      coinAOpeningPrice: row.coin_a_opening_price,
+      coinAImageUrl: row.coin_a_image_url,
+      coinBSymbol: row.coin_b_symbol,
+      coinBName: row.coin_b_name,
+      coinBAddress: row.coin_b_address,
+      coinBOpeningPrice: row.coin_b_opening_price,
+      coinBImageUrl: row.coin_b_image_url,
+      // Use blockchain_market_id to match the main database schema
+      blockchainMarketId: row.blockchain_market_id || row.contract_market_id,
+    } as Market));
+  } catch (err) {
+    console.error('Error in getDualCoinMarketsFromDb:', err);
+    return [];
+  }
+}
 
 /**
  * Updates current stock prices for all active markets using batch API
@@ -127,14 +192,74 @@ export async function checkAndSettleMarkets(): Promise<void> {
     }));
     const synced = await syncSettlementStatusFromChain(marketsWithBlockchainId);
     
-    // First lock any markets that passed their lock time
+    // First lock any markets that passed their lock time (in-memory markets)
     const locked = lockExpiredMarkets();
     if (locked > 0) {
-      console.log(`🔒 Locked ${locked} markets`);
+      console.log(`🔒 Locked ${locked} in-memory markets`);
     }
     
-    // Get markets ready to settle
-    const marketsToSettle = getMarketsReadyToSettle();
+    // Also check database for ACTIVE/LOCKED dual coin markets that need locking/settling
+    // These may not be in memory if created by auto-cycle
+    const dbDualCoinMarkets = await getDualCoinMarketsFromDb();
+    if (dbDualCoinMarkets.length > 0) {
+      console.log(`📡 Found ${dbDualCoinMarkets.length} dual coin markets in DB to check`);
+      for (const m of dbDualCoinMarkets) {
+        console.log(`   - ${m.stockSymbol}: status=${m.status}, lockTime=${m.lockTime.toISOString()}, settleTime=${m.settleTime.toISOString()}, blockchainId=${m.blockchainMarketId}`);
+        
+        // Add DB markets to memory if not already there (ensures tracking for settlement)
+        if (!getMarket(m.id)) {
+          addMarketToMemory(m);
+        }
+      }
+    }
+    
+    // Get markets ready to settle (from in-memory)
+    let marketsToSettle = getMarketsReadyToSettle();
+    console.log(`📊 In-memory markets ready to settle: ${marketsToSettle.length}`);
+    
+    // Add any DB dual coin markets that are ready to settle but not in memory
+    const inMemoryIds = new Set(marketsToSettle.map(m => m.id));
+    const now = new Date();
+    console.log(`⏰ Current time: ${now.toISOString()}`);
+    
+    for (const dbMarket of dbDualCoinMarkets) {
+      if (!inMemoryIds.has(dbMarket.id)) {
+        const settleTime = new Date(dbMarket.settleTime);
+        const lockTime = new Date(dbMarket.lockTime);
+        
+        console.log(`   Checking ${dbMarket.stockSymbol}: status=${dbMarket.status}, lockTime=${lockTime.toISOString()}, settleTime=${settleTime.toISOString()}`);
+        console.log(`   Time comparison: now >= lockTime = ${now >= lockTime}, now >= settleTime = ${now >= settleTime}`);
+        
+        // Check if market is LOCKED and past settle time
+        if (dbMarket.status === MarketStatus.LOCKED && now >= settleTime) {
+          console.log(`📡 Found DB dual coin market ready to settle: ${dbMarket.stockSymbol}`);
+          marketsToSettle.push(dbMarket);
+        }
+        // Check if market is ACTIVE and past lock time - lock it first, then check if ready to settle
+        else if (dbMarket.status === MarketStatus.ACTIVE && now >= lockTime) {
+          console.log(`🔒 Locking DB dual coin market: ${dbMarket.stockSymbol}`);
+          dbMarket.status = MarketStatus.LOCKED;
+          await saveMarket(dbMarket);
+          addMarketToMemory(dbMarket); // Keep memory in sync
+          
+          // If also past settle time, add to settle list immediately
+          if (now >= settleTime) {
+            console.log(`📡 Market ${dbMarket.stockSymbol} is also ready to settle (past lock AND settle time)`);
+            marketsToSettle.push(dbMarket);
+          } else {
+            console.log(`⏳ Market ${dbMarket.stockSymbol} is now LOCKED, will settle later`);
+          }
+        }
+        // Check if market is ACTIVE but already past SETTLE time (missed the lock window)
+        else if (dbMarket.status === MarketStatus.ACTIVE && now >= settleTime) {
+          console.log(`⚡ Market ${dbMarket.stockSymbol} is past settle time but still ACTIVE - fast-tracking to settlement`);
+          dbMarket.status = MarketStatus.LOCKED;
+          await saveMarket(dbMarket);
+          addMarketToMemory(dbMarket); // Keep memory in sync
+          marketsToSettle.push(dbMarket);
+        }
+      }
+    }
     
     if (marketsToSettle.length === 0) {
       // Even if no markets to settle, we may have synced some from blockchain
@@ -251,7 +376,15 @@ export async function settleDualCoinMarket(market: Market): Promise<any> {
       console.log(`   ⚠️  No blockchainMarketId - skipping on-chain settlement`);
     }
     
+    console.log(`   💾 Saving market settlement to database...`);
+    console.log(`      Market ID: ${market.id}`);
+    console.log(`      New status: ${market.status}`);
+    console.log(`      Winner: ${winner} (${winningPosition})`);
+    
     await saveMarket(market);
+    
+    console.log(`   ✅ Market ${market.coinASymbol} vs ${market.coinBSymbol} settlement complete!`);
+    console.log(`   📊 Users can now claim their payouts from the smart contract`);
     
     return {
       stockSymbol: `${market.coinASymbol} vs ${market.coinBSymbol}`,

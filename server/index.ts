@@ -284,8 +284,8 @@ app.post('/api/webhook', (req, res) => {
   res.status(200).json({ success: true });
 });
 
-// Schedule market settlement check every 15 minutes
-cron.schedule('*/15 * * * *', async () => {
+// Schedule market settlement check every 5 minutes (more frequent for dual coin battles)
+cron.schedule('*/5 * * * *', async () => {
   console.log('Running scheduled market settlement check...');
   try {
     await checkAndSettleMarkets();

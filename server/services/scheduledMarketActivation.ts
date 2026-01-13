@@ -4,7 +4,7 @@
  */
 
 import { MarketStatus, Market } from '../types/market';
-import { getAllMarkets } from './marketService';
+import { getAllMarkets, addMarketToMemory } from './marketService';
 import { updateMarketStatus, getSupabase } from './database';
 import { createOnChainMarket, createDualCoinOnChainMarket } from './blockchainSync';
 import { getTokenByAddress } from './dexScreenerApi';
@@ -217,7 +217,7 @@ async function activateMarketFromDb(dbMarket: any, supabase: any) {
     console.error(`   ❌ Failed to create on-chain market:`, err.message);
   }
   
-  // Update database
+  // Update database - save to both blockchain_market_id and contract_market_id for compatibility
   const { error } = await supabase
     .from('markets')
     .update({
@@ -226,7 +226,8 @@ async function activateMarketFromDb(dbMarket: any, supabase: any) {
       settle_time: newSettleTime.toISOString(),
       coin_a_opening_price: coinAOpeningPrice,
       coin_b_opening_price: coinBOpeningPrice,
-      contract_market_id: blockchainMarketId,
+      blockchain_market_id: blockchainMarketId,  // Primary column used by main DB code
+      contract_market_id: blockchainMarketId,    // Legacy column, keep in sync
       updated_at: now.toISOString(),
     })
     .eq('id', dbMarket.id);
@@ -235,7 +236,47 @@ async function activateMarketFromDb(dbMarket: any, supabase: any) {
     throw new Error(`DB update failed: ${error.message}`);
   }
   
+  // Add the activated market to in-memory storage so it can be tracked for settlement
+  const activatedMarket: Market = {
+    id: dbMarket.id,
+    stockSymbol: dbMarket.stock_symbol || dbMarket.title,
+    stockName: dbMarket.title || dbMarket.stock_symbol,
+    description: dbMarket.description || '',
+    status: MarketStatus.ACTIVE,
+    createdAt: new Date(dbMarket.created_at),
+    lockTime: newLockTime,
+    settleTime: newSettleTime,
+    startTime: dbMarket.start_time ? new Date(dbMarket.start_time) : undefined,
+    openingPrice: coinAOpeningPrice || dbMarket.reference_price || 0,
+    currentPrice: coinAOpeningPrice || dbMarket.reference_price || 0,
+    openTimestamp: now,
+    isAfterHours: false,
+    upPool: 0,
+    downPool: 0,
+    totalPool: 0,
+    upBettors: 0,
+    downBettors: 0,
+    totalBets: 0,
+    isDualCoin: dbMarket.is_dual_coin || false,
+    coinASymbol: dbMarket.coin_a_symbol,
+    coinAName: dbMarket.coin_a_name,
+    coinAAddress: dbMarket.coin_a_address,
+    coinAOpeningPrice: coinAOpeningPrice,
+    coinAImageUrl: dbMarket.coin_a_image_url,
+    coinBSymbol: dbMarket.coin_b_symbol,
+    coinBName: dbMarket.coin_b_name,
+    coinBAddress: dbMarket.coin_b_address,
+    coinBOpeningPrice: coinBOpeningPrice,
+    coinBImageUrl: dbMarket.coin_b_image_url,
+    blockchainMarketId: blockchainMarketId || undefined,
+  };
+  
+  addMarketToMemory(activatedMarket);
+  
   console.log(`✅ Market activated: ${dbMarket.stock_symbol}`);
+  if (blockchainMarketId !== null) {
+    console.log(`   📍 On-chain market ID: ${blockchainMarketId}`);
+  }
 }
 
 /**

@@ -154,13 +154,19 @@ contract ListingAuction is Ownable, ReentrancyGuard {
         );
 
         // Check if this coin already has bids - new bid must be higher
+        // Also verify the bid ID is still valid (handles case where bids were cleared)
         bytes32 coinHash = keccak256(abi.encodePacked(coinAddress));
         if (coinHasBids[coinHash]) {
             uint256 existingHighestBidId = highestBidPerCoin[coinHash];
-            require(
-                amount > bids[existingHighestBidId].amount,
-                "Bid must be higher than existing bid for this coin"
-            );
+            // Only enforce higher bid requirement if the bid ID is still valid
+            // (bids array might have been cleared between auctions)
+            if (existingHighestBidId < bids.length) {
+                require(
+                    amount > bids[existingHighestBidId].amount,
+                    "Bid must be higher than existing bid for this coin"
+                );
+            }
+            // If bid ID is invalid (array was cleared), treat as fresh bid - no minimum required
         }
 
         // Transfer tokens from bidder to contract
