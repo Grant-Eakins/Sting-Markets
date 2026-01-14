@@ -285,16 +285,16 @@ export default function Token() {
             <div className="text-xs text-gray-400 mb-2">Contract Address</div>
             <div className="flex items-center gap-2 mb-3">
               <code className="text-xs font-mono text-yellow-400 truncate max-w-[120px]">
-                {tokenContract.slice(0, 8)}...{tokenContract.slice(-6)}
+                BZKjW...1zpump
               </code>
               <Button variant="ghost" size="sm" onClick={copyToClipboard} className="h-6 w-6 p-0 text-white hover:text-yellow-400">
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </Button>
             </div>
-            <a href={buyLinks.pumpfun} target="_blank" rel="noopener noreferrer">
+            <a href="https://pump.fun/coin/BZKjWhhrtkm8RobxHtBc32TfDR83JmTLgd1K8y1zpump" target="_blank" rel="noopener noreferrer">
               <Button className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-bold" size="sm">
                 <ExternalLink className="w-3 h-3 mr-1" />
-                Buy $STNG
+                Buy $STNG on Pump.fun
               </Button>
             </a>
             {isAdmin && (
