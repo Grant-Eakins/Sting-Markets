@@ -190,6 +190,13 @@ export default function Markets() {
           <img src="/Copilot_20251226_230143.png" alt="Coin Battles" className="h-24 sm:h-32 md:h-40" />
         </div>
 
+        {/* Beta Notice */}
+        <div className="mb-4 sm:mb-6 bg-amber-100 border border-amber-300 rounded-lg px-4 py-3 text-center">
+          <p className="text-amber-800 font-medium text-sm sm:text-base">
+            🐝 Site is still in beta: Max bets = $2 and Minimum Auction bids = $1
+          </p>
+        </div>
+
         {/* Scheduled Battles Section */}
         {!isLoadingScheduled && scheduledMarkets.length > 0 && (
           <div className="mb-6 sm:mb-8">
