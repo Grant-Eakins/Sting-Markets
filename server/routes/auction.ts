@@ -15,7 +15,7 @@ import {
   getTopTwoWinners,
 } from '../services/listingAuction';
 import { enableAutoCycle, disableAutoCycle, triggerAuctionCycleCheck, triggerFinalizeAndCreateMarket } from '../services/auctionAutoCycle';
-import { clearOnChainAuctionBids } from '../services/blockchainSync';
+import { clearOnChainAuctionBids, getOnChainLeaderboard } from '../services/blockchainSync';
 import { clearAllBids as clearDatabaseBids } from '../services/listingAuction';
 import { getSupabase } from '../services/database';
 import { getTokenByAddress } from '../services/dexScreenerApi';
@@ -169,12 +169,42 @@ router.post('/bid', async (req: Request, res: Response) => {
 
 /**
  * GET /api/auction/leaderboard
- * Get current leaderboard
+ * Get current leaderboard from on-chain contract
  */
 router.get('/leaderboard', async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
-    const leaderboard = await getLeaderboard(limit);
+    
+    // Read directly from on-chain contract
+    const onChainBids = await getOnChainLeaderboard(limit);
+    
+    // Transform on-chain data to API format and enrich with token info
+    const leaderboard = await Promise.all(onChainBids.map(async (bid, index) => {
+      // Try to get token info from DexScreener
+      let tokenInfo = null;
+      try {
+        tokenInfo = await getTokenByAddress(bid.coinAddress);
+      } catch (e) {
+        // Token info not available, use defaults
+      }
+      
+      // Convert amount from smallest unit (USDC has 6 decimals)
+      const bidAmountNumber = Number(bid.amount) / 1_000_000;
+      
+      return {
+        id: bid.bidId.toString(),
+        walletAddress: bid.bidder,
+        coinContractAddress: bid.coinAddress,
+        chain: bid.chain,
+        coinSymbol: tokenInfo?.symbol || bid.coinAddress.slice(0, 8),
+        coinName: tokenInfo?.name || 'Unknown Token',
+        marketCap: tokenInfo?.marketCap || 0,
+        bidAmount: bidAmountNumber,
+        status: 'active',
+        rank: index + 1,
+      };
+    }));
+    
     res.json(leaderboard);
   } catch (error: any) {
     console.error('Error getting leaderboard:', error);
