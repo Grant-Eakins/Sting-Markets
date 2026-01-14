@@ -27,6 +27,16 @@ import Token from "./pages/Token";
 
 import "@rainbow-me/rainbowkit/styles.css";
 
+// Preload 3D coin model in background
+if (typeof window !== 'undefined') {
+  const link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.href = '/coin.glb';
+  link.as = 'fetch';
+  link.crossOrigin = 'anonymous';
+  document.head.appendChild(link);
+}
+
 const queryClient = new QueryClient();
 
 const App = () => (
