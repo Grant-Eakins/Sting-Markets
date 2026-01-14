@@ -1,14 +1,14 @@
 import { Market } from '@/lib/marketApi';
 import { useReadContracts } from 'wagmi';
 import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI } from '@/config/contract';
-import { baseSepolia } from 'wagmi/chains';
+import { base } from 'wagmi/chains';
 import { useEffect, useState } from 'react';
 import { createPublicClient, http, parseAbiItem } from 'viem';
 
 // Create a public client for reading events
 const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(),
+  chain: base,
+  transport: http('https://mainnet.base.org'),
 });
 
 /**
@@ -32,7 +32,7 @@ export function useAggregateMarketStats(markets: Market[]) {
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getMarket' as const,
     args: [BigInt(market.blockchainMarketId!)],
-    chainId: baseSepolia.id,
+    chainId: base.id,
   }));
 
   // Fetch bet count from SharesPurchased events

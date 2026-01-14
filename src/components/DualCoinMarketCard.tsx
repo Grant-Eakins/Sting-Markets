@@ -7,7 +7,7 @@ import { BetDialog } from './BetDialog';
 import { useLiveCoinPrice } from '@/hooks/useLiveCoinPrice';
 import { useDualCoinBucketLiquidity, useMaxBetSize } from '@/hooks/useContract';
 import { createPublicClient, http, parseAbiItem } from 'viem';
-import { baseSepolia, base } from 'wagmi/chains';
+import { base } from 'wagmi/chains';
 import { useChainId } from 'wagmi';
 import { DUAL_COIN_CONTRACT_ADDRESSES } from '@/config/contract';
 
@@ -91,13 +91,12 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
       }
 
       try {
-        const activeChainId = (chainId === 8453 || chainId === 84532) ? chainId : 8453;
+        const activeChainId = 8453; // Base mainnet only
         const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
-        const chain = activeChainId === 8453 ? base : baseSepolia;
-        const rpcUrl = activeChainId === 8453 ? 'https://mainnet.base.org' : 'https://sepolia.base.org';
+        const rpcUrl = 'https://mainnet.base.org';
         
         const publicClient = createPublicClient({
-          chain,
+          chain: base,
           transport: http(rpcUrl),
         });
 

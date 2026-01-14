@@ -1,18 +1,12 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { createConfig, http, fallback } from 'wagmi';
-import { base, baseSepolia } from 'wagmi/chains';
+import { base } from 'wagmi/chains';
 import { farcasterFrame } from '@farcaster/miniapp-wagmi-connector';
 
 // WalletConnect Project ID from https://cloud.walletconnect.com/
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'eb33070102c31c71949eeac977f28689';
 
 // RPC endpoints with fallbacks for reliability
-const BASE_SEPOLIA_RPC_URLS = [
-  'https://base-sepolia-rpc.publicnode.com',
-  'https://base-sepolia.blockpi.network/v1/rpc/public',
-  'https://sepolia.base.org',
-];
-
 const BASE_MAINNET_RPC_URLS = [
   'https://base-rpc.publicnode.com',
   'https://base.blockpi.network/v1/rpc/public', 
@@ -63,28 +57,26 @@ const isInFarcasterClient = detectFarcasterClient();
 
 // Use different config based on environment
 // Always include farcasterFrame connector in both configs for flexibility
+// Base mainnet only
 export const config = isInFarcasterClient
   ? createConfig({
-      chains: [baseSepolia, base],
+      chains: [base],
       connectors: [farcasterFrame()],
       transports: {
-        [baseSepolia.id]: fallback(BASE_SEPOLIA_RPC_URLS.map(url => http(url))),
         [base.id]: fallback(BASE_MAINNET_RPC_URLS.map(url => http(url))),
       },
     })
   : getDefaultConfig({
       appName: 'Sting Markets',
       projectId,
-      chains: [baseSepolia, base],
+      chains: [base],
       ssr: false,
       transports: {
-        [baseSepolia.id]: fallback(BASE_SEPOLIA_RPC_URLS.map(url => http(url))),
         [base.id]: fallback(BASE_MAINNET_RPC_URLS.map(url => http(url))),
       },
     });
 
 export const BASE_CHAIN_ID = base.id;
-export const BASE_SEPOLIA_CHAIN_ID = baseSepolia.id;
 
 // Base chain configuration
 export const BASE_CONFIG = {
@@ -92,19 +84,6 @@ export const BASE_CONFIG = {
   name: 'Base',
   rpcUrl: 'https://mainnet.base.org',
   blockExplorer: 'https://basescan.org',
-  nativeCurrency: {
-    name: 'Ethereum',
-    symbol: 'ETH',
-    decimals: 18,
-  },
-};
-
-// Base Sepolia testnet configuration
-export const BASE_SEPOLIA_CONFIG = {
-  chainId: baseSepolia.id,
-  name: 'Base Sepolia',
-  rpcUrl: 'https://sepolia.base.org',
-  blockExplorer: 'https://sepolia.basescan.org',
   nativeCurrency: {
     name: 'Ethereum',
     symbol: 'ETH',

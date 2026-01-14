@@ -2,15 +2,15 @@ import { useAccount } from 'wagmi';
 import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_DECIMALS } from '@/config/contract';
 import { useState, useEffect } from 'react';
 import { createPublicClient, http, parseAbiItem } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 
 // Token decimals from config (USDC uses 6 decimals)
 const DECIMALS_DIVISOR = 10 ** TOKEN_DECIMALS;
 
 // Create a public client for reading events with a proper RPC
 const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http('https://sepolia.base.org'),
+  chain: base,
+  transport: http('https://mainnet.base.org'),
 });
 
 export interface BlockchainBet {
