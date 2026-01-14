@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Market, placeBet } from '@/lib/marketApi';
-import { useAccount, useChainId } from 'wagmi';
+import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePlaceBet, Position, useMarketProbabilities, useTokenAllowance, useTokenApproval, useTokenBalance, useBucketLiquidity, useDualCoinPlaceBet, useDualCoinTokenAllowance, useDualCoinTokenApproval, useDualCoinBucketLiquidity, useMaxBetSize } from '@/hooks/useContract';
 import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
@@ -27,6 +27,7 @@ interface BetDialogProps {
 export function BetDialog({ market, position, odds, bucketIndex, coinName, onClose, onBetPlaced }: BetDialogProps) {
   const { address, isConnected, chain } = useAccount();
   const chainIdFromHook = useChainId();
+  const { switchChain } = useSwitchChain();
   // Fallback to chain.id from useAccount if useChainId fails
   const chainId = chainIdFromHook || chain?.id;
   const [amount, setAmount] = useState('5'); // Default 5 tokens
@@ -572,8 +573,16 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
           ) : isConnected && chainId !== 8453 ? (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                <strong>Wrong Network:</strong> Please switch to Base mainnet.
+              <AlertDescription className="text-xs flex items-center justify-between">
+                <span><strong>Wrong Network:</strong> Please switch to Base mainnet.</span>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="ml-2 h-6 text-xs"
+                  onClick={() => switchChain({ chainId: 8453 })}
+                >
+                  Switch to Base
+                </Button>
               </AlertDescription>
             </Alert>
           ) : needsApproval ? (

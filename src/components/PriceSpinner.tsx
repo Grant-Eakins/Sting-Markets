@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { TrendingUp, TrendingDown, DollarSign, Loader2, CheckCircle2, Share2 } from 'lucide-react';
 import { cn, formatCryptoPrice } from '@/lib/utils';
 import { usePlaceBet, useTokenAllowance, useTokenApproval, useTokenBalance } from '@/hooks/useContract';
-import { useAccount, useChainId } from 'wagmi';
+import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { CONTRACT_ADDRESSES, TOKEN_DECIMALS, TOKEN_SYMBOL } from '@/config/contract';
 import { parseUnits } from 'viem';
 import sdk from '@farcaster/frame-sdk';
@@ -107,6 +107,7 @@ export function PriceSpinner({
   // Wallet and contract hooks
   const { address, isConnected, chain } = useAccount();
   const chainIdFromHook = useChainId();
+  const { switchChain } = useSwitchChain();
   // Fallback to chain.id from useAccount if useChainId fails
   const chainId = chainIdFromHook || chain?.id;
   const { placeBet: placeBetOnChain, isPending, isConfirming, isConfirmed, error: contractError, hash: txHash } = usePlaceBet();
@@ -702,8 +703,16 @@ export function PriceSpinner({
 
         {/* Wrong network warning */}
         {isConnected && chainId !== 8453 && (
-          <div className="text-yellow-500 text-xs text-center py-2 bg-yellow-500/10 rounded border border-yellow-500/20">
-            ⚠️ Switch to Base to place bets
+          <div className="text-yellow-500 text-xs text-center py-2 bg-yellow-500/10 rounded border border-yellow-500/20 flex items-center justify-center gap-2">
+            <span>⚠️ Switch to Base to place bets</span>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="h-6 text-xs"
+              onClick={() => switchChain({ chainId: 8453 })}
+            >
+              Switch
+            </Button>
           </div>
         )}
 
