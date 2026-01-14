@@ -1151,7 +1151,7 @@ export default function MyBets() {
               <CardDescription className="mb-6 text-xs">
                 Connected: {address?.slice(0, 6)}...{address?.slice(-4)}
                 <br />
-                Contract: {CONTRACT_ADDRESSES[8453].slice(0, 10)}...
+                Contract: {DUAL_COIN_CONTRACT_ADDRESSES[8453].slice(0, 10)}...
               </CardDescription>
               <Button asChild>
                 <a href="/">Browse Markets</a>
