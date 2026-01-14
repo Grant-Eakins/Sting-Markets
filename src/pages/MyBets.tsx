@@ -939,86 +939,6 @@ export default function MyBets() {
 
         {/* Bets List */}
         <div className="space-y-6">
-          {/* Active Bets */}
-          {activeBets.length > 0 && (
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold mb-4">Active Bets</h2>
-              <div className="space-y-3">
-                {activeBets.map((bet) => {
-                  // Calculate potential winnings based on share ratio * opposite bucket liquidity
-                  // This requires fetching pool data from the contract
-                  const marketData = getBetMarketData(bet.marketId);
-                  let potentialWinnings = bet.potentialPayout;
-                  
-                  // If we have market data with probabilities, calculate more accurately
-                  if (marketData && marketData.probabilities && marketData.probabilities.length > bet.outcomeIndex) {
-                    const yourProbability = marketData.probabilities[bet.outcomeIndex];
-                    if (yourProbability > 0 && marketData.totalLiquidity > 0) {
-                      // Your proportional share of winning bucket
-                      const yourShareOfWinningBucket = bet.amountToken / (marketData.totalLiquidity * yourProbability);
-                      // Size of losing bucket
-                      const losingBucketSize = marketData.totalLiquidity * (1 - yourProbability);
-                      // Potential payout = your bet + your share of losing side
-                      potentialWinnings = bet.amountToken + (yourShareOfWinningBucket * losingBucketSize);
-                      // Cap at total liquidity
-                      potentialWinnings = Math.min(potentialWinnings, marketData.totalLiquidity);
-                    }
-                  }
-                  
-                  return (
-                    <Card key={bet.betId.toString()}>
-                      <CardContent className="p-4 sm:p-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                          <div className="flex-1 space-y-2">
-                            {/* Coin/Market Name */}
-                            <div className="flex items-center gap-2">
-                              {bet.market?.isDualCoin ? (
-                                <TrendingUp className="w-5 h-5 text-green-500 shrink-0" />
-                              ) : bet.isUpBet ? (
-                                <TrendingUp className="w-5 h-5 text-green-500 shrink-0" />
-                              ) : (
-                                <TrendingDown className="w-5 h-5 text-red-500 shrink-0" />
-                              )}
-                              <span className="font-bold text-lg">{bet.marketName}</span>
-                              <Badge variant="secondary" className="font-mono text-xs">
-                                {bet.market?.isDualCoin 
-                                  ? (bet.outcomeIndex === 0 
-                                      ? (bet.market.coinASymbol || ((bet.market as any).symbol?.split('-')[0]) || 'Coin A')
-                                      : (bet.market.coinBSymbol || ((bet.market as any).symbol?.split('-')[1]) || 'Coin B'))
-                                  : bet.bucketLabel
-                                }
-                              </Badge>
-                            </div>
-                            
-                            {/* Simple stats */}
-                            <div className="grid grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Amount Bet:</span>
-                                <p className="font-bold text-lg">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Shares:</span>
-                                <p className="font-bold text-lg text-purple-500">{bet.sharesNum.toFixed(2)}</p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Bought at:</span>
-                                <p className="font-bold text-lg text-blue-500">{bet.purchaseProbability}%</p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Potential Win:</span>
-                                <p className="font-bold text-lg text-green-500">{potentialWinnings.toFixed(2)} {TOKEN_SYMBOL}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Settled Bets */}
           {settledBets.length > 0 && (
             <div>
@@ -1113,6 +1033,86 @@ export default function MyBets() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active Bets */}
+          {activeBets.length > 0 && (
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold mb-4">Active Bets</h2>
+              <div className="space-y-3">
+                {activeBets.map((bet) => {
+                  // Calculate potential winnings based on share ratio * opposite bucket liquidity
+                  // This requires fetching pool data from the contract
+                  const marketData = getBetMarketData(bet.marketId);
+                  let potentialWinnings = bet.potentialPayout;
+                  
+                  // If we have market data with probabilities, calculate more accurately
+                  if (marketData && marketData.probabilities && marketData.probabilities.length > bet.outcomeIndex) {
+                    const yourProbability = marketData.probabilities[bet.outcomeIndex];
+                    if (yourProbability > 0 && marketData.totalLiquidity > 0) {
+                      // Your proportional share of winning bucket
+                      const yourShareOfWinningBucket = bet.amountToken / (marketData.totalLiquidity * yourProbability);
+                      // Size of losing bucket
+                      const losingBucketSize = marketData.totalLiquidity * (1 - yourProbability);
+                      // Potential payout = your bet + your share of losing side
+                      potentialWinnings = bet.amountToken + (yourShareOfWinningBucket * losingBucketSize);
+                      // Cap at total liquidity
+                      potentialWinnings = Math.min(potentialWinnings, marketData.totalLiquidity);
+                    }
+                  }
+                  
+                  return (
+                    <Card key={bet.betId.toString()}>
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="flex-1 space-y-2">
+                            {/* Coin/Market Name */}
+                            <div className="flex items-center gap-2">
+                              {bet.market?.isDualCoin ? (
+                                <TrendingUp className="w-5 h-5 text-green-500 shrink-0" />
+                              ) : bet.isUpBet ? (
+                                <TrendingUp className="w-5 h-5 text-green-500 shrink-0" />
+                              ) : (
+                                <TrendingDown className="w-5 h-5 text-red-500 shrink-0" />
+                              )}
+                              <span className="font-bold text-lg">{bet.marketName}</span>
+                              <Badge variant="secondary" className="font-mono text-xs">
+                                {bet.market?.isDualCoin 
+                                  ? (bet.outcomeIndex === 0 
+                                      ? (bet.market.coinASymbol || ((bet.market as any).symbol?.split('-')[0]) || 'Coin A')
+                                      : (bet.market.coinBSymbol || ((bet.market as any).symbol?.split('-')[1]) || 'Coin B'))
+                                  : bet.bucketLabel
+                                }
+                              </Badge>
+                            </div>
+                            
+                            {/* Simple stats */}
+                            <div className="grid grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Amount Bet:</span>
+                                <p className="font-bold text-lg">{bet.amountToken.toFixed(2)} {TOKEN_SYMBOL}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Shares:</span>
+                                <p className="font-bold text-lg text-purple-500">{bet.sharesNum.toFixed(2)}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Bought at:</span>
+                                <p className="font-bold text-lg text-blue-500">{bet.purchaseProbability}%</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Potential Win:</span>
+                                <p className="font-bold text-lg text-green-500">{potentialWinnings.toFixed(2)} {TOKEN_SYMBOL}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}

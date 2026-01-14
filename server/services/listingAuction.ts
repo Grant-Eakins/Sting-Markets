@@ -341,6 +341,27 @@ export async function finalizeAuction(): Promise<{ success: boolean; winners?: L
 }
 
 /**
+ * Clear all bids from the database (called when starting new auction cycle)
+ */
+export async function clearAllBids(): Promise<boolean> {
+  const supabase = getDb();
+  console.log('🗑️ Clearing all bids from database...');
+  
+  const { error } = await supabase
+    .from('listing_bids')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+  
+  if (error) {
+    console.error('❌ Error clearing bids from database:', error);
+    return false;
+  }
+  
+  console.log('✅ Database bids cleared');
+  return true;
+}
+
+/**
  * Get user's bids
  */
 export async function getUserBids(walletAddress: string): Promise<ListingBid[]> {

@@ -22,6 +22,7 @@ import {
   finalizeOnChainAuction,
   clearOnChainAuctionBids
 } from './blockchainSync';
+import { clearAllBids as clearDatabaseBids } from './listingAuction';
 
 const getDb = () => {
   const db = getSupabase();
@@ -364,8 +365,9 @@ async function checkAndCycleAuctions() {
         // Wait a moment for state to update
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Clear old bids
+        // Clear old bids (both on-chain and database)
         await clearOnChainAuctionBids();
+        await clearDatabaseBids();
         
         // Wait a moment
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -579,9 +581,10 @@ async function bootstrapAutoCycle() {
     .update({ linked_market_id: newMarket.id })
     .eq('id', 1);
   
-  // Clear any old bids and start fresh auction
+  // Clear any old bids and start fresh auction (both on-chain and database)
   console.log('🧹 Clearing old auction bids...');
   await clearOnChainAuctionBids();
+  await clearDatabaseBids();
   
   // Start auction for 24-hour cycle
   console.log(`🎪 Starting ${auctionDurationHours}-hour auction`);
@@ -670,6 +673,7 @@ async function finalizeAuctionAndCreateMarket() {
         console.log('⚠️ No fallback coins available - cannot create market');
         // Clear bids and start a new auction anyway
         await clearOnChainAuctionBids();
+        await clearDatabaseBids();
         const { auctionDurationHours } = getNext24HourCycleTiming();
         await startOnChainAuction(auctionDurationHours);
         return;
@@ -682,6 +686,7 @@ async function finalizeAuctionAndCreateMarket() {
       if (!token1 || !token2) {
         console.error('❌ Failed to fetch prices for fallback coins');
         await clearOnChainAuctionBids();
+        await clearDatabaseBids();
         const { auctionDurationHours } = getNext24HourCycleTiming();
         await startOnChainAuction(auctionDurationHours);
         return;
@@ -791,9 +796,10 @@ async function finalizeAuctionAndCreateMarket() {
       .update({ linked_market_id: newMarket.id })
       .eq('id', 1);
 
-    // Clear old auction bids on-chain
-    console.log('\n🧹 Step 6: Clearing old auction bids on-chain...');
+    // Clear old auction bids (on-chain and database)
+    console.log('\n🧹 Step 6: Clearing old auction bids...');
     await clearOnChainAuctionBids();
+    await clearDatabaseBids();
 
     // Start new auction for full 24-hour cycle
     console.log(`\n🎪 Step 7: Starting new auction for next cycle`);
