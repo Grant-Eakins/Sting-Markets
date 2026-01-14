@@ -18,7 +18,7 @@ const publicClient = createPublicClient({
  * [stockSymbol, sessionType, status, numOutcomes, referencePrice, finalPrice, lockTime, settleTime, settled, winningOutcome, totalLiquidity]
  */
 export function useAggregateMarketStats(markets: Market[]) {
-  const contractAddress = CONTRACT_ADDRESSES[84532];
+  const contractAddress = CONTRACT_ADDRESSES[8453];
   const [eventBetCount, setEventBetCount] = useState(0);
 
   // Filter markets with blockchain IDs

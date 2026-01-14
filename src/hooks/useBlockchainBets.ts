@@ -40,8 +40,8 @@ export function useBlockchainBets() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const contractAddress = CONTRACT_ADDRESSES[84532];
-  const dualCoinContractAddress = DUAL_COIN_CONTRACT_ADDRESSES[84532];
+  const contractAddress = CONTRACT_ADDRESSES[8453];
+  const dualCoinContractAddress = DUAL_COIN_CONTRACT_ADDRESSES[8453];
 
   const fetchBets = async () => {
     if (!address || (!contractAddress && !dualCoinContractAddress)) {

@@ -12,14 +12,14 @@ export const CONTRACT_ADDRESSES = {
 
 export const DUAL_COIN_CONTRACT_ADDRESSES = {
   // Base Mainnet
-  8453: '0x0000000000000000000000000000000000000000',
+  8453: '0xBAa1e14BCE9154D75db4458b2C31EE02C4fBB368', // ProportionalMarketDualCoin
   // Base Sepolia Testnet
   84532: '0xfe1FbFd6d3d53617d1dd4664280900aCf9B16df4', // ProportionalMarketDualCoin
 } as const;
 
 export const LISTING_AUCTION_ADDRESSES = {
   // Base Mainnet
-  8453: '0x0000000000000000000000000000000000000000',
+  8453: '0x208E5150866C37c4022bA216deE23a13d6c18370', // ListingAuction (USDC, vault mode)
   // Base Sepolia Testnet
   84532: '0x4e03284c6caCD161A3238AAe211DA11FbbC6fC0C', // ListingAuction (USDC, vault mode)
 } as const;

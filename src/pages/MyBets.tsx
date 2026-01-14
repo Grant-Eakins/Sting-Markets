@@ -196,7 +196,7 @@ export default function MyBets() {
   // Query standard MIND contract for standard markets
   const { data: stdMarketsData } = useReadContracts({
     contracts: stdMarketIds.map((marketId) => ({
-      address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
+      address: CONTRACT_ADDRESSES[8453] as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'getMarket',
       args: [marketId],
@@ -212,7 +212,7 @@ export default function MyBets() {
   // Query dual coin USDC contract for dual coin markets
   const { data: dualMarketsData } = useReadContracts({
     contracts: dualMarketIds.map((marketId) => ({
-      address: DUAL_COIN_CONTRACT_ADDRESSES[84532] as `0x${string}`,
+      address: DUAL_COIN_CONTRACT_ADDRESSES[8453] as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'getMarket',
       args: [marketId],
@@ -260,7 +260,7 @@ export default function MyBets() {
   // Query standard markets
   const { data: stdProbabilitiesData } = useReadContracts({
     contracts: stdMarketIds.map((marketId) => ({
-      address: CONTRACT_ADDRESSES[84532] as `0x${string}`,
+      address: CONTRACT_ADDRESSES[8453] as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'getProbabilities',
       args: [marketId],
@@ -276,7 +276,7 @@ export default function MyBets() {
   // Query dual coin markets
   const { data: dualProbabilitiesData } = useReadContracts({
     contracts: dualMarketIds.map((marketId) => ({
-      address: DUAL_COIN_CONTRACT_ADDRESSES[84532] as `0x${string}`,
+      address: DUAL_COIN_CONTRACT_ADDRESSES[8453] as `0x${string}`,
       abi: PREDICTION_MARKET_ABI,
       functionName: 'getProbabilities',
       args: [marketId],
@@ -324,8 +324,8 @@ export default function MyBets() {
       // Determine if this is a dual coin market
       const isDualCoin = marketIdsToDualCoin.get(marketId.toString()) || false;
       const contractAddress = isDualCoin 
-        ? DUAL_COIN_CONTRACT_ADDRESSES[84532]
-        : CONTRACT_ADDRESSES[84532];
+        ? DUAL_COIN_CONTRACT_ADDRESSES[8453]
+        : CONTRACT_ADDRESSES[8453];
       
       console.log(`💰 Claiming payout for market ${marketId} (isDualCoin: ${isDualCoin}, contract: ${contractAddress})`);
       
@@ -1151,7 +1151,7 @@ export default function MyBets() {
               <CardDescription className="mb-6 text-xs">
                 Connected: {address?.slice(0, 6)}...{address?.slice(-4)}
                 <br />
-                Contract: {CONTRACT_ADDRESSES[84532].slice(0, 10)}...
+                Contract: {CONTRACT_ADDRESSES[8453].slice(0, 10)}...
               </CardDescription>
               <Button asChild>
                 <a href="/">Browse Markets</a>

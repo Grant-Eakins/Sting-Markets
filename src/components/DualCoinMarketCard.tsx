@@ -7,7 +7,8 @@ import { BetDialog } from './BetDialog';
 import { useLiveCoinPrice } from '@/hooks/useLiveCoinPrice';
 import { useDualCoinBucketLiquidity, useMaxBetSize } from '@/hooks/useContract';
 import { createPublicClient, http, parseAbiItem } from 'viem';
-import { baseSepolia } from 'wagmi/chains';
+import { baseSepolia, base } from 'wagmi/chains';
+import { useChainId } from 'wagmi';
 import { DUAL_COIN_CONTRACT_ADDRESSES } from '@/config/contract';
 
 interface DualCoinMarketCardProps {
@@ -69,6 +70,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   const [showBetDialog, setShowBetDialog] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<'UP' | 'DOWN'>('UP');
   const [onChainBetCount, setOnChainBetCount] = useState<number | null>(null);
+  const chainId = useChainId();
 
   // Fetch live prices from DexScreener
   const { data: coinAData } = useLiveCoinPrice(market.coinAAddress);
@@ -89,10 +91,14 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
       }
 
       try {
-        const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[84532];
+        const activeChainId = (chainId === 8453 || chainId === 84532) ? chainId : 8453;
+        const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
+        const chain = activeChainId === 8453 ? base : baseSepolia;
+        const rpcUrl = activeChainId === 8453 ? 'https://mainnet.base.org' : 'https://sepolia.base.org';
+        
         const publicClient = createPublicClient({
-          chain: baseSepolia,
-          transport: http('https://sepolia.base.org'),
+          chain,
+          transport: http(rpcUrl),
         });
 
         const currentBlock = await publicClient.getBlockNumber();

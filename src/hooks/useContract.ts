@@ -296,7 +296,7 @@ export function useSellShares() {
 export function useMarketProbabilities(marketId: number | undefined | null, isDualCoin: boolean = false) {
   const chainId = useChainId();
   // Default to Base Sepolia if not connected
-  const activeChainId = chainId || 84532;
+  const activeChainId = chainId || 8453;
   const contractAddress = isDualCoin 
     ? DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES]
     : CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
@@ -306,7 +306,7 @@ export function useMarketProbabilities(marketId: number | undefined | null, isDu
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getProbabilities',
     args: marketId != null ? [BigInt(marketId)] : undefined,
-    chainId: 84532, // Explicitly use Base Sepolia
+    chainId: 8453, // Explicitly use Base Sepolia
     query: {
       enabled: marketId != null,
       refetchInterval: 3000, // Refetch every 3 seconds for faster updates
@@ -343,7 +343,7 @@ export function useMarketProbabilities(marketId: number | undefined | null, isDu
 export function useBucketLiquidity(marketId: number | undefined | null, outcomeIndex: number | undefined) {
   const chainId = useChainId();
   // Default to Base Sepolia if not connected
-  const activeChainId = chainId || 84532;
+  const activeChainId = chainId || 8453;
   const contractAddress = CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
@@ -351,7 +351,7 @@ export function useBucketLiquidity(marketId: number | undefined | null, outcomeI
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getBucketData',
     args: marketId != null && outcomeIndex !== undefined ? [BigInt(marketId), outcomeIndex] : undefined,
-    chainId: 84532, // Explicitly use Base Sepolia
+    chainId: 8453, // Explicitly use Base Sepolia
     query: {
       enabled: marketId != null && outcomeIndex !== undefined,
       refetchInterval: 3000, // Refetch every 3 seconds
@@ -561,7 +561,7 @@ export function useProtocolFees() {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'protocolFeesCollected',
-    chainId: chainId || 84532,
+    chainId: chainId || 8453,
     query: {
       enabled: !!contractAddress,
       refetchInterval: 5000,
@@ -587,7 +587,7 @@ export function useDualCoinProtocolFees() {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'protocolFeesCollected',
-    chainId: chainId || 84532,
+    chainId: chainId || 8453,
     query: {
       enabled: !!contractAddress,
       refetchInterval: 5000,
@@ -613,7 +613,7 @@ export function useMaxBetSize() {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'maxBetSize',
-    chainId: chainId || 84532,
+    chainId: chainId || 8453,
     query: {
       enabled: !!contractAddress,
       refetchInterval: 10000,
@@ -681,7 +681,7 @@ export function useBurnConfig() {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'burnEnabled',
-    chainId: chainId || 84532,
+    chainId: chainId || 8453,
     query: {
       enabled: !!contractAddress,
       refetchInterval: 10000,
@@ -692,7 +692,7 @@ export function useBurnConfig() {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'totalBurned',
-    chainId: chainId || 84532,
+    chainId: chainId || 8453,
     query: {
       enabled: !!contractAddress,
       refetchInterval: 10000,
@@ -703,7 +703,7 @@ export function useBurnConfig() {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'utilityToken',
-    chainId: chainId || 84532,
+    chainId: chainId || 8453,
     query: {
       enabled: !!contractAddress,
       refetchInterval: 10000,
@@ -714,7 +714,7 @@ export function useBurnConfig() {
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'uniswapRouter',
-    chainId: chainId || 84532,
+    chainId: chainId || 8453,
     query: {
       enabled: !!contractAddress,
       refetchInterval: 10000,
@@ -1298,7 +1298,7 @@ export function useStopAuction() {
  */
 export function useDualCoinBucketLiquidity(marketId: number | undefined | null, outcomeIndex: number | undefined) {
   const chainId = useChainId();
-  const activeChainId = chainId || 84532;
+  const activeChainId = chainId || 8453;
   const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
@@ -1306,7 +1306,7 @@ export function useDualCoinBucketLiquidity(marketId: number | undefined | null, 
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getBucketData',
     args: marketId != null && outcomeIndex !== undefined ? [BigInt(marketId), outcomeIndex] : undefined,
-    chainId: 84532,
+    chainId: 8453,
     query: {
       enabled: marketId != null && outcomeIndex !== undefined,
       refetchInterval: 3000,

@@ -95,8 +95,8 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
   // Get max bet size for dual coin markets
   const { maxBetSize } = useMaxBetSize();
   
-  // Default to Base Sepolia (84532) if not connected
-  const activeChainId = chainId || 84532;
+  // Default to Base Mainnet (8453) if not connected
+  const activeChainId = chainId || 8453;
   const contractAddress = isDualCoin 
     ? DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES]
     : CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
@@ -569,11 +569,11 @@ export function BetDialog({ market, position, odds, bucketIndex, coinName, onClo
                 <strong>Success!</strong> Your bet has been placed on-chain.
               </AlertDescription>
             </Alert>
-          ) : isConnected && chainId !== 84532 ? (
+          ) : isConnected && chainId !== 8453 ? (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                <strong>Wrong Network:</strong> Please switch to Base Sepolia testnet.
+                <strong>Wrong Network:</strong> Please switch to Base mainnet.
               </AlertDescription>
             </Alert>
           ) : needsApproval ? (

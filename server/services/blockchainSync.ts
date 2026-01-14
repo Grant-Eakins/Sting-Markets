@@ -2,18 +2,25 @@
  * Service to automatically create on-chain markets for Google Trends
  */
 import { createPublicClient, createWalletClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { baseSepolia, base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import dotenv from 'dotenv';
 import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, LISTING_AUCTION_ADDRESSES } from '../../shared/contracts';
 
 dotenv.config();
 
-// ProportionalMarketUSDC contract address (Base Sepolia)
-const CONTRACT_ADDRESS = CONTRACT_ADDRESSES[84532];
+// Target chain from environment (8453 = mainnet, 84532 = testnet)
+const TARGET_CHAIN_ID = parseInt(process.env.TARGET_CHAIN_ID || '8453') as 8453 | 84532;
+const TARGET_CHAIN = TARGET_CHAIN_ID === 8453 ? base : baseSepolia;
+const RPC_URL = TARGET_CHAIN_ID === 8453 
+  ? (process.env.BASE_RPC_URL || 'https://mainnet.base.org')
+  : (process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org');
 
-// ProportionalMarketDualCoin contract address (Base Sepolia)
-const DUAL_COIN_CONTRACT_ADDRESS = DUAL_COIN_CONTRACT_ADDRESSES[84532];
+console.log(`🔗 Blockchain sync targeting chain: ${TARGET_CHAIN_ID} (${TARGET_CHAIN_ID === 8453 ? 'MAINNET' : 'TESTNET'})`);
+
+// Contract addresses based on target chain
+const CONTRACT_ADDRESS = CONTRACT_ADDRESSES[TARGET_CHAIN_ID];
+const DUAL_COIN_CONTRACT_ADDRESS = DUAL_COIN_CONTRACT_ADDRESSES[TARGET_CHAIN_ID];
 
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)
@@ -167,8 +174,8 @@ const DUAL_COIN_ABI = [
   }
 ] as const;
 
-// ListingAuction contract address (Base Sepolia)
-const AUCTION_CONTRACT_ADDRESS = LISTING_AUCTION_ADDRESSES[84532];
+// ListingAuction contract address based on target chain
+const AUCTION_CONTRACT_ADDRESS = LISTING_AUCTION_ADDRESSES[TARGET_CHAIN_ID];
 
 // ListingAuction ABI (for on-chain auction management)
 const AUCTION_ABI = [
@@ -248,18 +255,21 @@ export function initializeBlockchain() {
 
     walletClient = createWalletClient({
       account,
-      chain: baseSepolia,
-      transport: http()
+      chain: TARGET_CHAIN,
+      transport: http(RPC_URL)
     });
 
     publicClient = createPublicClient({
-      chain: baseSepolia,
-      transport: http()
+      chain: TARGET_CHAIN,
+      transport: http(RPC_URL)
     });
 
     isInitialized = true;
     console.log('✅ Blockchain sync initialized');
+    console.log(`🔗 Chain: ${TARGET_CHAIN_ID} (${TARGET_CHAIN_ID === 8453 ? 'MAINNET' : 'TESTNET'})`);
     console.log('📍 Contract:', CONTRACT_ADDRESS);
+    console.log('📍 Dual Coin:', DUAL_COIN_CONTRACT_ADDRESS);
+    console.log('📍 Auction:', AUCTION_CONTRACT_ADDRESS);
     console.log('👤 Owner:', account.address);
     return true;
   } catch (error: any) {

@@ -111,7 +111,7 @@ export function PriceSpinner({
   const chainId = chainIdFromHook || chain?.id;
   const { placeBet: placeBetOnChain, isPending, isConfirming, isConfirmed, error: contractError, hash: txHash } = usePlaceBet();
   
-  const activeChainId = chainId || 84532;
+  const activeChainId = chainId || 8453;
   const contractAddress = CONTRACT_ADDRESSES[activeChainId as keyof typeof CONTRACT_ADDRESSES];
   const isContractDeployed = contractAddress && contractAddress !== '0x0000000000000000000000000000000000000000';
 
@@ -701,9 +701,9 @@ export function PriceSpinner({
         )}
 
         {/* Wrong network warning */}
-        {isConnected && chainId !== 84532 && (
+        {isConnected && chainId !== 8453 && (
           <div className="text-yellow-500 text-xs text-center py-2 bg-yellow-500/10 rounded border border-yellow-500/20">
-            ⚠️ Switch to Base Sepolia to place bets
+            ⚠️ Switch to Base to place bets
           </div>
         )}
 
@@ -715,7 +715,7 @@ export function PriceSpinner({
             selectedLevel !== null && priceLevels[selectedLevel].bucketIndex >= 6 && 'bg-red-600 hover:bg-red-700',
             (selectedLevel === null || (priceLevels[selectedLevel].bucketIndex >= 4 && priceLevels[selectedLevel].bucketIndex <= 5)) && 'bg-primary hover:bg-primary/90'
           )}
-          disabled={selectedLevel === null || !betAmount || parseFloat(betAmount) < 1 || !isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming || chainId !== 84532}
+          disabled={selectedLevel === null || !betAmount || parseFloat(betAmount) < 1 || !isConnected || isPending || isConfirming || isConfirmed || isApproving || isApprovalConfirming || chainId !== 8453}
           size="sm"
         >
           {isApproving ? (
@@ -745,8 +745,8 @@ export function PriceSpinner({
             </>
           ) : !isConnected ? (
             'Connect Wallet to Bet'
-          ) : chainId !== 84532 ? (
-            'Switch to Base Sepolia'
+          ) : chainId !== 8453 ? (
+            'Switch to Base'
           ) : selectedLevel === null ? (
             'Select a price bucket'
           ) : (

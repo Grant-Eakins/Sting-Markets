@@ -1,6 +1,6 @@
 import { useReadContract } from 'wagmi';
 import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI } from '@/config/contract';
-import { baseSepolia } from 'wagmi/chains';
+import { base } from 'wagmi/chains';
 
 /**
  * Hook to read market data directly from the ProportionalMarket smart contract
@@ -9,14 +9,14 @@ import { baseSepolia } from 'wagmi/chains';
  * Note: The new contract uses multi-outcome buckets instead of binary upPool/downPool
  */
 export function useContractMarketData(blockchainMarketId: number | undefined) {
-  const contractAddress = CONTRACT_ADDRESSES[84532];
+  const contractAddress = CONTRACT_ADDRESSES[8453];
 
   const { data: marketData, isLoading, error, refetch } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getMarket',
     args: blockchainMarketId !== undefined && blockchainMarketId !== null ? [BigInt(blockchainMarketId)] : undefined,
-    chainId: baseSepolia.id,
+    chainId: base.id,
     query: {
       enabled: blockchainMarketId !== undefined && blockchainMarketId !== null,
       refetchInterval: 3000, // Refetch every 3 seconds for faster updates
@@ -31,7 +31,7 @@ export function useContractMarketData(blockchainMarketId: number | undefined) {
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getProbabilities',
     args: blockchainMarketId !== undefined && blockchainMarketId !== null ? [BigInt(blockchainMarketId)] : undefined,
-    chainId: baseSepolia.id,
+    chainId: base.id,
     query: {
       enabled: blockchainMarketId !== undefined && blockchainMarketId !== null,
       refetchInterval: 3000, // Refetch every 3 seconds
@@ -130,7 +130,7 @@ export function useContractMarketData(blockchainMarketId: number | undefined) {
  * Note: ProportionalMarket doesn't have getMarketBets, so this uses marketCounter instead
  */
 export function useContractMarketBets(blockchainMarketId: number | undefined) {
-  const contractAddress = CONTRACT_ADDRESSES[84532];
+  const contractAddress = CONTRACT_ADDRESSES[8453];
 
   // The ProportionalMarket contract doesn't track individual bets like the old binary contract
   // Instead, it tracks shares per bucket. For now, return a placeholder.
@@ -141,7 +141,7 @@ export function useContractMarketBets(blockchainMarketId: number | undefined) {
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getMarket',
     args: blockchainMarketId !== undefined && blockchainMarketId !== null ? [BigInt(blockchainMarketId)] : undefined,
-    chainId: baseSepolia.id,
+    chainId: base.id,
     query: {
       enabled: blockchainMarketId !== undefined && blockchainMarketId !== null,
       refetchInterval: 3000, // Refetch every 3 seconds
