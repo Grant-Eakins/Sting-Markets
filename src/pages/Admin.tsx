@@ -131,6 +131,10 @@ export default function AdminPage() {
   const [newMaxBetInput, setNewMaxBetInput] = useState('');
   const [walletBetLimitEnabled, setWalletBetLimitEnabled] = useState(true);
   const [togglingWalletLimit, setTogglingWalletLimit] = useState(false);
+  
+  // Withdraw all state
+  const [withdrawAllStep, setWithdrawAllStep] = useState<number>(0); // 0 = idle, 1-3 = step in progress
+  const [withdrawAllError, setWithdrawAllError] = useState<string | null>(null);
 
   // Protocol fees hooks - Standard contract
   const { feesCollected, isLoading: feesLoading, refetch: refetchFees } = useProtocolFees();
@@ -931,6 +935,56 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* Withdraw All Button */}
+                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-lg">
+                  <div>
+                    <p className="text-sm font-semibold text-green-500">💰 Withdraw All to Treasury</p>
+                    <p className="text-xs text-muted-foreground">
+                      Collect all fees from Standard, Dual Coin, and Auction contracts in one click
+                    </p>
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      setWithdrawAllStep(1);
+                      setWithdrawAllError(null);
+                      try {
+                        // Step 1: Standard fees
+                        if (feesCollected && feesCollected > 0n) {
+                          await withdrawFees();
+                        }
+                        setWithdrawAllStep(2);
+                        // Step 2: Dual coin fees
+                        if (dualCoinFees && dualCoinFees > 0n) {
+                          await withdrawDualCoinFees();
+                        }
+                        setWithdrawAllStep(3);
+                        // Step 3: Auction funds
+                        if (auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000') {
+                          await withdrawAuctionFunds();
+                        }
+                        setWithdrawAllStep(0);
+                      } catch (err: any) {
+                        setWithdrawAllError(err.message || 'Failed to withdraw');
+                        setWithdrawAllStep(0);
+                      }
+                    }}
+                    disabled={withdrawAllStep > 0 || isWithdrawing || isWithdrawingDual || isWithdrawingAuction}
+                    size="lg"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {withdrawAllStep === 1 && '⏳ Standard...'}
+                    {withdrawAllStep === 2 && '⏳ Battle...'}
+                    {withdrawAllStep === 3 && '⏳ Auction...'}
+                    {withdrawAllStep === 0 && '🏦 Withdraw All'}
+                  </Button>
+                </div>
+                
+                {withdrawAllError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Withdraw All Error: {withdrawAllError}</AlertDescription>
+                  </Alert>
+                )}
                 {/* Standard Contract Fees */}
                 <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                   <div>
