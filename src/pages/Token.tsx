@@ -132,10 +132,9 @@ export default function Token() {
     }
   };
 
-  // DEX links for buying
+  // DEX links for buying (pump.fun for Solana token)
   const buyLinks = {
-    uniswap: `https://app.uniswap.org/swap?outputCurrency=${tokenContract}&chain=base`,
-    baseSwap: `https://baseswap.fi/swap?outputCurrency=${tokenContract}`,
+    pumpfun: `https://pump.fun/coin/${tokenContract}`,
   };
 
   return (
@@ -292,7 +291,7 @@ export default function Token() {
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </Button>
             </div>
-            <a href={buyLinks.uniswap} target="_blank" rel="noopener noreferrer">
+            <a href={buyLinks.pumpfun} target="_blank" rel="noopener noreferrer">
               <Button className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-bold" size="sm">
                 <ExternalLink className="w-3 h-3 mr-1" />
                 Buy $STNG
