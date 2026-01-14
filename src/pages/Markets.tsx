@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Market, fetchMarkets } from '@/lib/marketApi';
-import { TOKEN_SYMBOL, TOKEN_ADDRESSES } from '@/config/contract';
+import { TOKEN_SYMBOL } from '@/config/contract';
 import { MarketCard } from '@/components/MarketCard';
 import { DualCoinMarketCard } from '@/components/DualCoinMarketCard';
 import { ScheduledMarketCard } from '@/components/ScheduledMarketCard';
@@ -10,11 +10,11 @@ import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MarketCardSkeleton, StatCardSkeleton } from '@/components/ui/skeleton';
 import { useAggregateMarketStats } from '@/hooks/useAggregateMarketStats';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount } from 'wagmi';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,8 +22,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ChevronDown } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { baseSepolia } from 'viem/chains';
 
 // Authorized admin wallet addresses (lowercase for comparison)
 const ADMIN_WALLETS = [
@@ -31,60 +29,13 @@ const ADMIN_WALLETS = [
   '0xb0687ef6ea5906089ec3586f9997764650bf1934',
 ];
 
-const MOCK_USDC_ABI = [
-  {
-    "inputs": [],
-    "name": "faucet",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-] as const;
-
 export default function Markets() {
   const { address, isConnected } = useAccount();
   const { isInFarcasterClient } = useFarcasterAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { toast } = useToast();
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash });
   
   // Check if connected wallet is admin
   const isAdmin = isConnected && address && ADMIN_WALLETS.includes(address.toLowerCase());
-
-  const handleFaucet = async () => {
-    if (!isConnected) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      writeContract({
-        address: TOKEN_ADDRESSES[baseSepolia.id] as `0x${string}`,
-        abi: MOCK_USDC_ABI,
-        functionName: 'faucet',
-        chainId: baseSepolia.id,
-        chain: undefined,
-        account: address,
-      });
-      
-      toast({
-        title: "Requesting USDC...",
-        description: "Transaction submitted",
-      });
-    } catch (error) {
-      console.error('Faucet error:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to request USDC",
-        variant: "destructive",
-      });
-    }
-  };
 
   // Fetch active markets
   const { data: markets = [], isLoading, refetch } = useQuery({
@@ -169,15 +120,18 @@ export default function Markets() {
           
           <div className="flex items-center gap-1 sm:gap-2">
             <div className="hidden sm:flex flex-col items-center">
-              <Button 
-                size="sm"
-                onClick={handleFaucet}
-                disabled={!isConnected || isPending || isConfirming}
-                className="bg-green-600 hover:bg-green-700 text-white"
+              <a 
+                href="https://app.uniswap.org/swap?chain=base&outputCurrency=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
-              </Button>
-              <span className="text-[10px] text-muted-foreground mt-0.5">(Need test ETH for transactions)</span>
+                <Button 
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Get USDC <ExternalLink className="w-3 h-3 ml-1" />
+                </Button>
+              </a>
             </div>
             <FarcasterConnect />
             {!isInFarcasterClient && <WalletConnect />}
@@ -197,18 +151,19 @@ export default function Markets() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
             <div className="mb-2">
-              <Button 
-                size="sm"
-                onClick={() => {
-                  handleFaucet();
-                  setMobileMenuOpen(false);
-                }}
-                disabled={!isConnected || isPending || isConfirming}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
+              <a 
+                href="https://app.uniswap.org/swap?chain=base&outputCurrency=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
               >
-                {isPending || isConfirming ? "Collecting..." : "Get Test USDC"}
-              </Button>
-              <p className="text-xs text-muted-foreground text-center mt-1">(Need test ETH for transactions)</p>
+                <Button 
+                  size="sm"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Get USDC <ExternalLink className="w-3 h-3 ml-1" />
+                </Button>
+              </a>
             </div>
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Coin Battles</Button>

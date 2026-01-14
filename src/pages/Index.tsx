@@ -3,69 +3,10 @@ import { HowItWorks } from "@/components/HowItWorks";
 import { WalletConnect } from "@/components/WalletConnect";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
-import { TOKEN_ADDRESSES } from '@/config/contract';
-import { useToast } from '@/hooks/use-toast';
-import { baseSepolia } from 'viem/chains';
-
-const MOCK_USDC_ABI = [
-  {
-    "inputs": [],
-    "name": "faucet",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-] as const;
+import { ExternalLink } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { isConnected } = useAccount();
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
-  
-  const handleFaucet = async () => {
-    if (!isConnected) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet first",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      writeContract({
-        address: TOKEN_ADDRESSES[baseSepolia.id] as `0x${string}`,
-        abi: MOCK_USDC_ABI,
-        functionName: 'faucet',
-        chainId: baseSepolia.id,
-        chain: undefined,
-        account: address,
-      });
-      
-      toast({
-        title: "Requesting USDC...",
-        description: "Transaction submitted",
-      });
-    } catch (error) {
-      console.error('Faucet error:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to request USDC",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Show success toast when transaction confirms
-  if (isSuccess) {
-    toast({
-      title: "Success!",
-      description: "1000 Mock USDC added to your wallet",
-    });
-  }
   
   return (
     <div className="min-h-screen bg-background">
@@ -80,15 +21,19 @@ const Index = () => {
           Start Betting on Markets
         </Button>
         <div>
-          <Button 
-            size="lg"
-            onClick={handleFaucet}
-            disabled={!isConnected || isPending || isConfirming}
-            variant="outline"
-            className="bg-green-600 hover:bg-green-700 text-white border-0"
+          <a 
+            href="https://app.uniswap.org/swap?chain=base&outputCurrency=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            {isPending || isConfirming ? "Collecting..." : "Collect 1000 Mock USDC"}
-          </Button>
+            <Button 
+              size="lg"
+              variant="outline"
+              className="bg-blue-600 hover:bg-blue-700 text-white border-0"
+            >
+              Get USDC <ExternalLink className="w-4 h-4 ml-2" />
+            </Button>
+          </a>
         </div>
       </div>
       <HowItWorks />
