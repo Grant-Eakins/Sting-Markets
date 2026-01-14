@@ -1115,7 +1115,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <span className="text-muted-foreground">Min Bid:</span>
-                        <p className="font-medium">{auctionConfig.minBidAmount} MIND</p>
+                        <p className="font-medium">{auctionConfig.minBidAmount} USDC</p>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Total Bids:</span>
@@ -1268,7 +1268,7 @@ export default function AdminPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                     <Input 
-                      placeholder="Min Bid (MIND)" 
+                      placeholder="Min Bid (USDC)" 
                       value={auctionMinBid}
                       onChange={(e) => setAuctionMinBid(e.target.value)}
                       type="number"

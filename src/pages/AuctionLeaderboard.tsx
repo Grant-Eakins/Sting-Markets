@@ -149,7 +149,7 @@ export default function AuctionLeaderboard() {
     if (isApproved && coinAddress && bidAmount && !hasHandledApproval.current) {
       hasHandledApproval.current = true;
       refetchAllowance();
-      toast({ title: '✅ Approved! Submitting bid...', description: `Now sending your ${tokenSymbol || 'MIND'} bid to the auction` });
+      toast({ title: '✅ Approved! Submitting bid...', description: `Now sending your ${tokenSymbol || 'USDC'} bid to the auction` });
       
       // Auto-submit after approval
       const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(coinAddress);
@@ -194,9 +194,9 @@ export default function AuctionLeaderboard() {
       } else if (errorMessage.includes('Auction has ended')) {
         errorMessage = 'This auction has already ended.';
       } else if (errorMessage.includes('Bid below minimum')) {
-        errorMessage = `Your bid is below the minimum of ${config?.minBidAmount || 0} ${tokenSymbol || 'MIND'} tokens.`;
+        errorMessage = `Your bid is below the minimum of ${config?.minBidAmount || 0} ${tokenSymbol || 'USDC'} tokens.`;
       } else if (errorMessage.includes('insufficient allowance')) {
-        errorMessage = `Please approve ${tokenSymbol || 'MIND'} tokens first.`;
+        errorMessage = `Please approve ${tokenSymbol || 'USDC'} tokens first.`;
       }
       
       toast({ 
@@ -212,7 +212,7 @@ export default function AuctionLeaderboard() {
   useEffect(() => {
     if (isRefundConfirmed && !hasHandledRefund.current) {
       hasHandledRefund.current = true;
-      toast({ title: '✅ Refund claimed!', description: `Your ${tokenSymbol || 'MIND'} tokens have been returned to your wallet` });
+      toast({ title: '✅ Refund claimed!', description: `Your ${tokenSymbol || 'USDC'} tokens have been returned to your wallet` });
       setRefundingBidId(null);
       refetchUserBids();
       refetchLeaderboard();
@@ -262,7 +262,7 @@ export default function AuctionLeaderboard() {
     if (config && bidAmountNum < config.minBidAmount) {
       toast({ 
         title: '❌ Bid too low', 
-        description: `Minimum bid is ${config.minBidAmount} ${tokenSymbol || 'MIND'} tokens. You entered ${bidAmount}.`,
+        description: `Minimum bid is ${config.minBidAmount} ${tokenSymbol || 'USDC'} tokens. You entered ${bidAmount}.`,
         variant: 'destructive' 
       });
       return;
@@ -365,7 +365,7 @@ export default function AuctionLeaderboard() {
             if (newBidAmount <= existingBidAmount) {
               toast({ 
                 title: '❌ Bid too low', 
-                description: `This coin already has a bid of ${existingBidAmount.toLocaleString()} ${tokenSymbol || 'MIND'}. Your bid must be higher.`,
+                description: `This coin already has a bid of ${existingBidAmount.toLocaleString()} ${tokenSymbol || 'USDC'}. Your bid must be higher.`,
                 variant: 'destructive' 
               });
               setIsValidatingCoin(false);
@@ -374,7 +374,7 @@ export default function AuctionLeaderboard() {
             
             toast({ 
               title: '💰 Outbidding existing bid', 
-              description: `Your ${bidAmount} ${tokenSymbol || 'MIND'} will outbid the current ${existingBidAmount.toLocaleString()} ${tokenSymbol || 'MIND'}` 
+              description: `Your ${bidAmount} ${tokenSymbol || 'USDC'} will outbid the current ${existingBidAmount.toLocaleString()} ${tokenSymbol || 'USDC'}` 
             });
           }
         } catch (error) {
@@ -395,7 +395,7 @@ export default function AuctionLeaderboard() {
       const needsApproval = !allowance || allowance < amountInWei;
 
       if (needsApproval) {
-        toast({ title: '🔓 Approval needed', description: `Approving ${tokenSymbol || 'MIND'} tokens for auction...` });
+        toast({ title: '🔓 Approval needed', description: `Approving ${tokenSymbol || 'USDC'} tokens for auction...` });
         approve(bidAmount);
       } else {
         submitBid(coinAddress, detectedChain, bidAmount);
@@ -555,7 +555,7 @@ export default function AuctionLeaderboard() {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">Min Bid</div>
-                  <div className="text-lg font-bold">{config?.minBidAmount} {tokenSymbol || 'MIND'}</div>
+                  <div className="text-lg font-bold">{config?.minBidAmount} {tokenSymbol || 'USDC'}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">Total Bids</div>
@@ -591,7 +591,7 @@ export default function AuctionLeaderboard() {
                     className="flex-1"
                   />
                   <Input
-                    placeholder={`Bid Amount (${tokenSymbol || 'MIND'})`}
+                    placeholder={`Bid Amount (${tokenSymbol || 'USDC'})`}
                     type="number"
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
@@ -607,7 +607,7 @@ export default function AuctionLeaderboard() {
                     {isApprovingConfirm && 'Confirming Approval...'}
                     {isSubmitting && 'Submitting Bid...'}
                     {isSubmitConfirm && 'Confirming Bid...'}
-                    {!isProcessing && needsApproval && `Approve ${tokenSymbol || 'MIND'}`}
+                    {!isProcessing && needsApproval && `Approve ${tokenSymbol || 'USDC'}`}
                     {!isProcessing && !needsApproval && 'Submit Bid'}
                   </Button>
                 </div>

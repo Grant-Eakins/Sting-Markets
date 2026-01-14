@@ -517,7 +517,7 @@ export function useWithdrawBurnVault() {
  */
 export function useWithdrawAuctionFunds() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -910,8 +910,8 @@ export function useDualCoinPlaceBet() {
 export function useAuctionTokenAllowance() {
   const chainId = useChainId();
   const { address } = useAccount();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
-  const mindTokenAddress = MIND_TOKEN_ADDRESSES[chainId as keyof typeof MIND_TOKEN_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const mindTokenAddress = MIND_TOKEN_ADDRESSES[(chainId || 8453) as keyof typeof MIND_TOKEN_ADDRESSES];
   
   const { data: allowance, refetch } = useReadContract({
     address: mindTokenAddress as `0x${string}`,
@@ -934,8 +934,8 @@ export function useAuctionTokenAllowance() {
  */
 export function useAuctionTokenApproval() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
-  const mindTokenAddress = MIND_TOKEN_ADDRESSES[chainId as keyof typeof MIND_TOKEN_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const mindTokenAddress = MIND_TOKEN_ADDRESSES[(chainId || 8453) as keyof typeof MIND_TOKEN_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -974,7 +974,7 @@ export function useAuctionTokenApproval() {
  */
 export function useSubmitAuctionBid() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -1013,7 +1013,7 @@ export function useSubmitAuctionBid() {
  */
 export function useAuctionConfig() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: auctionAddress as `0x${string}`,
@@ -1037,7 +1037,7 @@ export function useAuctionConfig() {
  */
 export function useAuctionLeaderboard(limit: number = 50) {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: auctionAddress as `0x${string}`,
@@ -1075,7 +1075,7 @@ export function useAuctionLeaderboard(limit: number = 50) {
  */
 export function useAuctionTotalBids() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: auctionAddress as `0x${string}`,
@@ -1099,7 +1099,7 @@ export function useAuctionTotalBids() {
  */
 export function useBiddingToken() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: auctionAddress as `0x${string}`,
@@ -1142,7 +1142,7 @@ export function useTokenSymbol(tokenAddress: `0x${string}` | undefined) {
  */
 export function useUpdateBiddingToken() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -1183,7 +1183,7 @@ export function useUpdateBiddingToken() {
  */
 export function useUpdateAuctionConfig() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -1224,7 +1224,7 @@ export function useUpdateAuctionConfig() {
  */
 export function useStartAuction() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -1261,7 +1261,7 @@ export function useStartAuction() {
  */
 export function useStopAuction() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -1332,7 +1332,7 @@ export function useDualCoinBucketLiquidity(marketId: number | undefined | null, 
  */
 export function useFinalizeAuction() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -1370,7 +1370,7 @@ export function useFinalizeAuction() {
  */
 export function useRefundBid() {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
@@ -1407,7 +1407,7 @@ export function useRefundBid() {
  */
 export function useUserAuctionBids(userAddress: `0x${string}` | undefined) {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: auctionAddress as `0x${string}`,
@@ -1432,7 +1432,7 @@ export function useUserAuctionBids(userAddress: `0x${string}` | undefined) {
  */
 export function useAuctionBidDetails(bidId: bigint | undefined) {
   const chainId = useChainId();
-  const auctionAddress = LISTING_AUCTION_ADDRESSES[chainId as keyof typeof LISTING_AUCTION_ADDRESSES];
+  const auctionAddress = LISTING_AUCTION_ADDRESSES[(chainId || 8453) as keyof typeof LISTING_AUCTION_ADDRESSES];
   
   const { data, isLoading, error, refetch } = useReadContract({
     address: auctionAddress as `0x${string}`,
