@@ -531,6 +531,16 @@ export async function settleDualCoinOnChain(blockchainMarketId: number, coinAWon
       "type": "function"
     },
     {
+      "inputs": [
+        { "internalType": "uint256", "name": "marketId", "type": "uint256" },
+        { "internalType": "bool", "name": "coinAWon", "type": "bool" }
+      ],
+      "name": "settleMarketManual",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
       "name": "markets",
       "outputs": [
