@@ -18,8 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 
 const API_BASE = import.meta.env.PROD ? '/api' : 'http://localhost:3001/api';
 
-// Default token contract address (fallback if not set in database)
-const DEFAULT_TOKEN_CONTRACT = '0x0000000000000000000000000000000000000000';
+// Default token contract address (Solana pump.fun token)
+const DEFAULT_TOKEN_CONTRACT = 'BZKjWhhrtkm8RobxHtBc32TfDR83JmTLgd1K8y1zpump';
 const TOKEN_SYMBOL = '$STNG';
 const TOKEN_NAME = 'Sting Markets Token';
 
