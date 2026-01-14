@@ -101,8 +101,12 @@ export default function Token() {
     return () => clearInterval(interval);
   }, [tokenContract]);
 
+  // Hardcoded Solana token address for $STNG
+  const STNG_TOKEN_ADDRESS = 'BZKjWhhrtkm8RobxHtBc32TfDR83JmTLgd1K8y1zpump';
+  const PUMP_FUN_URL = `https://pump.fun/coin/${STNG_TOKEN_ADDRESS}`;
+
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(tokenContract);
+    navigator.clipboard.writeText(STNG_TOKEN_ADDRESS);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -130,11 +134,6 @@ export default function Token() {
     } finally {
       setIsUpdating(false);
     }
-  };
-
-  // DEX links for buying (pump.fun for Solana token)
-  const buyLinks = {
-    pumpfun: `https://pump.fun/coin/${tokenContract}`,
   };
 
   return (
@@ -291,7 +290,7 @@ export default function Token() {
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </Button>
             </div>
-            <a href="https://pump.fun/coin/BZKjWhhrtkm8RobxHtBc32TfDR83JmTLgd1K8y1zpump" target="_blank" rel="noopener noreferrer">
+            <a href={PUMP_FUN_URL} target="_blank" rel="noopener noreferrer">
               <Button className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-bold" size="sm">
                 <ExternalLink className="w-3 h-3 mr-1" />
                 Buy $STNG on Pump.fun
