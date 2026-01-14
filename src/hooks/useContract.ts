@@ -293,7 +293,7 @@ export function useSellShares() {
 /**
  * Hook to get probabilities for all outcomes in a market
  */
-export function useMarketProbabilities(marketId: number | undefined, isDualCoin: boolean = false) {
+export function useMarketProbabilities(marketId: number | undefined | null, isDualCoin: boolean = false) {
   const chainId = useChainId();
   // Default to Base Sepolia if not connected
   const activeChainId = chainId || 84532;
@@ -305,10 +305,10 @@ export function useMarketProbabilities(marketId: number | undefined, isDualCoin:
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getProbabilities',
-    args: marketId !== undefined && marketId !== null ? [BigInt(marketId)] : undefined,
+    args: marketId != null ? [BigInt(marketId)] : undefined,
     chainId: 84532, // Explicitly use Base Sepolia
     query: {
-      enabled: marketId !== undefined && marketId !== null,
+      enabled: marketId != null,
       refetchInterval: 3000, // Refetch every 3 seconds for faster updates
       staleTime: 0, // Always consider data stale to ensure fresh reads
       gcTime: 1000, // Garbage collect after 1 second
@@ -340,7 +340,7 @@ export function useMarketProbabilities(marketId: number | undefined, isDualCoin:
 /**
  * Hook to get liquidity in a specific bucket
  */
-export function useBucketLiquidity(marketId: number | undefined, outcomeIndex: number | undefined) {
+export function useBucketLiquidity(marketId: number | undefined | null, outcomeIndex: number | undefined) {
   const chainId = useChainId();
   // Default to Base Sepolia if not connected
   const activeChainId = chainId || 84532;
@@ -350,10 +350,10 @@ export function useBucketLiquidity(marketId: number | undefined, outcomeIndex: n
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getBucketData',
-    args: marketId !== undefined && outcomeIndex !== undefined ? [BigInt(marketId), outcomeIndex] : undefined,
+    args: marketId != null && outcomeIndex !== undefined ? [BigInt(marketId), outcomeIndex] : undefined,
     chainId: 84532, // Explicitly use Base Sepolia
     query: {
-      enabled: marketId !== undefined && outcomeIndex !== undefined,
+      enabled: marketId != null && outcomeIndex !== undefined,
       refetchInterval: 3000, // Refetch every 3 seconds
       staleTime: 0,
       gcTime: 1000,
