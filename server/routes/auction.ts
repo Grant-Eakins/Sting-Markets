@@ -444,10 +444,10 @@ router.delete('/fallback-queue/:id', async (req: Request, res: Response) => {
  */
 router.post('/admin/trigger-cycle-check', async (req: Request, res: Response) => {
   try {
-    const { walletAddress } = req.body;
+    const walletAddress = req.body?.walletAddress;
 
     if (!walletAddress || !isAdmin(walletAddress)) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json({ error: 'Unauthorized - walletAddress required' });
     }
 
     console.log('🧪 Admin triggering auction cycle check...');
@@ -470,10 +470,10 @@ router.post('/admin/trigger-cycle-check', async (req: Request, res: Response) =>
  */
 router.post('/admin/trigger-finalize', async (req: Request, res: Response) => {
   try {
-    const { walletAddress } = req.body;
+    const walletAddress = req.body?.walletAddress;
 
     if (!walletAddress || !isAdmin(walletAddress)) {
-      return res.status(403).json({ error: 'Unauthorized' });
+      return res.status(403).json({ error: 'Unauthorized - walletAddress required' });
     }
 
     console.log('🧪 Admin triggering auction finalization...');
