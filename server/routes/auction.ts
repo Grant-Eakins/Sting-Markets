@@ -329,7 +329,6 @@ router.get('/fallback-queue', async (req: Request, res: Response) => {
     const { data: queue, error } = await supabase
       .from('fallback_coin_queue')
       .select('*')
-      .eq('is_available', true)
       .order('added_at', { ascending: true });
 
     if (error) throw error;
@@ -373,7 +372,6 @@ router.post('/fallback-queue', async (req: Request, res: Response) => {
       .from('fallback_coin_queue')
       .select('id')
       .ilike('contract_address', contractAddress)
-      .eq('is_available', true)
       .single();
 
     if (existing) {

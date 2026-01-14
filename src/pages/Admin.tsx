@@ -173,7 +173,7 @@ export default function AdminPage() {
     linked_market_id: linkedMarketId,
   } : null;
 
-  // Fetch auto-cycle config from database (not stored on-chain)
+  // Fetch auto-cycle config and fallback queue from database (not stored on-chain)
   useEffect(() => {
     const fetchAutoCycleConfig = async () => {
       try {
@@ -188,7 +188,20 @@ export default function AdminPage() {
       }
     };
     
+    const fetchFallbackQueue = async () => {
+      try {
+        const queueResponse = await fetch(`${API_BASE}/auction/fallback-queue`);
+        const queueData = await queueResponse.json();
+        if (queueData.queue) {
+          setFallbackQueue(queueData.queue);
+        }
+      } catch (error) {
+        console.error('Error fetching fallback queue:', error);
+      }
+    };
+    
     fetchAutoCycleConfig();
+    fetchFallbackQueue();
   }, [contractAuctionConfig]); // Re-fetch when contract config changes
 
   // Use contract leaderboard data

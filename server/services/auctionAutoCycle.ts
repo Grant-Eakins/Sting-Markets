@@ -109,11 +109,11 @@ async function getCoinsFromFallbackQueue(count: number = 2): Promise<{
     return [];
   }
 
-  // Mark coins as used
+  // Delete coins from queue after using them
   const coinIds = coins.map(c => c.id);
   await supabase
     .from('fallback_coin_queue')
-    .update({ is_available: false, used_at: new Date().toISOString() })
+    .delete()
     .in('id', coinIds);
 
   console.log(`📦 Using ${coins.length} coins from fallback queue: ${coins.map(c => c.symbol).join(', ')}`);
