@@ -242,6 +242,16 @@ export default function AuctionLeaderboard() {
   const handleSubmitBid = async () => {
     if (!bidAmount || !coinAddress || !address) return;
 
+    // Validate bid meets minimum before submitting
+    if (config && bidAmount < config.minBidAmount) {
+      toast({ 
+        title: '❌ Bid too low', 
+        description: `Minimum bid is ${config.minBidAmount} ${tokenSymbol || 'MIND'} tokens. You entered ${bidAmount}.`,
+        variant: 'destructive' 
+      });
+      return;
+    }
+
     // Auto-detect chain based on address format
     const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(coinAddress);
     const isSolanaAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(coinAddress);
