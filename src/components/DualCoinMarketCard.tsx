@@ -84,7 +84,7 @@ export function DualCoinMarketCard({ market, userBet }: DualCoinMarketCardProps)
   // Fetch on-chain bet count
   useEffect(() => {
     async function fetchBetCount() {
-      if (!market.blockchainMarketId) {
+      if (market.blockchainMarketId == null) {
         return;
       }
 

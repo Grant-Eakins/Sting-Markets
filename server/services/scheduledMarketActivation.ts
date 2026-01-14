@@ -10,6 +10,33 @@ import { createOnChainMarket, createDualCoinOnChainMarket } from './blockchainSy
 import { getTokenByAddress } from './dexScreenerApi';
 
 /**
+ * Get the next 6 PM Central time (00:00 UTC next day)
+ * This is when battles end and auctions stop
+ * 
+ * Timeline in UTC:
+ * - 00:00 UTC = 6 PM Central (battle ends, auction ends)
+ * - 12:00 UTC = 6 AM Central (battle starts, market activates)
+ * 
+ * If current UTC hour is:
+ * - 0-11 (6PM-6AM Central, preview period): next 6 PM is at 00:00 UTC TOMORROW
+ * - 12-23 (6AM-6PM Central, battle period): next 6 PM is at 00:00 UTC TOMORROW
+ * 
+ * So next 6 PM Central is always 00:00 UTC of the next day after today
+ */
+function getNext6PMCentral(): Date {
+  const now = new Date();
+  const nextEnd = new Date(now);
+  nextEnd.setUTCMinutes(0, 0, 0);
+  nextEnd.setUTCHours(0); // 00:00 UTC = 6 PM Central
+  
+  // Since 00:00 UTC is the start of a day, we need to go to tomorrow's 00:00
+  // If current time has any hours past midnight, we need tomorrow
+  nextEnd.setUTCDate(nextEnd.getUTCDate() + 1);
+  
+  return nextEnd;
+}
+
+/**
  * Check for scheduled markets that should activate now and activate them
  * Checks both in-memory markets and database for scheduled markets
  */
@@ -17,14 +44,39 @@ export async function activateScheduledMarkets(): Promise<number> {
   const now = new Date();
   const supabase = getSupabase();
   
+  console.log(`[ScheduledMarkets] Checking for scheduled markets at ${now.toISOString()}`);
+  
   // Check database for scheduled markets ready to activate
   if (supabase) {
     try {
+      // First, let's check ALL scheduled markets (regardless of start_time)
+      const { data: allScheduled, error: allError } = await supabase
+        .from('markets')
+        .select('id, stock_symbol, status, start_time')
+        .eq('status', 'SCHEDULED');
+      
+      if (allError) {
+        console.error('[ScheduledMarkets] Error fetching all scheduled markets:', allError);
+      } else {
+        console.log(`[ScheduledMarkets] All SCHEDULED markets in DB: ${allScheduled?.length || 0}`);
+        if (allScheduled && allScheduled.length > 0) {
+          for (const m of allScheduled) {
+            console.log(`  - ${m.stock_symbol}: start_time=${m.start_time}, now=${now.toISOString()}, ready=${m.start_time && new Date(m.start_time) <= now}`);
+          }
+        }
+      }
+      
       const { data: dbScheduledMarkets, error } = await supabase
         .from('markets')
         .select('*')
         .eq('status', 'SCHEDULED')
         .lte('start_time', now.toISOString());
+      
+      if (error) {
+        console.error('[ScheduledMarkets] Query error:', error);
+      }
+      
+      console.log(`[ScheduledMarkets] Markets ready to activate: ${dbScheduledMarkets?.length || 0}`);
       
       if (!error && dbScheduledMarkets && dbScheduledMarkets.length > 0) {
         console.log(`🚀 Found ${dbScheduledMarkets.length} scheduled markets in DB ready to activate`);
@@ -64,15 +116,15 @@ export async function activateScheduledMarkets(): Promise<number> {
     try {
       console.log(`⏰ Activating market: ${market.stockSymbol}`);
 
-      // Recalculate lock and settle times at activation (12 hours from now)
-      const activationTime = new Date();
-      const newLockTime = new Date(activationTime.getTime() + 12 * 60 * 60 * 1000); // 12 hours from now
-      const newSettleTime = new Date(activationTime.getTime() + 12 * 60 * 60 * 1000 + 5 * 60 * 1000); // 12 hours + 5 min
+      // Lock time is the next 6 PM Central (00:00 UTC)
+      // This ensures all battles end at 6 PM Central regardless of when they're activated
+      const newLockTime = getNext6PMCentral();
+      const newSettleTime = new Date(newLockTime.getTime() + 3000); // 3 seconds after lock
       
       market.lockTime = newLockTime;
       market.settleTime = newSettleTime;
 
-      console.log(`   Lock time: ${newLockTime.toLocaleString()}`);
+      console.log(`   Lock time: ${newLockTime.toLocaleString()} (6 PM Central)`);
       console.log(`   Settle time: ${newSettleTime.toLocaleString()}`);
 
       // Fetch current prices for dual-coin markets
@@ -161,12 +213,12 @@ async function activateMarketFromDb(dbMarket: any, supabase: any) {
   
   const now = new Date();
   
-  // Recalculate lock and settle times at activation (12 hours from now)
-  const activationTime = new Date();
-  const newLockTime = new Date(activationTime.getTime() + 12 * 60 * 60 * 1000);
-  const newSettleTime = new Date(activationTime.getTime() + 12 * 60 * 60 * 1000 + 5 * 60 * 1000);
+  // Lock time is the next 6 PM Central (00:00 UTC)
+  // This ensures all battles end at 6 PM Central regardless of when they're activated
+  const newLockTime = getNext6PMCentral();
+  const newSettleTime = new Date(newLockTime.getTime() + 3000); // 3 seconds after lock
   
-  console.log(`   Lock time: ${newLockTime.toLocaleString()}`);
+  console.log(`   Lock time: ${newLockTime.toLocaleString()} (6 PM Central)`);
   console.log(`   Settle time: ${newSettleTime.toLocaleString()}`);
   
   // Fetch current prices for dual-coin markets
@@ -215,6 +267,7 @@ async function activateMarketFromDb(dbMarket: any, supabase: any) {
     }
   } catch (err: any) {
     console.error(`   ❌ Failed to create on-chain market:`, err.message);
+    console.log(`   ⚠️  Market will activate WITHOUT blockchain integration - manual sync needed`);
   }
   
   // Update database - save to both blockchain_market_id and contract_market_id for compatibility
@@ -228,7 +281,6 @@ async function activateMarketFromDb(dbMarket: any, supabase: any) {
       coin_b_opening_price: coinBOpeningPrice,
       blockchain_market_id: blockchainMarketId,  // Primary column used by main DB code
       contract_market_id: blockchainMarketId,    // Legacy column, keep in sync
-      updated_at: now.toISOString(),
     })
     .eq('id', dbMarket.id);
   

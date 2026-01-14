@@ -1296,7 +1296,7 @@ export function useStopAuction() {
 /**
  * Hook to get bucket liquidity for dual coin market
  */
-export function useDualCoinBucketLiquidity(marketId: number | undefined, outcomeIndex: number | undefined) {
+export function useDualCoinBucketLiquidity(marketId: number | undefined | null, outcomeIndex: number | undefined) {
   const chainId = useChainId();
   const activeChainId = chainId || 84532;
   const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[activeChainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
@@ -1305,10 +1305,10 @@ export function useDualCoinBucketLiquidity(marketId: number | undefined, outcome
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'getBucketData',
-    args: marketId !== undefined && outcomeIndex !== undefined ? [BigInt(marketId), outcomeIndex] : undefined,
+    args: marketId != null && outcomeIndex !== undefined ? [BigInt(marketId), outcomeIndex] : undefined,
     chainId: 84532,
     query: {
-      enabled: marketId !== undefined && outcomeIndex !== undefined,
+      enabled: marketId != null && outcomeIndex !== undefined,
       refetchInterval: 3000,
       staleTime: 0,
       gcTime: 1000,

@@ -37,40 +37,42 @@ const getDb = () => {
 function getNext24HourCycleTiming() {
   const now = new Date();
   
-  // Align to 12-hour UTC boundaries (00:00 or 12:00)
+  // Central Time is UTC-6 (CST) or UTC-5 (CDT)
+  // For simplicity, we use fixed UTC times that correspond to Central Time:
+  // 6 AM Central = 12:00 UTC (in winter CST)
+  // 6 PM Central = 00:00 UTC next day (midnight UTC)
+  // 
+  // The cycle is:
+  // - 6 PM Central (00:00 UTC): Auction ends, battle ends, settle, new scheduled market, new auction starts
+  // - 6 AM Central (12:00 UTC): Scheduled market becomes ACTIVE, battle begins
+  // - 6 PM Central (00:00 UTC): Battle ends (12 hours), auction ends (12 hours running)
+  
   const currentHour = now.getUTCHours();
-  const currentSessionStart = currentHour < 12 ? 0 : 12;
-  const nextSessionStart = currentSessionStart === 0 ? 12 : 0;
   
-  // Calculate when the next session starts (market becomes active)
-  const sessionStartDate = new Date(now);
-  sessionStartDate.setUTCMinutes(0, 0, 0);
+  // Determine the next 6 AM Central (12:00 UTC) for when market becomes active
+  const startTime = new Date(now);
+  startTime.setUTCMinutes(0, 0, 0);
+  startTime.setUTCHours(12); // 6 AM Central = 12:00 UTC
   
-  if (nextSessionStart === 0) {
-    // Next session is midnight tomorrow
-    sessionStartDate.setUTCDate(sessionStartDate.getUTCDate() + 1);
-    sessionStartDate.setUTCHours(0);
-  } else {
-    // Next session is noon today or tomorrow
-    if (currentHour >= 12) {
-      sessionStartDate.setUTCDate(sessionStartDate.getUTCDate() + 1);
-    }
-    sessionStartDate.setUTCHours(12);
+  // If we're past noon UTC, the next 6 AM Central is tomorrow
+  if (currentHour >= 12) {
+    startTime.setUTCDate(startTime.getUTCDate() + 1);
   }
   
-  // startTime = when market goes from scheduled to active (first 12-hour boundary)
-  const startTime = new Date(sessionStartDate);
-  
-  // lockTime = when betting stops (12 hours after startTime = 24 hours total cycle)
+  // lockTime = 6 PM Central (00:00 UTC) = 12 hours after 6 AM Central
+  // This is when battle ends and betting stops
   const lockTime = new Date(startTime.getTime() + 12 * 60 * 60 * 1000);
   
-  // settleTime = when winner is determined (a few seconds after lock)
+  // settleTime = a few seconds after lock for settlement
   const settleTime = new Date(lockTime.getTime() + 3000);
   
-  // Total auction duration in hours (from now until market settles)
+  // Auction runs from 6 PM Central to 6 PM Central (24 hours total, but we calculate remaining)
+  // Since auction should end at 6 PM Central when battle ends, calculate hours until lockTime
   const auctionDurationHours = Math.max(1, Math.floor((lockTime.getTime() - Date.now()) / (1000 * 60 * 60)));
   
-  const sessionLabel = `${startTime.toDateString()} ${startTime.getUTCHours()}:00 UTC`;
+  // Format session label with Central Time
+  const centralStartHour = 6; // 6 AM Central
+  const sessionLabel = `${startTime.toDateString()} ${centralStartHour}:00 AM Central (${startTime.getUTCHours()}:00 UTC)`;
   
   return { startTime, lockTime, settleTime, auctionDurationHours, sessionLabel };
 }
@@ -347,6 +349,35 @@ async function checkAndCycleAuctions() {
       
       console.log(`📊 Market: ${currentMarket.title} (SCHEDULED, activates in ${Math.round(minutesToActivation)} min)`);
       
+      // Check if auction is marked active but has actually expired (timer ran out)
+      // In this case, we need to clean up the old auction and start a fresh one
+      const auctionExpired = auctionConfig.isActive && auctionConfig.auctionEnd && now > auctionConfig.auctionEnd;
+      
+      if (auctionExpired) {
+        console.log('⚠️ Old auction expired but still marked active - cleaning up...');
+        console.log(`   Auction end: ${auctionConfig.auctionEnd.toISOString()}`);
+        console.log(`   Current time: ${now.toISOString()}`);
+        
+        // Stop the expired auction (this will let us finalize and clear)
+        await stopOnChainAuction();
+        
+        // Wait a moment for state to update
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Clear old bids
+        await clearOnChainAuctionBids();
+        
+        // Wait a moment
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Now start a fresh auction for the current scheduled market
+        const settleTime = new Date(currentMarket.settle_time);
+        const hoursUntilSettle = Math.max(1, Math.floor((settleTime.getTime() - now.getTime()) / (1000 * 60 * 60)));
+        console.log(`🎪 Starting fresh auction (${hoursUntilSettle} hours until market settles)`);
+        await startOnChainAuction(hoursUntilSettle);
+        return;
+      }
+      
       // If auction not running, start it for the full cycle
       if (!auctionConfig.isActive) {
         // Auction runs until market settles (start_time + 12h battle = settle_time)
@@ -364,6 +395,19 @@ async function checkAndCycleAuctions() {
     const minutesRemaining = (settleTime.getTime() - now.getTime()) / (1000 * 60);
 
     console.log(`📊 Market: ${currentMarket.title} (ACTIVE, settles in ${Math.round(minutesRemaining)} min)`);
+
+    // Check if auction has ended (either by timer or manually stopped)
+    // If auction ended but market is still active, we should schedule the next battle now
+    const auctionEnded = !auctionConfig.isActive || (auctionConfig.auctionEnd && now > auctionConfig.auctionEnd);
+    
+    if (auctionEnded) {
+      console.log('🏁 Auction has ended while market is still active - scheduling next battle...');
+      console.log(`   Auction isActive: ${auctionConfig.isActive}`);
+      console.log(`   Auction end time: ${auctionConfig.auctionEnd ? new Date(auctionConfig.auctionEnd).toISOString() : 'N/A'}`);
+      console.log(`   Current time: ${now.toISOString()}`);
+      await finalizeAuctionAndCreateMarket();
+      return;
+    }
 
     // If auction not running, start it to run alongside the active battle
     if (!auctionConfig.isActive) {

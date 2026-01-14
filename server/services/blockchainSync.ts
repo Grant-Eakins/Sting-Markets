@@ -1018,6 +1018,7 @@ export async function stopOnChainAuction(): Promise<boolean> {
 
 /**
  * Finalize auction on-chain with winning bid IDs
+ * Automatically stops auction first if it's still active
  */
 export async function finalizeOnChainAuction(winningBidIds: bigint[]): Promise<boolean> {
   if (!isInitialized || !walletClient) {
@@ -1026,6 +1027,19 @@ export async function finalizeOnChainAuction(winningBidIds: bigint[]): Promise<b
   }
 
   try {
+    // First check if auction is still active and stop it
+    const auctionConfig = await getOnChainAuctionConfig();
+    if (auctionConfig && auctionConfig.isActive) {
+      console.log('🛑 Auction still active - stopping first...');
+      const stopped = await stopOnChainAuction();
+      if (!stopped) {
+        console.error('❌ Failed to stop auction before finalizing');
+        return false;
+      }
+      // Wait a moment for the state to update
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
     console.log(`🏆 Finalizing on-chain auction with winners: ${winningBidIds.map(id => id.toString()).join(', ')}`);
     
     const hash = await walletClient.writeContract({
