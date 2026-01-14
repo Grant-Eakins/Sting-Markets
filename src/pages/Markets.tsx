@@ -137,6 +137,9 @@ export default function Markets() {
               <Link to="/auction">
                 <Button variant="ghost" size="sm">Auction</Button>
               </Link>
+              <Link to="/token">
+                <Button variant="ghost" size="sm">Token</Button>
+              </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-1">
@@ -212,8 +215,9 @@ export default function Markets() {
             </Link>
             <Link to="/my-bets" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">My Bets</Button>
-            </Link>
-            {isAdmin && (
+            </Link>            <Link to="/token" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" size="sm" className="w-full justify-start">Token</Button>
+            </Link>            {isAdmin && (
               <Link to="/admin-167" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="ghost" size="sm" className="w-full justify-start">Admin</Button>
               </Link>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Swords, TrendingUp, Wallet, Menu, Trophy, Gavel } from 'lucide-react';
+import { Swords, TrendingUp, Wallet, Menu, Trophy, Gavel, Coins } from 'lucide-react';
 import { useState } from 'react';
 import {
   Sheet,
@@ -55,6 +55,17 @@ export function MobileFooterNav() {
           >
             <Wallet className="h-7 w-7" />
             <span className="text-sm font-medium">My Bets</span>
+          </Link>
+
+          {/* Token */}
+          <Link 
+            to="/token" 
+            className={`flex flex-col items-center justify-center flex-1 gap-1.5 py-2 transition-colors ${
+              isActive('/token') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Coins className="h-7 w-7" />
+            <span className="text-sm font-medium">Token</span>
           </Link>
 
           {/* More */}

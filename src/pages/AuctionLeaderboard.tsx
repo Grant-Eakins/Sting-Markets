@@ -100,7 +100,8 @@ export default function AuctionLeaderboard() {
       refetchLeaderboard();
     }, 10000);
     return () => clearInterval(interval);
-  }, [refetchConfig, refetchLeaderboard]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch coin metadata for leaderboard
   useEffect(() => {
@@ -139,7 +140,8 @@ export default function AuctionLeaderboard() {
     };
 
     fetchCoinMetadata();
-  }, [leaderboard]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(leaderboard)]);
 
   // Refetch allowance after approval and auto-submit bid
   useEffect(() => {
@@ -160,7 +162,8 @@ export default function AuctionLeaderboard() {
     if (!isApproved) {
       hasHandledApproval.current = false;
     }
-  }, [isApproved, coinAddress, bidAmount, refetchAllowance, toast, tokenSymbol, submitBid]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isApproved, coinAddress, bidAmount, tokenSymbol]);
 
   // Handle successful bid submission
   useEffect(() => {
@@ -176,7 +179,8 @@ export default function AuctionLeaderboard() {
     if (!isBidSubmitted) {
       hasHandledBidSubmission.current = false;
     }
-  }, [isBidSubmitted, refetchLeaderboard, refetchAllowance, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBidSubmitted]);
 
   // Handle bid submission errors
   useEffect(() => {
@@ -200,7 +204,8 @@ export default function AuctionLeaderboard() {
         variant: 'destructive' 
       });
     }
-  }, [bidError, config]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bidError]);
 
   // Handle successful refund
   useEffect(() => {
@@ -215,7 +220,8 @@ export default function AuctionLeaderboard() {
     if (!isRefundConfirmed) {
       hasHandledRefund.current = false;
     }
-  }, [isRefundConfirmed, refetchUserBids, refetchLeaderboard, tokenSymbol, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRefundConfirmed, tokenSymbol]);
 
   // Handle refund errors
   useEffect(() => {
@@ -237,6 +243,7 @@ export default function AuctionLeaderboard() {
       });
       setRefundingBidId(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refundError]);
 
   const handleClaimRefund = (bidId: bigint) => {
@@ -431,6 +438,9 @@ export default function AuctionLeaderboard() {
               <Link to="/auction">
                 <Button variant="ghost" size="sm">Auction</Button>
               </Link>
+              <Link to="/token">
+                <Button variant="ghost" size="sm">Token</Button>
+              </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-1">
@@ -484,6 +494,9 @@ export default function AuctionLeaderboard() {
             </Link>
             <Link to="/auction" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Auction</Button>
+            </Link>
+            <Link to="/token" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" size="sm" className="w-full justify-start">Token</Button>
             </Link>
             {isAdmin && (
               <Link to="/admin-167" onClick={() => setMobileMenuOpen(false)}>

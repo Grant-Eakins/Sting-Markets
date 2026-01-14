@@ -190,6 +190,46 @@ app.use(express.static(distPath));
 app.use('/api/markets', marketsRouter);
 app.use('/api/auction', auctionRouter);
 
+// Token config storage (simple file-based for now)
+const tokenConfigPath = path.join(__dirname, 'token-config.json');
+
+function getTokenConfig(): { contractAddress: string } {
+  try {
+    if (fs.existsSync(tokenConfigPath)) {
+      return JSON.parse(fs.readFileSync(tokenConfigPath, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('Error reading token config:', e);
+  }
+  return { contractAddress: '0x0000000000000000000000000000000000000000' };
+}
+
+function saveTokenConfig(config: { contractAddress: string }): void {
+  try {
+    fs.writeFileSync(tokenConfigPath, JSON.stringify(config, null, 2));
+  } catch (e) {
+    console.error('Error saving token config:', e);
+  }
+}
+
+// Get token config
+app.get('/api/token/config', (req, res) => {
+  res.json(getTokenConfig());
+});
+
+// Update token config (admin only)
+app.post('/api/token/config', (req, res) => {
+  const { contractAddress } = req.body;
+  
+  if (!contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(contractAddress)) {
+    return res.status(400).json({ error: 'Invalid contract address' });
+  }
+  
+  saveTokenConfig({ contractAddress });
+  console.log(`✅ Token contract updated to: ${contractAddress}`);
+  res.json({ success: true, contractAddress });
+});
+
 // Burn scheduler routes (admin only)
 const ADMIN_WALLETS = [
   '0x6b1b7e7b207ec756b8d9edc59db4b32184160b22',
