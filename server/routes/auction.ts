@@ -14,7 +14,7 @@ import {
   getUserBids,
   getTopTwoWinners,
 } from '../services/listingAuction';
-import { enableAutoCycle, disableAutoCycle } from '../services/auctionAutoCycle';
+import { enableAutoCycle, disableAutoCycle, triggerAuctionCycleCheck, triggerFinalizeAndCreateMarket } from '../services/auctionAutoCycle';
 import { clearOnChainAuctionBids } from '../services/blockchainSync';
 import { getSupabase } from '../services/database';
 import { getTokenByAddress } from '../services/dexScreenerApi';
@@ -431,6 +431,61 @@ router.delete('/fallback-queue/:id', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error removing from fallback queue:', error);
     res.status(500).json({ error: 'Failed to remove coin from queue' });
+  }
+});
+
+// ============================================
+// TEST ENDPOINTS (for testing auto-cycle)
+// ============================================
+
+/**
+ * POST /api/auction/admin/trigger-cycle-check
+ * Manually trigger auction cycle check (bypasses enabled check)
+ */
+router.post('/admin/trigger-cycle-check', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.body;
+
+    if (!walletAddress || !isAdmin(walletAddress)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    console.log('🧪 Admin triggering auction cycle check...');
+    const result = await triggerAuctionCycleCheck();
+    
+    res.json({
+      success: result.triggered,
+      message: result.message,
+    });
+  } catch (error: any) {
+    console.error('Error triggering cycle check:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/auction/admin/trigger-finalize
+ * Manually trigger auction finalization and new market creation
+ * This is what happens at the end of each cycle
+ */
+router.post('/admin/trigger-finalize', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req.body;
+
+    if (!walletAddress || !isAdmin(walletAddress)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    console.log('🧪 Admin triggering auction finalization...');
+    const result = await triggerFinalizeAndCreateMarket();
+    
+    res.json({
+      success: result.triggered,
+      message: result.message,
+    });
+  } catch (error: any) {
+    console.error('Error triggering finalization:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

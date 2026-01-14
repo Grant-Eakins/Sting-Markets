@@ -22,7 +22,7 @@ import { getCryptoQuote } from '../services/cryptoApi';
 import { getTokenByAddress, searchTokens, getTokenHistory } from '../services/dexScreenerApi';
 import { saveMarket, deleteMarketFromDb } from '../services/database';
 import { getScheduledMarkets } from '../services/scheduledMarketActivation';
-import { settleDualCoinMarket } from '../services/marketSettlement';
+import { settleDualCoinMarket, checkAndSettleMarkets, manuallySettleMarket } from '../services/marketSettlement';
 
 const router = express.Router();
 
@@ -1321,6 +1321,196 @@ router.get('/wallet-total/:marketId/:walletAddress', async (req, res) => {
       success: false,
       error: error.message,
     });
+  }
+});
+
+// ============================================
+// TEST ENDPOINTS (for testing auto-settlement & auto-cycle)
+// ============================================
+
+/**
+ * POST /api/markets/admin/test-dual-coin-market
+ * Create a quick 2-minute test dual-coin market
+ * Locks in 1 minute, settles in 2 minutes
+ */
+router.post('/admin/test-dual-coin-market', async (req, res) => {
+  try {
+    const supabase = require('../services/database').getSupabase();
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Database not connected' });
+    }
+
+    // Use DOGE and SHIB for testing (well-known tokens)
+    const coin1Address = '0xba2ae424d960c26247dd6c32edc70b295c744c43'; // DOGE on BSC
+    const coin2Address = '0x2859e4544c4bb03966803b044a93563bd2d0dd4d'; // SHIB on BSC
+    
+    // Get token prices
+    const token1 = await getTokenByAddress(coin1Address);
+    const token2 = await getTokenByAddress(coin2Address);
+    
+    if (!token1 || !token2) {
+      return res.status(400).json({ success: false, error: 'Could not fetch token prices' });
+    }
+
+    const now = new Date();
+    const lockMinutes = parseInt(req.body.lockMinutes || '1');
+    const settleMinutes = parseInt(req.body.settleMinutes || '2');
+    
+    const startTime = now;
+    const lockTime = new Date(now.getTime() + lockMinutes * 60 * 1000);
+    const settleTime = new Date(now.getTime() + settleMinutes * 60 * 1000);
+    
+    const marketId = `test-dual-${Date.now()}`;
+    const marketData = {
+      id: marketId,
+      title: `TEST: ${token1.symbol} vs ${token2.symbol}`,
+      stock_symbol: `${token1.symbol}-${token2.symbol}-TEST`,
+      description: `Quick test market - locks in ${lockMinutes} min, settles in ${settleMinutes} min`,
+      is_dual_coin: true,
+      status: 'ACTIVE',
+      start_time: startTime.toISOString(),
+      lock_time: lockTime.toISOString(),
+      settle_time: settleTime.toISOString(),
+      total_cost: 0,
+      reference_price: 0,
+      coin_a_address: coin1Address,
+      coin_a_symbol: token1.symbol,
+      coin_a_name: token1.name,
+      coin_a_opening_price: token1.price,
+      coin_a_image_url: token1.imageUrl,
+      coin_b_address: coin2Address,
+      coin_b_symbol: token2.symbol,
+      coin_b_name: token2.name,
+      coin_b_opening_price: token2.price,
+      coin_b_image_url: token2.imageUrl,
+    };
+
+    // Create on-chain market
+    let blockchainMarketId: number | null = null;
+    try {
+      blockchainMarketId = await createDualCoinOnChainMarket(
+        token1.symbol,
+        token2.symbol,
+        lockTime,
+        settleTime
+      );
+      if (blockchainMarketId !== null) {
+        (marketData as any).contract_market_id = blockchainMarketId;
+        console.log(`   ✅ On-chain dual coin market created: ID ${blockchainMarketId}`);
+      }
+    } catch (chainError: any) {
+      console.error(`   ⚠️ On-chain creation failed: ${chainError.message}`);
+    }
+
+    const { data: newMarket, error } = await supabase
+      .from('markets')
+      .insert(marketData)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    console.log(`🧪 Created ${settleMinutes}-minute test dual-coin market`);
+    console.log(`   ${token1.symbol} vs ${token2.symbol}`);
+    console.log(`   Locks at: ${lockTime.toISOString()}`);
+    console.log(`   Settles at: ${settleTime.toISOString()}`);
+
+    res.json({
+      success: true,
+      message: `Created ${settleMinutes}-minute test dual-coin market`,
+      market: {
+        id: marketId,
+        title: marketData.title,
+        coinA: token1.symbol,
+        coinB: token2.symbol,
+        lockTime: lockTime.toISOString(),
+        settleTime: settleTime.toISOString(),
+        secondsUntilLock: lockMinutes * 60,
+        secondsUntilSettle: settleMinutes * 60,
+        blockchainMarketId,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error creating test dual-coin market:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/markets/admin/force-settle/:marketId
+ * Force settle a specific market immediately (bypasses time checks)
+ */
+router.post('/admin/force-settle/:marketId', async (req, res) => {
+  try {
+    const { marketId } = req.params;
+    
+    // Check if it's a dual coin market in the database
+    const supabase = require('../services/database').getSupabase();
+    const { data: dbMarket } = await supabase
+      .from('markets')
+      .select('*')
+      .eq('id', marketId)
+      .single();
+    
+    if (dbMarket && dbMarket.is_dual_coin) {
+      console.log(`🧪 Force settling dual-coin market: ${dbMarket.title}`);
+      
+      // Convert DB market to Market type
+      const market = {
+        id: dbMarket.id,
+        title: dbMarket.title,
+        stockSymbol: dbMarket.stock_symbol,
+        status: dbMarket.status,
+        isDualCoin: true,
+        coinAAddress: dbMarket.coin_a_address,
+        coinBAddress: dbMarket.coin_b_address,
+        coinASymbol: dbMarket.coin_a_symbol,
+        coinBSymbol: dbMarket.coin_b_symbol,
+        coinAOpeningPrice: dbMarket.coin_a_opening_price,
+        coinBOpeningPrice: dbMarket.coin_b_opening_price,
+        blockchainMarketId: dbMarket.contract_market_id,
+      };
+      
+      const result = await settleDualCoinMarket(market as any);
+      
+      res.json({
+        success: true,
+        message: `Force settled dual-coin market: ${dbMarket.title}`,
+        result,
+      });
+    } else {
+      // Regular market
+      await manuallySettleMarket(marketId);
+      
+      res.json({
+        success: true,
+        message: `Force settled market: ${marketId}`,
+      });
+    }
+  } catch (error: any) {
+    console.error('Error force settling market:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/markets/admin/trigger-settlement-check
+ * Manually trigger the settlement check (same as cron job)
+ */
+router.post('/admin/trigger-settlement-check', async (req, res) => {
+  try {
+    console.log('🧪 Manually triggering settlement check...');
+    await checkAndSettleMarkets();
+    
+    res.json({
+      success: true,
+      message: 'Settlement check completed',
+    });
+  } catch (error: any) {
+    console.error('Error triggering settlement check:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

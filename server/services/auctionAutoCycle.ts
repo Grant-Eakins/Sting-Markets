@@ -827,3 +827,39 @@ export async function initializeAutoCycle() {
     console.error('⚠️ Failed to initialize auto-cycle (will retry later):', error);
   }
 }
+
+/**
+ * Manually trigger auction cycle check (for testing)
+ * This bypasses the auto-cycle enabled check
+ */
+export async function triggerAuctionCycleCheck(): Promise<{ triggered: boolean; message: string }> {
+  console.log('🧪 Manually triggering auction cycle check...');
+  
+  // Temporarily bypass the isChecking flag for manual trigger
+  const wasChecking = isChecking;
+  isChecking = false;
+  
+  try {
+    await checkAndCycleAuctions();
+    return { triggered: true, message: 'Auction cycle check completed' };
+  } catch (error: any) {
+    return { triggered: false, message: error.message };
+  } finally {
+    isChecking = wasChecking;
+  }
+}
+
+/**
+ * Manually trigger auction finalization and new market creation (for testing)
+ * This creates a new market from auction winners (or fallback queue)
+ */
+export async function triggerFinalizeAndCreateMarket(): Promise<{ triggered: boolean; message: string }> {
+  console.log('🧪 Manually triggering auction finalization and new market creation...');
+  
+  try {
+    await finalizeAuctionAndCreateMarket();
+    return { triggered: true, message: 'Auction finalized and new market created' };
+  } catch (error: any) {
+    return { triggered: false, message: error.message };
+  }
+}
