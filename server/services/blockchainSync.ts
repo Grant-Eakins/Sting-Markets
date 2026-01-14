@@ -5,7 +5,7 @@ import { createPublicClient, createWalletClient, http } from 'viem';
 import { baseSepolia, base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import dotenv from 'dotenv';
-import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, LISTING_AUCTION_ADDRESSES } from '../../shared/contracts';
+import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, LISTING_AUCTION_ADDRESSES, TOKEN_ADDRESSES } from '../../shared/contracts';
 
 dotenv.config();
 
@@ -21,6 +21,31 @@ console.log(`🔗 Blockchain sync targeting chain: ${TARGET_CHAIN_ID} (${TARGET_
 // Contract addresses based on target chain
 const CONTRACT_ADDRESS = CONTRACT_ADDRESSES[TARGET_CHAIN_ID];
 const DUAL_COIN_CONTRACT_ADDRESS = DUAL_COIN_CONTRACT_ADDRESSES[TARGET_CHAIN_ID];
+const USDC_ADDRESS = TOKEN_ADDRESSES[TARGET_CHAIN_ID];
+
+// ERC20 ABI for approvals
+const ERC20_ABI = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "spender", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "approve",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "owner", "type": "address" },
+      { "internalType": "address", "name": "spender", "type": "address" }
+    ],
+    "name": "allowance",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
 
 const ABI = [
   // createMarket(string stockSymbol, SessionType sessionType, uint256 referencePrice, uint256 lockTime, uint256 settleTime)
@@ -370,8 +395,34 @@ export async function createDualCoinOnChainMarket(
 
     console.log(`⛓️  Creating dual-coin market: ${coinASymbol} vs ${coinBSymbol}`);
     console.log(`   Contract: ${DUAL_COIN_CONTRACT_ADDRESS}`);
+    console.log(`   USDC: ${USDC_ADDRESS}`);
     console.log(`   Lock: ${lockTime.toLocaleString()}`);
     console.log(`   Settle: ${settleTime.toLocaleString()}`);
+
+    // Check current USDC allowance
+    const account = walletClient.account;
+    const currentAllowance = await publicClient.readContract({
+      address: USDC_ADDRESS as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [account.address, DUAL_COIN_CONTRACT_ADDRESS as `0x${string}`]
+    });
+    console.log(`   Current USDC allowance: ${currentAllowance}`);
+
+    // Approve max USDC if needed (only needs to be done once)
+    const MAX_UINT256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+    if (currentAllowance < BigInt(1000000)) { // Less than 1 USDC approved
+      console.log('   📝 Approving USDC for DualCoin contract...');
+      const approveHash = await walletClient.writeContract({
+        address: USDC_ADDRESS as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [DUAL_COIN_CONTRACT_ADDRESS as `0x${string}`, MAX_UINT256]
+      });
+      console.log(`   ⏳ Approval tx: ${approveHash}`);
+      await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      console.log('   ✅ USDC approved!');
+    }
 
     // Read nextMarketId BEFORE the transaction - this will be the ID of our new market
     const marketIdBeforeCreate = await publicClient.readContract({
