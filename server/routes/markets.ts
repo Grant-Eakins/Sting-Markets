@@ -20,7 +20,7 @@ import { Position, MarketStatus } from '../types/market';
 import { testDiscordWebhook } from '../services/discordBot';
 import { getCryptoQuote } from '../services/cryptoApi';
 import { getTokenByAddress, searchTokens, getTokenHistory } from '../services/dexScreenerApi';
-import { saveMarket, deleteMarketFromDb } from '../services/database';
+import { saveMarket, deleteMarketFromDb, getSupabase } from '../services/database';
 import { getScheduledMarkets } from '../services/scheduledMarketActivation';
 import { settleDualCoinMarket, checkAndSettleMarkets, manuallySettleMarket } from '../services/marketSettlement';
 
@@ -1335,7 +1335,7 @@ router.get('/wallet-total/:marketId/:walletAddress', async (req, res) => {
  */
 router.post('/admin/test-dual-coin-market', async (req, res) => {
   try {
-    const supabase = require('../services/database').getSupabase();
+    const supabase = getSupabase();
     if (!supabase) {
       return res.status(500).json({ success: false, error: 'Database not connected' });
     }
@@ -1447,7 +1447,7 @@ router.post('/admin/force-settle/:marketId', async (req, res) => {
     const { marketId } = req.params;
     
     // Check if it's a dual coin market in the database
-    const supabase = require('../services/database').getSupabase();
+    const supabase = getSupabase();
     const { data: dbMarket } = await supabase
       .from('markets')
       .select('*')
