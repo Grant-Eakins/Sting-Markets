@@ -53,6 +53,7 @@ export default function AuctionLeaderboard() {
   const { toast } = useToast();
   const { isInFarcasterClient } = useFarcasterAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showAuctionDetails, setShowAuctionDetails] = useState(false);
   
   // Bid form
   const [coinAddress, setCoinAddress] = useState('');
@@ -421,10 +422,10 @@ export default function AuctionLeaderboard() {
     <div className="min-h-screen bg-yellow-content flex flex-col">
       {/* Navigation Bar */}
       <div className="border-b bg-background sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:gap-6">
+        <div className="container mx-auto px-2 sm:px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 ml-4 sm:ml-0">
             <Link to="/" className="flex items-center gap-2 shrink-0">
-              <img src="/Copilot_20251128_175824-removebg-preview.png" alt="Sting Markets" className="h-8 sm:h-10" />
+              <img src="/Copilot_20251128_175824-removebg-preview.png" alt="Sting Markets" className="h-7 sm:h-10 ml-2 sm:ml-0" />
               <span className="text-lg sm:text-xl font-bold italic tracking-tight hidden sm:inline">Sting Markets</span>
             </Link>
             {/* Desktop nav */}
@@ -510,7 +511,7 @@ export default function AuctionLeaderboard() {
       {/* Main Content */}
       <div className="flex-1 container mx-auto px-4 py-8 mb-20 md:mb-0">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center mb-6 -ml-6">
+          <div className="flex items-center mb-6 ml-2 sm:-ml-6">
             <img src="/Copilot_20260113_223236.png" alt="Listing Auction" className="h-28 sm:h-32 md:h-40" />
           </div>
 
@@ -532,25 +533,36 @@ export default function AuctionLeaderboard() {
               </CardDescription>
             )}
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-sm text-muted-foreground">Min Market Cap</div>
-                <div className="text-lg font-bold">${config?.minMarketCap.toLocaleString()}</div>
+          <CardContent className="pt-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAuctionDetails(!showAuctionDetails)}
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground -ml-2"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${showAuctionDetails ? 'rotate-180' : ''}`} />
+              {showAuctionDetails ? 'Hide Details' : 'Show Details'}
+            </Button>
+            {showAuctionDetails && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 pt-3 border-t">
+                <div>
+                  <div className="text-sm text-muted-foreground">Min Market Cap</div>
+                  <div className="text-lg font-bold">${config?.minMarketCap.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Max Market Cap</div>
+                  <div className="text-lg font-bold">${config?.maxMarketCap.toLocaleString()}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Min Bid</div>
+                  <div className="text-lg font-bold">{config?.minBidAmount} {tokenSymbol || 'MIND'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Total Bids</div>
+                  <div className="text-lg font-bold">{enrichedLeaderboard.length}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Max Market Cap</div>
-                <div className="text-lg font-bold">${config?.maxMarketCap.toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Min Bid</div>
-                <div className="text-lg font-bold">{config?.minBidAmount} {tokenSymbol || 'MIND'}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Total Bids</div>
-                <div className="text-lg font-bold">{enrichedLeaderboard.length}</div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 

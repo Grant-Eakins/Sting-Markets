@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 interface SpinningCoin3DProps {
   className?: string;
@@ -9,6 +10,8 @@ interface SpinningCoin3DProps {
 
 export function SpinningCoin3D({ className }: SpinningCoin3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadProgress, setLoadProgress] = useState(0);
   const sceneRef = useRef<{
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
@@ -88,7 +91,7 @@ export function SpinningCoin3D({ className }: SpinningCoin3DProps) {
     fillLight.position.set(0, -3, 2);
     scene.add(fillLight);
 
-    // Load GLB model
+    // Load GLB model with progress tracking
     const loader = new GLTFLoader();
     let model: THREE.Group | null = null;
 
@@ -123,10 +126,16 @@ export function SpinningCoin3D({ className }: SpinningCoin3DProps) {
         model.scale.set(3.0, 3.0, 3.0);
         scene.add(model);
         sceneRef.current = { scene, camera, renderer, model, controls, animationId: 0, isDragging };
+        setIsLoading(false);
       },
-      undefined,
+      (progress) => {
+        if (progress.total > 0) {
+          setLoadProgress(Math.round((progress.loaded / progress.total) * 100));
+        }
+      },
       (error) => {
         console.error('Error loading GLB:', error);
+        setIsLoading(false);
       }
     );
 
@@ -178,8 +187,41 @@ export function SpinningCoin3D({ className }: SpinningCoin3DProps) {
         cursor: 'grab',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
+        position: 'relative'
       }}
-    />
+    >
+      {isLoading && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 10
+        }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            border: '4px solid rgba(212, 165, 0, 0.2)',
+            borderTop: '4px solid #d4a500',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <span style={{ color: '#d4a500', fontSize: '14px', fontWeight: 500 }}>
+            {loadProgress > 0 ? `${loadProgress}%` : 'Loading...'}
+          </span>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      )}
+    </div>
   );
 }
