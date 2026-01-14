@@ -443,7 +443,7 @@ async function settleMarketWithData(marketId: string, symbol: string, openingPri
  * Manually settle a specific market (for admin use)
  */
 export async function manuallySettleMarket(marketId: string): Promise<void> {
-  const market = require('./marketService').getMarket(marketId);
+  const market = getMarket(marketId);
   if (!market) {
     throw new Error('Market not found');
   }
