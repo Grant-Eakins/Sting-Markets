@@ -242,8 +242,10 @@ export default function AuctionLeaderboard() {
   const handleSubmitBid = async () => {
     if (!bidAmount || !coinAddress || !address) return;
 
+    const bidAmountNum = Number(bidAmount);
+    
     // Validate bid meets minimum before submitting
-    if (config && bidAmount < config.minBidAmount) {
+    if (config && bidAmountNum < config.minBidAmount) {
       toast({ 
         title: '❌ Bid too low', 
         description: `Minimum bid is ${config.minBidAmount} ${tokenSymbol || 'MIND'} tokens. You entered ${bidAmount}.`,
@@ -403,9 +405,9 @@ export default function AuctionLeaderboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-yellow-content flex flex-col">
       {/* Navigation Bar */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+      <div className="border-b bg-background sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4 lg:gap-6">
             <Link to="/" className="flex items-center gap-2 shrink-0">
@@ -476,9 +478,8 @@ export default function AuctionLeaderboard() {
       {/* Main Content */}
       <div className="flex-1 container mx-auto px-4 py-8 mb-20 md:mb-0">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 mb-6">
-            <Trophy className="h-8 w-8 text-yellow-500" />
-            <h1 className="text-3xl font-bold">Listing Auction</h1>
+          <div className="flex items-center mb-6 -ml-6">
+            <img src="/Copilot_20260113_223236.png" alt="Listing Auction" className="h-28 sm:h-32 md:h-40" />
           </div>
 
         {/* Auction Status */}

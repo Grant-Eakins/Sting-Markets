@@ -1448,7 +1448,10 @@ router.post('/admin/force-settle/:marketId', async (req, res) => {
     
     // Check if it's a dual coin market in the database
     const supabase = getSupabase();
-    const { data: dbMarket } = await supabase
+    if (!supabase) {
+      return res.status(500).json({ success: false, error: 'Database not initialized' });
+    }
+    const { data: dbMarket } = await supabase!
       .from('markets')
       .select('*')
       .eq('id', marketId)
