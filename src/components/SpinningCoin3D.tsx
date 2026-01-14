@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 interface SpinningCoin3DProps {
   className?: string;
@@ -91,12 +90,12 @@ export function SpinningCoin3D({ className }: SpinningCoin3DProps) {
     fillLight.position.set(0, -3, 2);
     scene.add(fillLight);
 
-    // Load GLB model with progress tracking
+    // Load simplified GLB model
     const loader = new GLTFLoader();
     let model: THREE.Group | null = null;
 
     loader.load(
-      '/gold coinbest.glb',
+      '/coin.glb',
       (gltf) => {
         model = gltf.scene;
         
