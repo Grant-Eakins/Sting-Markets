@@ -12,7 +12,7 @@ export default function Terms() {
           <Link to="/">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Markets
+              Back to Coin Battles
             </Button>
           </Link>
           <Link to="/" className="flex items-center gap-2">
@@ -49,9 +49,9 @@ export default function Terms() {
             </CardHeader>
             <CardContent className="prose prose-sm dark:prose-invert">
               <p>
-                Sting Markets provides a platform for users to participate in prediction markets related to equity price 
-                movements. Users can place bets on predicted price ranges for various cryptocurrencies and receive payouts based on 
-                market outcomes.
+                Sting Markets provides a platform for users to participate in Coin Battles - head-to-head prediction markets 
+                where users bet on which cryptocurrency will perform better over a set time period. Users can also participate 
+                in the Listing Auction to nominate coins for upcoming battles.
               </p>
               <p>
                 All transactions occur on the Base blockchain network. You are responsible for understanding how blockchain 
@@ -102,7 +102,7 @@ export default function Terms() {
             </CardHeader>
             <CardContent className="prose prose-sm dark:prose-invert">
               <p>
-                The Platform charges a 1% fee on all transactions (buying and selling shares). Additionally, you are 
+                The Platform charges a 3% fee on all transactions (buying and selling shares). Additionally, you are 
                 responsible for all blockchain gas fees associated with your transactions.
               </p>
               <p>
@@ -197,7 +197,7 @@ export default function Terms() {
           <div className="flex justify-center gap-6">
             <Link to="/privacy" className="hover:underline">Privacy Policy</Link>
             <Link to="/risk-disclaimer" className="hover:underline">Risk Disclaimer</Link>
-            <Link to="/" className="hover:underline">Back to Markets</Link>
+            <Link to="/" className="hover:underline">Back to Coin Battles</Link>
           </div>
         </div>
       </div>

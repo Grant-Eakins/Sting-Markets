@@ -10,8 +10,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TrendingUp, TrendingDown, Trophy, Wallet, AlertCircle, ArrowRightLeft, Menu, X, History } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trophy, Wallet, AlertCircle, ArrowRightLeft, Menu, X, History, ChevronDown } from 'lucide-react';
 import { archiveBet, isBetArchived, type ArchivedBet } from './BetHistory';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 // Authorized admin wallet addresses (lowercase for comparison)
 const ADMIN_WALLETS = [
@@ -453,12 +459,31 @@ export default function MyBets() {
                 <Link to="/">
                   <Button variant="ghost" size="sm">Coin Battles</Button>
                 </Link>
-                <Link to="/single-markets">
-                  <Button variant="ghost" size="sm">Markets</Button>
-                </Link>
                 <Link to="/my-bets">
                   <Button variant="ghost" size="sm">My Bets</Button>
                 </Link>
+                <Link to="/auction">
+                  <Button variant="ghost" size="sm">Auction</Button>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-1">
+                      More
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link to="/terms">Terms of Service</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/privacy">Privacy Policy</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/risk-disclaimer">Risk Disclaimer</Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </nav>
             </div>
             <div className="flex items-center gap-2">
@@ -799,15 +824,31 @@ export default function MyBets() {
               <Link to="/">
                 <Button variant="ghost" size="sm">Coin Battles</Button>
               </Link>
-              <Link to="/single-markets">
-                <Button variant="ghost" size="sm">Markets</Button>
-              </Link>
               <Link to="/my-bets">
                 <Button variant="ghost" size="sm">My Bets</Button>
               </Link>
               <Link to="/auction">
                 <Button variant="ghost" size="sm">Auction</Button>
               </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    More
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/terms">Terms of Service</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/privacy">Privacy Policy</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/risk-disclaimer">Risk Disclaimer</Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {isAdmin && (
                 <Link to="/admin-167">
                   <Button variant="ghost" size="sm">Admin</Button>
@@ -836,9 +877,6 @@ export default function MyBets() {
           <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Coin Battles</Button>
-            </Link>
-            <Link to="/single-markets" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="ghost" size="sm" className="w-full justify-start">Markets</Button>
             </Link>
             <Link to="/my-bets" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">My Bets</Button>

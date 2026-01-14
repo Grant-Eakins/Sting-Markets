@@ -15,6 +15,13 @@ import { Button } from '@/components/ui/button';
 import { MarketCardSkeleton, StatCardSkeleton } from '@/components/ui/skeleton';
 import { useAggregateMarketStats } from '@/hooks/useAggregateMarketStats';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { baseSepolia } from 'viem/chains';
 
@@ -124,15 +131,31 @@ export default function Markets() {
               <Link to="/">
                 <Button variant="ghost" size="sm">Coin Battles</Button>
               </Link>
-              <Link to="/single-markets">
-                <Button variant="ghost" size="sm">Markets</Button>
-              </Link>
               <Link to="/my-bets">
                 <Button variant="ghost" size="sm">My Bets</Button>
               </Link>
               <Link to="/auction">
                 <Button variant="ghost" size="sm">Auction</Button>
               </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    More
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/terms">Terms of Service</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/privacy">Privacy Policy</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/risk-disclaimer">Risk Disclaimer</Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {isAdmin && (
                 <Link to="/admin-167">
                   <Button variant="ghost" size="sm">Admin</Button>
@@ -186,9 +209,6 @@ export default function Markets() {
             </div>
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Coin Battles</Button>
-            </Link>
-            <Link to="/single-markets" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="ghost" size="sm" className="w-full justify-start">Markets</Button>
             </Link>
             <Link to="/my-bets" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">My Bets</Button>

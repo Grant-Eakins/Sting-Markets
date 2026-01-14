@@ -6,10 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Trophy, Coins, Timer, DollarSign, TrendingUp, Play, StopCircle, CheckCircle2, Menu, X, RefreshCw } from 'lucide-react';
+import { Trophy, Coins, Timer, DollarSign, TrendingUp, Play, StopCircle, CheckCircle2, Menu, X, RefreshCw, ChevronDown } from 'lucide-react';
 import { WalletConnect } from '@/components/WalletConnect';
 import { FarcasterConnect } from '@/components/FarcasterConnect';
 import { useFarcasterAuth } from '@/hooks/useFarcasterAuth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuctionTokenAllowance, useAuctionTokenApproval, useSubmitAuctionBid, useAuctionConfig, useAuctionLeaderboard, useAuctionTotalBids, useBiddingToken, useTokenSymbol, useUserAuctionBids, useRefundBid, useAuctionBidDetails } from '@/hooks/useContract';
 import { formatUnits } from 'viem';
 
@@ -419,15 +425,31 @@ export default function AuctionLeaderboard() {
               <Link to="/">
                 <Button variant="ghost" size="sm">Coin Battles</Button>
               </Link>
-              <Link to="/single-markets">
-                <Button variant="ghost" size="sm">Markets</Button>
-              </Link>
               <Link to="/my-bets">
                 <Button variant="ghost" size="sm">My Bets</Button>
               </Link>
               <Link to="/auction">
                 <Button variant="ghost" size="sm">Auction</Button>
               </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    More
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/terms">Terms of Service</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/privacy">Privacy Policy</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/risk-disclaimer">Risk Disclaimer</Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {isAdmin && (
                 <Link to="/admin-167">
                   <Button variant="ghost" size="sm">Admin</Button>
@@ -456,9 +478,6 @@ export default function AuctionLeaderboard() {
           <div className="md:hidden border-t bg-background px-4 py-3 space-y-1">
             <Link to="/" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">Coin Battles</Button>
-            </Link>
-            <Link to="/single-markets" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="ghost" size="sm" className="w-full justify-start">Markets</Button>
             </Link>
             <Link to="/my-bets" onClick={() => setMobileMenuOpen(false)}>
               <Button variant="ghost" size="sm" className="w-full justify-start">My Bets</Button>

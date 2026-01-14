@@ -12,7 +12,7 @@ export default function Privacy() {
           <Link to="/">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Markets
+              Back to Coin Battles
             </Button>
           </Link>
           <Link to="/" className="flex items-center gap-2">
@@ -51,9 +51,9 @@ export default function Privacy() {
             <CardContent className="prose prose-sm dark:prose-invert">
               <p><strong>Information collected automatically:</strong></p>
               <ul>
-                <li><strong>Wallet Address:</strong> Your public Ethereum wallet address when you connect to the Platform</li>
-                <li><strong>Transaction Data:</strong> All blockchain transactions are public and permanently recorded</li>
-                <li><strong>Usage Data:</strong> Pages visited, features used, and interaction patterns</li>
+                <li><strong>Wallet Address:</strong> Your public wallet address when you connect to participate in Coin Battles</li>
+                <li><strong>Transaction Data:</strong> All Coin Battle bets and auction bids are public blockchain transactions</li>
+                <li><strong>Usage Data:</strong> Pages visited, battles participated in, and interaction patterns</li>
                 <li><strong>Device Information:</strong> Browser type, operating system, and device identifiers</li>
                 <li><strong>IP Address:</strong> For security and fraud prevention purposes</li>
               </ul>
@@ -250,7 +250,7 @@ export default function Privacy() {
           <div className="flex justify-center gap-6">
             <Link to="/terms" className="hover:underline">Terms of Service</Link>
             <Link to="/risk-disclaimer" className="hover:underline">Risk Disclaimer</Link>
-            <Link to="/" className="hover:underline">Back to Markets</Link>
+            <Link to="/" className="hover:underline">Back to Coin Battles</Link>
           </div>
         </div>
       </div>
