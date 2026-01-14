@@ -925,7 +925,9 @@ export default function MyBets() {
                           <div className="flex-1 space-y-2">
                             {/* Coin/Market Name */}
                             <div className="flex items-center gap-2">
-                              {bet.isUpBet ? (
+                              {bet.market?.isDualCoin ? (
+                                <TrendingUp className="w-5 h-5 text-green-500 shrink-0" />
+                              ) : bet.isUpBet ? (
                                 <TrendingUp className="w-5 h-5 text-green-500 shrink-0" />
                               ) : (
                                 <TrendingDown className="w-5 h-5 text-red-500 shrink-0" />
