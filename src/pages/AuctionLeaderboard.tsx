@@ -80,7 +80,7 @@ export default function AuctionLeaderboard() {
   // Parse contract config
   const config = contractConfig ? {
     isActive: contractConfig[0],
-    minBidAmount: Number(formatUnits(contractConfig[1] as bigint, 18)), // MIND has 18 decimals
+    minBidAmount: Number(formatUnits(contractConfig[1] as bigint, 6)), // MockUSDC has 6 decimals
     auctionStart: new Date(Number(contractConfig[2]) * 1000).toISOString(),
     auctionEnd: new Date(Number(contractConfig[3]) * 1000).toISOString(),
     minMarketCap: Number(contractConfig[4]),

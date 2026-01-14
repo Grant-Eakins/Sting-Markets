@@ -944,7 +944,7 @@ export function useAuctionTokenApproval() {
       throw new Error('Auction or MIND token address not found');
     }
     
-    const amountInToken = parseUnits(amount, 18); // MIND has 18 decimals
+    const amountInToken = parseUnits(amount, 6); // MockUSDC has 6 decimals
     
     console.log(`✅ Approving ${amount} tokens for auction contract`);
     writeContract({
@@ -983,7 +983,7 @@ export function useSubmitAuctionBid() {
       throw new Error('Auction contract not deployed');
     }
     
-    const amountInToken = parseUnits(amount, 18); // MIND has 18 decimals
+    const amountInToken = parseUnits(amount, 6); // MockUSDC has 6 decimals
     
     console.log(`🏆 Submitting auction bid: ${coinAddress} (${chain}) - ${amount} tokens`);
     writeContract({
@@ -1192,7 +1192,7 @@ export function useUpdateAuctionConfig() {
       throw new Error('Auction contract not deployed');
     }
     
-    const minBidInWei = parseUnits(minBidAmount, 18); // MIND has 18 decimals
+    const minBidInWei = parseUnits(minBidAmount, 6); // MockUSDC has 6 decimals
     const minMarketCapNum = BigInt(Math.floor(parseFloat(minMarketCap)));
     const maxMarketCapNum = BigInt(Math.floor(parseFloat(maxMarketCap)));
     
