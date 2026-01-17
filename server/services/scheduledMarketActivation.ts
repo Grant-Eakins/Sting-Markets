@@ -5,7 +5,7 @@
 
 import { MarketStatus, Market } from '../types/market';
 import { getAllMarkets, addMarketToMemory } from './marketService';
-import { updateMarketStatus, getSupabase } from './database';
+import { updateMarketStatus, getSupabase, updateBlockchainMarketId } from './database';
 import { createOnChainMarket, createDualCoinOnChainMarket } from './blockchainSync';
 import { getTokenByAddress } from './dexScreenerApi';
 
@@ -182,6 +182,8 @@ export async function activateScheduledMarkets(): Promise<number> {
         if (blockchainMarketId !== null) {
           market.blockchainMarketId = blockchainMarketId;
           console.log(`   ⛓️  Created on-chain market #${blockchainMarketId}`);
+          // Persist blockchain market ID to database
+          await updateBlockchainMarketId(market.id, blockchainMarketId);
         }
       } catch (error: any) {
         console.error(`   ❌ Failed to create on-chain market:`, error.message);
