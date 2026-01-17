@@ -972,9 +972,7 @@ export default function AdminPage() {
                         }
                         setWithdrawAllStep(3);
                         // Step 3: Auction funds
-                        if (auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000') {
-                          await withdrawAuctionFunds();
-                        }
+                        await withdrawAuctionFunds();
                         setWithdrawAllStep(0);
                       } catch (err: any) {
                         setWithdrawAllError(err.message || 'Failed to withdraw');
@@ -1036,8 +1034,7 @@ export default function AdminPage() {
                   </Button>
                 </div>
                 
-                {auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000' && (
-                  <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                     <div>
                       <p className="text-sm text-muted-foreground">Auction Funds</p>
                       <p className="text-lg font-bold">Available after finalization</p>
@@ -1052,8 +1049,7 @@ export default function AdminPage() {
                       {isConfirmingAuction && 'Confirming...'}
                       {!isWithdrawingAuction && !isConfirmingAuction && 'Collect Auction Funds'}
                     </Button>
-                  </div>
-                )}
+                </div>
                 
                 {(isConfirmed || isConfirmedDual || isAuctionConfirmed) && (
                   <Alert>

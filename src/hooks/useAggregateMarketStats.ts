@@ -1,6 +1,6 @@
 import { Market } from '@/lib/marketApi';
 import { useReadContracts } from 'wagmi';
-import { CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI } from '@/config/contract';
+import { DUAL_COIN_CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI } from '@/config/contract';
 import { base } from 'wagmi/chains';
 import { useEffect, useState } from 'react';
 import { createPublicClient, http, parseAbiItem } from 'viem';
@@ -14,11 +14,11 @@ const publicClient = createPublicClient({
 /**
  * Hook to aggregate stats from multiple markets, reading from blockchain
  * 
- * ProportionalMarket.getMarket returns:
- * [stockSymbol, sessionType, status, numOutcomes, referencePrice, finalPrice, lockTime, settleTime, settled, winningOutcome, totalLiquidity]
+ * ProportionalMarketDualCoin.getMarket returns:
+ * [coinASymbol, coinBSymbol, status, coinAPool, coinBPool, totalPool, lockTime, settleTime, settled, winningOutcome]
  */
 export function useAggregateMarketStats(markets: Market[]) {
-  const contractAddress = CONTRACT_ADDRESSES[8453];
+  const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[8453];
   const [eventBetCount, setEventBetCount] = useState(0);
 
   // Filter markets with blockchain IDs
@@ -48,7 +48,7 @@ export function useAggregateMarketStats(markets: Market[]) {
         
         // Query in chunks of 50,000 blocks (well under the 100k limit)
         const CHUNK_SIZE = 50000n;
-        const LOOKBACK_BLOCKS = 200000n; // ~5 days on Base Sepolia
+        const LOOKBACK_BLOCKS = 200000n; // ~5 days on Base mainnet (2 sec/block)
         const startBlock = currentBlock > LOOKBACK_BLOCKS ? currentBlock - LOOKBACK_BLOCKS : 0n;
         
         const allLogs: any[] = [];
@@ -112,13 +112,14 @@ export function useAggregateMarketStats(markets: Market[]) {
       if (marketResult?.status === 'success' && marketResult.result) {
         const marketData = marketResult.result as any;
         
-        // ProportionalMarket returns a tuple, access by index:
-        // [10]=totalLiquidity
-        const totalLiquidityWei = typeof marketData[10] === 'bigint' 
-          ? marketData[10] 
-          : BigInt(marketData[10] || marketData.totalLiquidity || 0);
+        // ProportionalMarketDualCoin.getMarket returns:
+        // [0]=coinASymbol, [1]=coinBSymbol, [2]=status, [3]=coinAPool, [4]=coinBPool, 
+        // [5]=totalPool, [6]=lockTime, [7]=settleTime, [8]=settled, [9]=winningOutcome
+        const totalLiquidityWei = typeof marketData[5] === 'bigint' 
+          ? marketData[5] 
+          : BigInt(marketData[5] || 0);
         
-        const poolTokens = Number(totalLiquidityWei) / 1e18; // MIND has 18 decimals
+        const poolTokens = Number(totalLiquidityWei) / 1e6; // USDC has 6 decimals
         
         if (!isNaN(poolTokens) && isFinite(poolTokens)) {
           totalPool += poolTokens;

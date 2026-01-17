@@ -453,20 +453,17 @@ export function useBurnVault() {
   const chainId = useChainId();
   const contractAddress = DUAL_COIN_CONTRACT_ADDRESSES[chainId as keyof typeof DUAL_COIN_CONTRACT_ADDRESSES];
   
-  // Check if contract address is valid (not zero address)
-  const isValidAddress = contractAddress && contractAddress !== '0x0000000000000000000000000000000000000000';
-  
   const { data, isLoading, refetch, error } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi: PREDICTION_MARKET_ABI,
     functionName: 'burnVault',
     query: {
-      enabled: isValidAddress,
+      enabled: !!contractAddress,
     },
   });
   
   // Debug logging
-  console.log('🔥 useBurnVault:', { chainId, contractAddress, isValidAddress, data, isLoading, error: error?.message });
+  console.log('🔥 useBurnVault:', { chainId, contractAddress, data, isLoading, error: error?.message });
   
   return {
     burnVault: data as bigint | undefined,
@@ -522,7 +519,7 @@ export function useWithdrawAuctionFunds() {
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const withdrawAuctionFunds = () => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+    if (!auctionAddress) {
       throw new Error('Auction contract not deployed');
     }
     
@@ -867,7 +864,7 @@ export function useDualCoinPlaceBet() {
   }, [status, hash, error]);
   
   const placeBet = async (marketId: number, outcomeIndex: number, amount: string) => {
-    if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
+    if (!contractAddress) {
       throw new Error('Dual coin contract not deployed on this network');
     }
     
@@ -979,7 +976,7 @@ export function useSubmitAuctionBid() {
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const submitBid = (coinAddress: string, chain: string, amount: string) => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+    if (!auctionAddress || false /* removed: auction always deployed */) {
       throw new Error('Auction contract not deployed');
     }
     
@@ -1020,7 +1017,7 @@ export function useAuctionConfig() {
     abi: LISTING_AUCTION_ABI,
     functionName: 'config',
     query: {
-      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000',
+      enabled: !!auctionAddress,
     },
   });
   
@@ -1045,7 +1042,7 @@ export function useAuctionLeaderboard(limit: number = 50) {
     functionName: 'getLeaderboard',
     args: [BigInt(limit)],
     query: {
-      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000',
+      enabled: !!auctionAddress,
     },
   });
   
@@ -1082,7 +1079,7 @@ export function useAuctionTotalBids() {
     abi: LISTING_AUCTION_ABI,
     functionName: 'getTotalBids',
     query: {
-      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000',
+      enabled: !!auctionAddress,
     },
   });
   
@@ -1106,7 +1103,7 @@ export function useBiddingToken() {
     abi: LISTING_AUCTION_ABI,
     functionName: 'biddingToken',
     query: {
-      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000',
+      enabled: !!auctionAddress,
     },
   });
   
@@ -1147,7 +1144,7 @@ export function useUpdateBiddingToken() {
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const updateBiddingToken = (newTokenAddress: string) => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+    if (!auctionAddress || false /* removed: auction always deployed */) {
       throw new Error('Auction contract not deployed');
     }
     
@@ -1188,7 +1185,7 @@ export function useUpdateAuctionConfig() {
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const updateConfig = (minBidAmount: string, minMarketCap: string, maxMarketCap: string) => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+    if (!auctionAddress || false /* removed: auction always deployed */) {
       throw new Error('Auction contract not deployed');
     }
     
@@ -1229,7 +1226,7 @@ export function useStartAuction() {
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const startAuction = (durationHours: number) => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+    if (!auctionAddress || false /* removed: auction always deployed */) {
       throw new Error('Auction contract not deployed');
     }
     
@@ -1266,7 +1263,7 @@ export function useStopAuction() {
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const stopAuction = () => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+    if (!auctionAddress || false /* removed: auction always deployed */) {
       throw new Error('Auction contract not deployed');
     }
     
@@ -1337,7 +1334,7 @@ export function useFinalizeAuction() {
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const finalizeAuction = (winningBidIds: [bigint, bigint]) => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+    if (!auctionAddress || false /* removed: auction always deployed */) {
       throw new Error('Auction contract not deployed');
     }
     
@@ -1375,7 +1372,7 @@ export function useRefundBid() {
   const { data: hash, isPending, writeContract, error } = useWriteContract();
   
   const refundBid = (bidId: bigint) => {
-    if (!auctionAddress || auctionAddress === '0x0000000000000000000000000000000000000000') {
+    if (!auctionAddress || false /* removed: auction always deployed */) {
       throw new Error('Auction contract not deployed');
     }
     
@@ -1415,7 +1412,7 @@ export function useUserAuctionBids(userAddress: `0x${string}` | undefined) {
     functionName: 'bidsByAddress',
     args: userAddress ? [userAddress] : undefined,
     query: {
-      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000' && !!userAddress,
+      enabled: !!auctionAddress && !!userAddress,
     },
   });
   
@@ -1440,7 +1437,7 @@ export function useAuctionBidDetails(bidId: bigint | undefined) {
     functionName: 'getBid',
     args: bidId !== undefined ? [bidId] : undefined,
     query: {
-      enabled: !!auctionAddress && auctionAddress !== '0x0000000000000000000000000000000000000000' && bidId !== undefined,
+      enabled: !!auctionAddress && bidId !== undefined,
     },
   });
   

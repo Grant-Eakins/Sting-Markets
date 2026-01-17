@@ -76,7 +76,11 @@ export function useBlockchainBets() {
       const claimLogs: any[] = [];
       
       // Query from BOTH contracts IN PARALLEL
-      const contractsToQuery = [contractAddress, dualCoinContractAddress].filter(Boolean);
+      // Filter out zero address (no contract deployed on that chain)
+      const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+      const contractsToQuery = [contractAddress, dualCoinContractAddress].filter(
+        addr => addr && addr !== ZERO_ADDRESS
+      );
       
       // Build all query promises upfront for parallel execution
       const allQueryPromises: Promise<any>[] = [];
