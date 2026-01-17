@@ -143,7 +143,8 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
     }
     
     /**
-     * @notice Create a new dual-coin battle market with seed liquidity
+     * @notice Create a new dual-coin battle market (no seed liquidity required)
+     * @dev First bet on each side gets fair 50/50 pricing
      */
     function createMarket(
         string memory coinASymbol,
@@ -165,15 +166,13 @@ contract ProportionalMarketDualCoin is Ownable, ReentrancyGuard, Pausable {
         market.settleTime = settleTime;
         market.settled = false;
         
-        // Seed with $1 each side to prevent division by zero
-        // Owner pays seed liquidity
-        token.safeTransferFrom(msg.sender, address(this), SEED_LIQUIDITY * 2);
-        market.bucketLiquidity[0] = SEED_LIQUIDITY;
-        market.bucketLiquidity[1] = SEED_LIQUIDITY;
-        market.totalLiquidity = SEED_LIQUIDITY * 2;
-        // Seed shares at 50/50 (1 share per $1 at 50% probability)
-        market.totalSharesPerBucket[0] = SEED_LIQUIDITY * PRECISION / (SEED_LIQUIDITY * 10**6 / SEED_LIQUIDITY);
-        market.totalSharesPerBucket[1] = SEED_LIQUIDITY * PRECISION / (SEED_LIQUIDITY * 10**6 / SEED_LIQUIDITY);
+        // No seed liquidity - pools start empty
+        // getSharePrice handles zero liquidity by returning 50/50 odds
+        market.bucketLiquidity[0] = 0;
+        market.bucketLiquidity[1] = 0;
+        market.totalLiquidity = 0;
+        market.totalSharesPerBucket[0] = 0;
+        market.totalSharesPerBucket[1] = 0;
         
         emit MarketCreated(marketId, coinASymbol, coinBSymbol, lockTime, settleTime);
         return marketId;

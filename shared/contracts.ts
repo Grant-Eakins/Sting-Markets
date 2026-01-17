@@ -12,7 +12,7 @@ export const CONTRACT_ADDRESSES = {
 
 export const DUAL_COIN_CONTRACT_ADDRESSES = {
   // Base Mainnet
-  8453: '0xBAa1e14BCE9154D75db4458b2C31EE02C4fBB368', // ProportionalMarketDualCoin
+  8453: '0x6BB13961b353ca41032C256E4D76607B662d336A', // ProportionalMarketDualCoin (no seed liquidity)
   // Base Sepolia Testnet
   84532: '0xfe1FbFd6d3d53617d1dd4664280900aCf9B16df4', // ProportionalMarketDualCoin
 } as const;
