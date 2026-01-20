@@ -1,16 +1,20 @@
 import { useAccount } from 'wagmi';
 import { CONTRACT_ADDRESSES, DUAL_COIN_CONTRACT_ADDRESSES, TOKEN_DECIMALS } from '@/config/contract';
 import { useState, useEffect } from 'react';
-import { createPublicClient, http, parseAbiItem } from 'viem';
+import { createPublicClient, http, parseAbiItem, fallback } from 'viem';
 import { base } from 'viem/chains';
 
 // Token decimals from config (USDC uses 6 decimals)
 const DECIMALS_DIVISOR = 10 ** TOKEN_DECIMALS;
 
-// Create a public client for reading events with a proper RPC
+// Create a public client for reading events with fallback RPCs for reliability
 const publicClient = createPublicClient({
   chain: base,
-  transport: http('https://mainnet.base.org'),
+  transport: fallback([
+    http('https://base.drpc.org'),
+    http('https://1rpc.io/base'),
+    http('https://mainnet.base.org'),
+  ]),
 });
 
 export interface BlockchainBet {
@@ -64,8 +68,8 @@ export function useBlockchainBets() {
       const currentBlock = await publicClient.getBlockNumber();
       console.log(`📊 Current block: ${currentBlock}`);
       
-      // Query in chunks of 50,000 blocks (well under the 100k limit)
-      const CHUNK_SIZE = 50000n;
+      // Query in chunks of 2,000 blocks (RPCs have strict limits on range)
+      const CHUNK_SIZE = 2000n;
       const LOOKBACK_BLOCKS = 500000n; // ~12 days on Base Sepolia (2 sec/block) - balance between coverage and speed
       const startBlock = currentBlock > LOOKBACK_BLOCKS ? currentBlock - LOOKBACK_BLOCKS : 0n;
       

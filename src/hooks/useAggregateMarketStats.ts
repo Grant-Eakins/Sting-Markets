@@ -3,12 +3,16 @@ import { useReadContracts } from 'wagmi';
 import { DUAL_COIN_CONTRACT_ADDRESSES, PREDICTION_MARKET_ABI } from '@/config/contract';
 import { base } from 'wagmi/chains';
 import { useEffect, useState } from 'react';
-import { createPublicClient, http, parseAbiItem } from 'viem';
+import { createPublicClient, http, parseAbiItem, fallback } from 'viem';
 
-// Create a public client for reading events
+// Create a public client for reading events with fallback RPCs for reliability
 const publicClient = createPublicClient({
   chain: base,
-  transport: http('https://mainnet.base.org'),
+  transport: fallback([
+    http('https://base.drpc.org'),
+    http('https://1rpc.io/base'),
+    http('https://mainnet.base.org'),
+  ]),
 });
 
 /**
@@ -46,8 +50,8 @@ export function useAggregateMarketStats(markets: Market[]) {
         // Get current block number
         const currentBlock = await publicClient.getBlockNumber();
         
-        // Query in chunks of 50,000 blocks (well under the 100k limit)
-        const CHUNK_SIZE = 50000n;
+        // Query in chunks of 2,000 blocks (RPCs have strict limits)
+        const CHUNK_SIZE = 2000n;
         const LOOKBACK_BLOCKS = 200000n; // ~5 days on Base mainnet (2 sec/block)
         const startBlock = currentBlock > LOOKBACK_BLOCKS ? currentBlock - LOOKBACK_BLOCKS : 0n;
         
