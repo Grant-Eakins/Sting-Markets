@@ -88,8 +88,10 @@ const BOOTSTRAP_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between bootstrap retr
 /**
  * Get coins from DexScreener trending/boosted tokens
  * Used as ultimate fallback when queue is empty
+ * @param count Number of coins to get
+ * @param excludeAddress Optional address to exclude (to avoid pairing same coin)
  */
-async function getCoinsFromTrending(count: number = 2): Promise<{
+async function getCoinsFromTrending(count: number = 2, excludeAddress?: string): Promise<{
   contractAddress: string;
   symbol: string;
   name: string;
@@ -101,7 +103,7 @@ async function getCoinsFromTrending(count: number = 2): Promise<{
   
   try {
     // Get trending tokens, preferring Base and Solana chains
-    const trendingTokens = await getTrendingTokens(count * 3, ['base', 'solana']);
+    let trendingTokens = await getTrendingTokens(count * 3, ['base', 'solana']);
     
     if (trendingTokens.length < count) {
       console.log(`⚠️ Only found ${trendingTokens.length} trending tokens (need ${count})`);
@@ -116,9 +118,17 @@ async function getCoinsFromTrending(count: number = 2): Promise<{
     }
     
     // Filter to ensure we have valid tokens with good liquidity
-    const validTokens = trendingTokens
-      .filter(t => t.liquidity >= 10000) // Minimum $10k liquidity
-      .slice(0, count);
+    let validTokens = trendingTokens
+      .filter(t => t.liquidity >= 10000); // Minimum $10k liquidity
+    
+    // Exclude the specified address if provided
+    if (excludeAddress) {
+      validTokens = validTokens.filter(t => 
+        t.address.toLowerCase() !== excludeAddress.toLowerCase()
+      );
+    }
+    
+    validTokens = validTokens.slice(0, count);
     
     if (validTokens.length < count) {
       console.log(`⚠️ Not enough valid trending tokens (need ${count}, have ${validTokens.length})`);
@@ -146,8 +156,10 @@ async function getCoinsFromTrending(count: number = 2): Promise<{
  * Get coins from the fallback queue to use when auction has no bids
  * Returns 2 coins if available, marks them as used
  * If queue is empty, falls back to DexScreener trending tokens
+ * @param count Number of coins to get
+ * @param excludeAddress Optional address to exclude (to avoid pairing same coin)
  */
-async function getCoinsFromFallbackQueue(count: number = 2): Promise<{
+async function getCoinsFromFallbackQueue(count: number = 2, excludeAddress?: string): Promise<{
   contractAddress: string;
   symbol: string;
   name: string;
@@ -157,19 +169,32 @@ async function getCoinsFromFallbackQueue(count: number = 2): Promise<{
 }[]> {
   const supabase = getDb();
   
-  const { data: coins, error } = await supabase
+  let query = supabase
     .from('fallback_coin_queue')
     .select('*')
     .eq('is_available', true)
     .order('added_at', { ascending: true })
-    .limit(count);
+    .limit(count + 1); // Get one extra in case we need to exclude
+
+  const { data: allCoins, error } = await query;
+  
+  // Filter out excluded address if provided
+  let coins = allCoins || [];
+  if (excludeAddress && coins.length > 0) {
+    coins = coins.filter(c => 
+      c.contract_address.toLowerCase() !== excludeAddress.toLowerCase()
+    );
+  }
+  
+  // Trim to requested count
+  coins = coins.slice(0, count);
 
   if (error || !coins || coins.length < count) {
     console.log(`⚠️ Not enough coins in fallback queue (need ${count}, have ${coins?.length || 0})`);
     console.log(`🔥 Trying DexScreener trending tokens as ultimate fallback...`);
     
     // Try trending tokens as fallback
-    const trendingCoins = await getCoinsFromTrending(count);
+    const trendingCoins = await getCoinsFromTrending(count, excludeAddress);
     if (trendingCoins.length >= count) {
       return trendingCoins.map(c => ({
         contractAddress: c.contractAddress,
@@ -701,6 +726,7 @@ async function finalizeAuctionAndCreateMarket() {
     let coin1: { address: string; symbol: string; name: string; price: number; imageUrl: string | null };
     let coin2: { address: string; symbol: string; name: string; price: number; imageUrl: string | null };
     let hadAuctionWinners = false;
+    let hadSingleAuctionWinner = false;
     let winnerBidIds: bigint[] = [];
     
     // Check if we have 2 different coins from auction
@@ -735,9 +761,50 @@ async function finalizeAuctionAndCreateMarket() {
           imageUrl: token2.imageUrl || null 
         };
       }
+    } 
+    // NEW: Handle exactly 1 auction bid - use it as coin1, get coin2 from fallback
+    else if (winners.length === 1) {
+      console.log(`🏆 Single auction winner: ${winners[0].coinAddress.slice(0, 10)}...`);
+      console.log('📦 Will pair with fallback coin for second slot...');
+      
+      hadSingleAuctionWinner = true;
+      winnerBidIds = [winners[0].bidId];
+      
+      const token1 = await getTokenByAddress(winners[0].coinAddress);
+      if (token1) {
+        coin1 = { 
+          address: winners[0].coinAddress, 
+          symbol: token1.symbol, 
+          name: token1.name, 
+          price: token1.price,
+          imageUrl: token1.imageUrl || null 
+        };
+      }
     }
     
-    // If we don't have valid coins from auction, try fallback queue
+    // If we have coin1 from auction but need coin2 from fallback (single bid case)
+    if (coin1! && !coin2!) {
+      console.log('📦 Getting second coin from fallback queue...');
+      
+      // Get 1 fallback coin, excluding the auction winner's address
+      const fallbackCoins = await getCoinsFromFallbackQueue(1, coin1.address);
+      
+      if (fallbackCoins.length >= 1) {
+        const token2 = await getTokenByAddress(fallbackCoins[0].contractAddress);
+        if (token2) {
+          coin2 = { 
+            address: fallbackCoins[0].contractAddress, 
+            symbol: fallbackCoins[0].symbol, 
+            name: fallbackCoins[0].name, 
+            price: token2.price,
+            imageUrl: fallbackCoins[0].imageUrl 
+          };
+          console.log(`📦 Paired auction winner ${coin1.symbol} with fallback ${coin2.symbol}`);
+        }
+      }
+    }
+    
+    // If we still don't have valid coins, try fallback queue for both
     if (!coin1! || !coin2!) {
       console.log('📦 Not enough valid auction bids, checking fallback queue...');
       
@@ -786,7 +853,7 @@ async function finalizeAuctionAndCreateMarket() {
 
     // Finalize auction on-chain if we had winners (this refunds losers automatically)
     if (hadAuctionWinners && winnerBidIds.length === 2) {
-      console.log(`🏆 Finalizing auction on-chain with winners - this will refund all losers...`);
+      console.log(`🏆 Finalizing auction on-chain with 2 winners - this will refund all losers...`);
       console.log(`   Winner 1: ${coin1.symbol} (${coin1.address.slice(0, 10)}...)`);
       console.log(`   Winner 2: ${coin2.symbol} (${coin2.address.slice(0, 10)}...)`);
       
@@ -797,6 +864,21 @@ async function finalizeAuctionAndCreateMarket() {
         // Bids can be manually refunded later if needed
       } else {
         console.log('✅ Auction finalized on-chain - losers have been refunded');
+      }
+    } else if (hadSingleAuctionWinner && winnerBidIds.length === 1) {
+      // Single winner case - finalize with just the one bid
+      console.log(`🏆 Finalizing auction on-chain with single winner paired with fallback...`);
+      console.log(`   Winner: ${coin1.symbol} (${coin1.address.slice(0, 10)}...)`);
+      console.log(`   Fallback: ${coin2.symbol} (${coin2.address.slice(0, 10)}...)`);
+      
+      // For single winner, we pass a dummy second bid ID (0n) - the contract should handle this
+      // Or we clear bids without refunding since there's only 1 winner
+      const finalized = await finalizeOnChainAuction([winnerBidIds[0], 0n]);
+      if (!finalized) {
+        console.error('⚠️ On-chain auction finalization failed for single winner - clearing bids manually');
+        await clearOnChainAuctionBids();
+      } else {
+        console.log('✅ Auction finalized on-chain with single winner');
       }
     } else {
       console.log('📦 No auction winners - using fallback coins, skipping on-chain finalization');
