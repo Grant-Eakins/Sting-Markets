@@ -1210,10 +1210,15 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
-                    If no one bids during an auction, these coins will be used to create the next market.
+                    <strong>Priority:</strong> Auction bids → This queue → DexScreener trending.
                     {fallbackQueue.length === 0 && (
                       <span className="block mt-1 text-blue-400">
-                        🔥 <strong>Trending Fallback Active:</strong> When queue is empty, top trending tokens from DexScreener will be used automatically!
+                        🔥 Queue empty - DexScreener trending will be used if no auction bids!
+                      </span>
+                    )}
+                    {fallbackQueue.length > 0 && (
+                      <span className="block mt-1">
+                        If no auction bids, these coins will create the next battle.
                       </span>
                     )}
                   </p>
