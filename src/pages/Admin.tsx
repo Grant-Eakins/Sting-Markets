@@ -1210,7 +1210,12 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
-                    If no one bids during an auction, these coins will be used to create the next market. Add coins to ensure 24/7 operation.
+                    If no one bids during an auction, these coins will be used to create the next market.
+                    {fallbackQueue.length === 0 && (
+                      <span className="block mt-1 text-blue-400">
+                        🔥 <strong>Trending Fallback Active:</strong> When queue is empty, top trending tokens from DexScreener will be used automatically!
+                      </span>
+                    )}
                   </p>
                   
                   {/* Add coin form */}
@@ -1256,8 +1261,8 @@ export default function AdminPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-muted-foreground text-center py-2">
-                      No coins in queue. Add some to ensure markets run 24/7.
+                    <p className="text-xs text-blue-400 text-center py-2">
+                      🔥 Queue empty - DexScreener trending tokens will be used as fallback
                     </p>
                   )}
                 </div>

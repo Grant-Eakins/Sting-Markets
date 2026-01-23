@@ -289,6 +289,75 @@ export async function getTokenHistory(
 }
 
 /**
+ * Get top trending/boosted tokens from DexScreener
+ * These are tokens with the most active promotional boosts
+ * @param count Number of tokens to return
+ * @param chainFilter Optional filter for specific chains (e.g., 'base', 'solana')
+ */
+export async function getTrendingTokens(count: number = 10, chainFilter?: string[]): Promise<TokenInfo[]> {
+  try {
+    console.log(`🔥 Fetching top trending tokens from DexScreener...`);
+    
+    const response = await axios.get('https://api.dexscreener.com/token-boosts/top/v1', { timeout: 10000 });
+    const data = response.data;
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      console.log('⚠️ No boosted tokens returned from DexScreener');
+      return [];
+    }
+    
+    console.log(`   Found ${data.length} boosted tokens`);
+    
+    // Filter by chain if specified
+    let filteredTokens = data;
+    if (chainFilter && chainFilter.length > 0) {
+      filteredTokens = data.filter((token: any) => 
+        chainFilter.includes(token.chainId?.toLowerCase())
+      );
+      console.log(`   Filtered to ${filteredTokens.length} tokens on chains: ${chainFilter.join(', ')}`);
+    }
+    
+    // Get detailed info for top tokens
+    const tokenInfoPromises = filteredTokens
+      .slice(0, count * 2) // Fetch extra in case some fail
+      .map(async (token: any) => {
+        try {
+          const tokenInfo = await getTokenByAddress(token.tokenAddress);
+          if (tokenInfo) {
+            // Add boost amount to the token info for sorting
+            (tokenInfo as any).boostAmount = token.totalAmount || token.amount || 0;
+          }
+          return tokenInfo;
+        } catch (error) {
+          console.log(`   ⚠️ Failed to get info for ${token.tokenAddress}`);
+          return null;
+        }
+      });
+    
+    const tokenInfos = await Promise.all(tokenInfoPromises);
+    
+    // Filter out nulls and sort by boost amount, then liquidity
+    const validTokens = tokenInfos
+      .filter((t): t is TokenInfo => t !== null)
+      .sort((a, b) => {
+        const boostA = (a as any).boostAmount || 0;
+        const boostB = (b as any).boostAmount || 0;
+        if (boostB !== boostA) return boostB - boostA;
+        return (b.liquidity || 0) - (a.liquidity || 0);
+      })
+      .slice(0, count);
+    
+    console.log(`🔥 Returning ${validTokens.length} trending tokens: ${validTokens.map(t => t.symbol).join(', ')}`);
+    
+    return validTokens;
+    
+  } catch (error: any) {
+    console.error('❌ Error fetching trending tokens:', error.message);
+    return [];
+  }
+}
+
+/**
  * Generate approximate historical data when chart API fails
  * Uses current price and 24h change to create realistic-looking data
  */

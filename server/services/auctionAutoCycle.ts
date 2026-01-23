@@ -13,7 +13,7 @@
  */
 
 import { getSupabase } from './database';
-import { getTokenByAddress } from './dexScreenerApi';
+import { getTokenByAddress, getTrendingTokens } from './dexScreenerApi';
 import { 
   getOnChainAuctionConfig,
   getOnChainTopTwoWinners,
@@ -86,15 +86,74 @@ let isChecking = false; // Prevent concurrent cycle checks
 const BOOTSTRAP_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between bootstrap retries
 
 /**
+ * Get coins from DexScreener trending/boosted tokens
+ * Used as ultimate fallback when queue is empty
+ */
+async function getCoinsFromTrending(count: number = 2): Promise<{
+  contractAddress: string;
+  symbol: string;
+  name: string;
+  imageUrl: string | null;
+  price: number;
+  chainId: string;
+}[]> {
+  console.log(`🔥 Fetching ${count} trending tokens from DexScreener as fallback...`);
+  
+  try {
+    // Get trending tokens, preferring Base and Solana chains
+    const trendingTokens = await getTrendingTokens(count * 3, ['base', 'solana']);
+    
+    if (trendingTokens.length < count) {
+      console.log(`⚠️ Only found ${trendingTokens.length} trending tokens (need ${count})`);
+      
+      // Try without chain filter if not enough
+      if (trendingTokens.length < count) {
+        const allTrending = await getTrendingTokens(count * 3);
+        trendingTokens.push(...allTrending.filter(t => 
+          !trendingTokens.some(existing => existing.address.toLowerCase() === t.address.toLowerCase())
+        ));
+      }
+    }
+    
+    // Filter to ensure we have valid tokens with good liquidity
+    const validTokens = trendingTokens
+      .filter(t => t.liquidity >= 10000) // Minimum $10k liquidity
+      .slice(0, count);
+    
+    if (validTokens.length < count) {
+      console.log(`⚠️ Not enough valid trending tokens (need ${count}, have ${validTokens.length})`);
+      return [];
+    }
+    
+    console.log(`🔥 Using ${validTokens.length} trending tokens: ${validTokens.map(t => `${t.symbol} (${t.chainId})`).join(', ')}`);
+    
+    return validTokens.map(t => ({
+      contractAddress: t.address,
+      symbol: t.symbol,
+      name: t.name,
+      imageUrl: t.imageUrl || null,
+      price: t.price,
+      chainId: t.chainId,
+    }));
+    
+  } catch (error: any) {
+    console.error('❌ Failed to fetch trending tokens:', error.message);
+    return [];
+  }
+}
+
+/**
  * Get coins from the fallback queue to use when auction has no bids
  * Returns 2 coins if available, marks them as used
+ * If queue is empty, falls back to DexScreener trending tokens
  */
 async function getCoinsFromFallbackQueue(count: number = 2): Promise<{
   contractAddress: string;
   symbol: string;
   name: string;
   imageUrl: string | null;
-  id: number;
+  id?: number;
+  fromTrending?: boolean;
 }[]> {
   const supabase = getDb();
   
@@ -107,6 +166,20 @@ async function getCoinsFromFallbackQueue(count: number = 2): Promise<{
 
   if (error || !coins || coins.length < count) {
     console.log(`⚠️ Not enough coins in fallback queue (need ${count}, have ${coins?.length || 0})`);
+    console.log(`🔥 Trying DexScreener trending tokens as ultimate fallback...`);
+    
+    // Try trending tokens as fallback
+    const trendingCoins = await getCoinsFromTrending(count);
+    if (trendingCoins.length >= count) {
+      return trendingCoins.map(c => ({
+        contractAddress: c.contractAddress,
+        symbol: c.symbol,
+        name: c.name,
+        imageUrl: c.imageUrl,
+        fromTrending: true,
+      }));
+    }
+    
     return [];
   }
 
@@ -488,10 +561,11 @@ async function bootstrapAutoCycle() {
   console.log('📦 No scheduled market, checking fallback queue...');
   
   const fallbackCoins = await getCoinsFromFallbackQueue(2);
-  console.log(`📦 Got ${fallbackCoins.length} coins from queue:`, fallbackCoins.map(c => c.symbol).join(', ') || 'none');
+  const usingTrending = fallbackCoins.some(c => c.fromTrending);
+  console.log(`${usingTrending ? '🔥' : '📦'} Got ${fallbackCoins.length} coins${usingTrending ? ' from DexScreener trending' : ' from queue'}:`, fallbackCoins.map(c => c.symbol).join(', ') || 'none');
   
   if (fallbackCoins.length < 2) {
-    console.log('⚠️ Need at least 2 coins in fallback queue to bootstrap. Add coins and try again.');
+    console.log('⚠️ Need at least 2 coins to bootstrap. Add coins to fallback queue or ensure DexScreener API is working.');
     return;
   }
   
