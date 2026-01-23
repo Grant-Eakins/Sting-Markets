@@ -72,8 +72,6 @@ export default function Token() {
   // Fetch token data from DexScreener when contract address is set
   useEffect(() => {
     const fetchTokenData = async () => {
-      if (tokenContract === DEFAULT_TOKEN_CONTRACT) return;
-      
       try {
         const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenContract}`);
         const data = await response.json();
@@ -83,12 +81,56 @@ export default function Token() {
             (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0)
           )[0];
           
+          // Format price based on magnitude
+          const priceNum = Number(bestPair.priceUsd);
+          let priceStr = '--';
+          if (priceNum) {
+            if (priceNum >= 1) {
+              priceStr = `$${priceNum.toFixed(2)}`;
+            } else if (priceNum >= 0.01) {
+              priceStr = `$${priceNum.toFixed(4)}`;
+            } else if (priceNum >= 0.0001) {
+              priceStr = `$${priceNum.toFixed(6)}`;
+            } else {
+              priceStr = `$${priceNum.toFixed(8)}`;
+            }
+          }
+          
+          // Use marketCap or fdv, whichever is available
+          const mcap = bestPair.marketCap || bestPair.fdv;
+          let marketCapStr = '--';
+          if (mcap) {
+            if (mcap >= 1000000000) {
+              marketCapStr = `$${(mcap / 1000000000).toFixed(2)}B`;
+            } else if (mcap >= 1000000) {
+              marketCapStr = `$${(mcap / 1000000).toFixed(2)}M`;
+            } else if (mcap >= 1000) {
+              marketCapStr = `$${(mcap / 1000).toFixed(2)}K`;
+            } else {
+              marketCapStr = `$${mcap.toFixed(0)}`;
+            }
+          }
+          
+          // Calculate supply from market cap and price
+          let supplyStr = '--';
+          if (mcap && priceNum && priceNum > 0) {
+            const supply = mcap / priceNum;
+            if (supply >= 1000000000) {
+              supplyStr = `${(supply / 1000000000).toFixed(2)}B`;
+            } else if (supply >= 1000000) {
+              supplyStr = `${(supply / 1000000).toFixed(2)}M`;
+            } else if (supply >= 1000) {
+              supplyStr = `${(supply / 1000).toFixed(2)}K`;
+            } else {
+              supplyStr = `${supply.toFixed(0)}`;
+            }
+          }
+          
           setTokenData({
-            price: bestPair.priceUsd ? `$${Number(bestPair.priceUsd).toFixed(6)}` : '--',
-            marketCap: bestPair.fdv ? `$${(bestPair.fdv / 1000000).toFixed(2)}M` : '--',
+            price: priceStr,
+            marketCap: marketCapStr,
             holders: '--', // DexScreener doesn't provide holder count
-            supply: bestPair.fdv && bestPair.priceUsd ? 
-              `${(bestPair.fdv / Number(bestPair.priceUsd) / 1000000).toFixed(1)}M` : '--',
+            supply: supplyStr,
           });
         }
       } catch (error) {
