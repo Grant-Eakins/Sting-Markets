@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import cron from 'node-cron';
 import marketsRouter from './routes/markets';
 import auctionRouter from './routes/auction';
+import { tollbooth } from '@agenttoll/sdk';
 import { syncCryptoMarkets, initializePausedSymbols } from './services/cryptoSync';
 import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/marketSettlement';
 import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain } from './services/blockchainSync';
@@ -186,7 +187,22 @@ app.get('/splash.png', (req, res) => {
 // Static file serving (after explicit routes)
 app.use(express.static(distPath));
 
-// Routes
+// Admin wallet addresses (lowercase for comparison)
+const ADMIN_WALLETS = [
+  '0x6b1b7e7b207ec756b8d9edc59db4b32184160b22',
+  '0xb0687ef6ea5906089ec3586f9997764650bf1934',
+];
+
+// AgentToll - Monetize API for AI agents
+// Free for humans, agents pay $0.001 per request in USDC
+app.use('/api/markets', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY, {
+  amount: 0.001
+}));
+
+app.use('/api/auction', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY, {
+  amount: 0.001
+}));
+
 app.use('/api/markets', marketsRouter);
 app.use('/api/auction', auctionRouter);
 
@@ -231,11 +247,6 @@ app.post('/api/token/config', (req, res) => {
 });
 
 // Burn scheduler routes (admin only)
-const ADMIN_WALLETS = [
-  '0x6b1b7e7b207ec756b8d9edc59db4b32184160b22',
-  '0xb0687ef6ea5906089ec3586f9997764650bf1934',
-];
-
 app.get('/api/admin/burn-status', (req, res) => {
   if (!burnScheduler) {
     return res.json({ enabled: false, error: 'Burn scheduler not configured' });
