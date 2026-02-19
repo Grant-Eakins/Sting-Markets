@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import cron from 'node-cron';
 import marketsRouter from './routes/markets';
 import auctionRouter from './routes/auction';
-import { tollbooth } from '@agenttoll/sdk';
+import tollbooth from '@agenttoll/sdk';
 import { syncCryptoMarkets, initializePausedSymbols } from './services/cryptoSync';
 import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/marketSettlement';
 import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain } from './services/blockchainSync';
@@ -194,13 +194,15 @@ const ADMIN_WALLETS = [
 ];
 
 // AgentToll - Monetize API for AI agents
-// Free for humans, agents pay $0.001 per request in USDC
-app.use('/api/markets', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY, {
-  amount: 0.001
+// Free for humans (browser requests), agents pay $0.001 per request in USDC
+app.use('/api/markets', tollbooth(process.env.AGENTTOLL_KEY!, {
+  amount: 0.001,
+  freeForHumans: true
 }));
 
-app.use('/api/auction', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY, {
-  amount: 0.001
+app.use('/api/auction', tollbooth(process.env.AGENTTOLL_KEY!, {
+  amount: 0.001,
+  freeForHumans: true
 }));
 
 app.use('/api/markets', marketsRouter);
