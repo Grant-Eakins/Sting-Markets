@@ -193,16 +193,15 @@ const ADMIN_WALLETS = [
   '0xb0687ef6ea5906089ec3586f9997764650bf1934',
 ];
 
-// AgentToll - Monetize API for AI agents
-// Free for humans (browser requests), agents pay $0.001 per request in USDC
-app.use('/api/markets', tollbooth(process.env.AGENTTOLL_KEY!, {
-  amount: 0.001,
-  freeForHumans: true
+// AgentToll - Monetize API for AI agents (SDK v1.2.0)
+// Free for humans (browser requests), agents pay $0.05 per request in USDC
+// Supports payments on both Solana and Base networks
+app.use('/api/markets', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
+  amount: 0.05,
 }));
 
-app.use('/api/auction', tollbooth(process.env.AGENTTOLL_KEY!, {
-  amount: 0.001,
-  freeForHumans: true
+app.use('/api/auction', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
+  amount: 0.05,
 }));
 
 app.use('/api/markets', marketsRouter);

@@ -2,7 +2,7 @@
 
 ## Overview
 
-StingMarkets.com uses the AgentToll SDK (`@agenttoll/sdk`) to monetize API access for AI agents while keeping the site free for human users.
+StingMarkets.com uses the AgentToll SDK v1.2.0 (`@agenttoll/sdk`) to monetize API access for AI agents while keeping the site free for human users. Payments are supported on both **Solana** and **Base** networks.
 
 ## Test Results
 
@@ -17,8 +17,8 @@ StingMarkets.com uses the AgentToll SDK (`@agenttoll/sdk`) to monetize API acces
 
 | Route | Price | Description |
 |-------|-------|-------------|
-| `/api/markets/*` | $0.001 USDC | Market data and betting endpoints |
-| `/api/auction/*` | $0.001 USDC | Auction status and bidding endpoints |
+| `/api/markets/*` | $0.05 USDC | Market data and betting endpoints |
+| `/api/auction/*` | $0.05 USDC | Auction status and bidding endpoints |
 
 ## Configuration
 
@@ -34,24 +34,36 @@ AGENTTOLL_SECRET=sk_live_634aa82f3b374ba8bdb64a7718ed7aa1
 ```typescript
 import tollbooth from '@agenttoll/sdk';
 
-// AgentToll - Monetize API for AI agents
-// Free for humans (browser requests), agents pay $0.001 per request in USDC
-app.use('/api/markets', tollbooth(process.env.AGENTTOLL_KEY!, {
-  amount: 0.001,
-  freeForHumans: true
+// AgentToll - Monetize API for AI agents (SDK v1.2.0)
+// Free for humans (browser requests), agents pay $0.05 per request in USDC
+// Supports payments on both Solana and Base networks
+app.use('/api/markets', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
+  amount: 0.05,
 }));
 
-app.use('/api/auction', tollbooth(process.env.AGENTTOLL_KEY!, {
-  amount: 0.001,
-  freeForHumans: true
+app.use('/api/auction', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
+  amount: 0.05,
 }));
+```
+
+### Convenience Methods (SDK v1.2.0)
+
+```typescript
+// Check if a request has a valid toll payment
+tollbooth.hasPaid(req)   // boolean
+
+// Check if a request is from an AI agent
+tollbooth.isAgent(req)   // boolean
+
+// Protect a single route inline
+app.get('/premium', tollbooth.protect('pk_xxx', { amount: 0.05 }), handler)
 ```
 
 ## How Agent Detection Works
 
 The SDK identifies AI agents by checking:
 
-1. **User-Agent patterns** - `claude`, `anthropic`, `openai`, `gpt-4`, `langchain`, `autogpt`, etc.
+1. **User-Agent patterns** - `claude`, `anthropic`, `openai`, `gpt-4`, `chatgpt`, `gemini`, `google-ai`, `langchain`, `autogpt`, `agentgpt`, `babyagi`, `crewai`, `superagent`, `openclaw`, `clawd`, etc.
 2. **Custom headers** - `x-agent-type`, `x-agenttoll-id`
 3. **x402 capability** - `x-402-capable: true` header
 
@@ -62,9 +74,9 @@ When an agent request is blocked, the response includes:
 ### HTTP Headers
 ```
 X-402-Version: 1
-X-402-Amount: 0.001
+X-402-Amount: 0.05
 X-402-Currency: USDC
-X-402-Network: solana
+X-402-Supported-Networks: solana,base
 X-402-Pay-URL: https://toll.agenttoll.io/pay?publisher=...
 X-402-Onboarding: true
 X-402-Setup-URL: https://toll.agenttoll.io/docs#agent-setup
@@ -75,20 +87,20 @@ X-402-Setup-URL: https://toll.agenttoll.io/docs#agent-setup
 {
   "status": 402,
   "message": "Payment Required",
-  "agent_instructions": "To access this resource, pay 0.001 USDC via the payment URL below. After payment, retry with the returned token in Authorization header.",
+  "agent_instructions": "To access this resource, pay 0.05 USDC on solana or base via the payment URL below. After payment, retry with the returned token in Authorization header.",
   "payment": {
-    "amount": 0.001,
+    "amount": 0.05,
     "currency": "USDC",
-    "network": "solana",
-    "pay_url": "https://toll.agenttoll.io/pay?publisher=pk_live_xxx&amount=0.001&resource=...",
+    "supported_networks": ["solana", "base"],
+    "pay_url": "https://toll.agenttoll.io/pay?publisher=pk_live_xxx&amount=0.05&resource=...",
     "api_endpoint": "https://toll.agenttoll.io/api/pay"
   },
   "x402": {
     "version": 1,
-    "amount": 0.001,
+    "amount": 0.05,
     "currency": "USDC",
     "receiver": "pending",
-    "network": "solana-mainnet",
+    "supported_networks": ["solana", "base"],
     "description": "Access to /"
   },
   "retry": {
@@ -128,11 +140,18 @@ Invoke-WebRequest -Uri "https://www.stingmarkets.com/api/markets" -Method GET -H
 
 1. Agent makes request to `/api/markets`
 2. Tollbooth detects agent via User-Agent or headers
-3. Returns 402 with payment info and `pay_url`
-4. Agent calls `pay_url` with USDC payment on Solana
+3. Returns 402 with payment info, `pay_url`, and supported networks
+4. Agent calls `pay_url` with USDC payment on **Solana** or **Base**
 5. Agent receives payment token
 6. Agent retries original request with `Authorization: Bearer <token>`
 7. Request succeeds with 200 OK
+
+## SDK Additional Features (v1.2.0)
+
+- **Bypass header**: Use `bypassHeader` option to allow internal services to skip toll checks
+- **Agent analytics**: SDK automatically reports agent-stopped events for dashboard analytics
+- **`tollbooth.hasPaid(req)`**: Check if a request has a valid toll payment in downstream middleware
+- **`tollbooth.isAgent(req)`**: Check if a request is from an AI agent
 
 ## Dashboard
 
