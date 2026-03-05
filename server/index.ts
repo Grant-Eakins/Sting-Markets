@@ -8,6 +8,7 @@ import cron from 'node-cron';
 import marketsRouter from './routes/markets';
 import auctionRouter from './routes/auction';
 import tollbooth from '@agenttoll/sdk';
+import { contentGate, generateRobotsTxt } from '@agenttoll/sdk/content-gate';
 import { syncCryptoMarkets, initializePausedSymbols } from './services/cryptoSync';
 import { checkAndSettleMarkets, updateActiveMarketPrices } from './services/marketSettlement';
 import { initializeBlockchain, syncAllMarketPools, syncSettlementStatusFromChain } from './services/blockchainSync';
@@ -193,7 +194,7 @@ const ADMIN_WALLETS = [
   '0xb0687ef6ea5906089ec3586f9997764650bf1934',
 ];
 
-// AgentToll - Monetize API for AI agents (SDK v1.2.0)
+// AgentToll - Monetize API for AI agents (SDK v1.3.1)
 // Free for humans (browser requests), agents pay $0.05 per request in USDC
 // Supports payments on both Solana and Base networks
 app.use('/api/markets', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
@@ -203,6 +204,14 @@ app.use('/api/markets', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
 app.use('/api/auction', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
   amount: 0.05,
 }));
+
+// Content Gate - Protect HTML pages from agentic crawlers (Perplexity, SearchGPT, etc.)
+app.use(contentGate(process.env.AGENTTOLL_KEY!, { amount: 0.05 }));
+
+// Auto-generate robots.txt with x402 payment signals for AI crawlers
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send(generateRobotsTxt({ publisherKey: process.env.AGENTTOLL_KEY! }));
+});
 
 app.use('/api/markets', marketsRouter);
 app.use('/api/auction', auctionRouter);
