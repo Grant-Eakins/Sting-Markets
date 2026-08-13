@@ -27,8 +27,8 @@ StingMarkets.com uses the AgentToll SDK v1.3.1 (`@agenttoll/sdk`) to monetize AP
 ### Environment Variables
 
 ```env
-AGENTTOLL_KEY=pk_live_6a68156b123d4306b0f0a0785d019dc5
-AGENTTOLL_SECRET=sk_live_634aa82f3b374ba8bdb64a7718ed7aa1
+AGENTTOLL_KEY=pk_live_6b140edf2dd446319b197567c5a5691c
+AGENTTOLL_SECRET=sk_live_<set in Railway dashboard — never commit>
 ```
 
 ### Server Integration (server/index.ts)

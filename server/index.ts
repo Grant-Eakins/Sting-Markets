@@ -185,18 +185,13 @@ app.get('/splash.png', (req, res) => {
   res.sendFile(path.join(distPath, 'splash.png'));
 });
 
-// Static file serving (after explicit routes)
-app.use(express.static(distPath));
-
 // Admin wallet addresses (lowercase for comparison)
 const ADMIN_WALLETS = [
   '0x6b1b7e7b207ec756b8d9edc59db4b32184160b22',
   '0xb0687ef6ea5906089ec3586f9997764650bf1934',
 ];
 
-// AgentToll - Monetize API for AI agents (SDK v1.3.1)
-// Free for humans (browser requests), agents pay $0.05 per request in USDC
-// Supports payments on both Solana and Base networks
+// AgentToll - must be before express.static so agents are intercepted before HTML is served
 app.use('/api/markets', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
   amount: 0.05,
 }));
@@ -205,13 +200,16 @@ app.use('/api/auction', tollbooth.agentsOnly(process.env.AGENTTOLL_KEY!, {
   amount: 0.05,
 }));
 
-// Content Gate - Protect HTML pages from agentic crawlers (Perplexity, SearchGPT, etc.)
+// Content Gate - must be before express.static to block agentic crawlers from HTML pages
 app.use(contentGate(process.env.AGENTTOLL_KEY!, { amount: 0.05 }));
 
 // Auto-generate robots.txt with x402 payment signals for AI crawlers
 app.get('/robots.txt', (req, res) => {
   res.type('text/plain').send(generateRobotsTxt({ publisherKey: process.env.AGENTTOLL_KEY! }));
 });
+
+// Static file serving (after AgentToll so bots are intercepted first)
+app.use(express.static(distPath));
 
 app.use('/api/markets', marketsRouter);
 app.use('/api/auction', auctionRouter);
